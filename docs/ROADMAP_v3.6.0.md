@@ -8,6 +8,13 @@ This roadmap captures all forward-looking and deferred items moved out of the v3
 - Primary theme: make OmenCore feel genuinely lightweight when idle, minimized, or used only for tray/OSD monitoring, without weakening active fan, tuning, RGB, or diagnostics reliability.
 - First rule for 3.6 work: measure before claiming savings. Every resource optimization should include before/after evidence for visible-window idle, tray-only idle, OSD-visible, fan-hold active, and lighting/tuning pages opened.
 
+## Bug Fix Progress
+- Implemented: Custom curve delete command now requeries when the selected saved preset changes, fixing disabled delete buttons for removable curve presets.
+- Implemented: WMI `Auto` presets that preserve a non-default thermal policy now keep the countdown hold alive, and `FanService` no longer overwrites explicit Auto curve payloads with a BIOS-default restore after `Max` -> `Auto` transitions.
+- Implemented: GPU power boost writes now use distinct payload/readback validation for `Minimum`, `Medium`, `Maximum`, and `Extended`; accepted-but-ignored BIOS writes now fail instead of reporting false success.
+- Implemented: Custom curve and manual fan `100%` writes now use the same protocol ceiling as Max mode so classic WMI systems are not capped at the detected `55` level when BIOS can clamp higher.
+- Validation pending: Physical RTX 4050 / OMEN 16-xd0xxx and Victus fan/RPM confirmation under sustained load.
+
 ## Carry-Over Reliability Work
 
 ### Fan and Profile State
@@ -15,6 +22,10 @@ This roadmap captures all forward-looking and deferred items moved out of the v3
 - Continue tightening requested vs confirmed behavior across sidebar, tray, fan page, OMEN/system page, startup restore, and hotkey flows.
 - Additional regression coverage for profile transitions with fan/performance link on and off.
 - Rebalance aggressive built-in fan curves (especially Gaming/Extreme) so moderate thermals do not ramp to near-max fan speed unnecessarily; keep Max as the explicit full-cooling mode.
+- Fix remaining `Auto`/thermal-policy handoff regressions on affected WMI BIOS laptops so `Max` -> `Silent`/`Custom` -> `Auto` transitions do not collapse GPU power back to low limits after higher-power modes were previously restored.
+- Validate that `Minimum`, `Medium`, `Maximum`, and `Extended` GPU power modes produce distinct confirmed behavior on affected RTX 4050 laptop hardware instead of appearing identical under sustained load.
+- Resolve custom curve profile management bugs, including the reported disabled delete action for removable curve presets.
+- Improve spin-down/state-release behavior after custom curves and preset holds so fans can ramp back down when requested duty drops instead of remaining latched high without a clear owner.
 
 ### Linux Hold and Capability UX
 - Continue daemon hold hardening for board and kernel variance.
@@ -45,15 +56,20 @@ This roadmap captures all forward-looking and deferred items moved out of the v3
   - Started by removing tray-startup `Dashboard`/`SystemControl` forced lazy loads and preventing Dashboard/General from constructing SystemControl as a side effect.
 - [~] M2 - Tray idle: make tray-only idle settle into the lowest safe cadence when no fan curve, hold, OSD, or diagnostics work is active.
   - Started by adding a fan curve/hold activity signal so minimized cadence is recalculated when fan ownership starts or stops, not only when the window is hidden/restored.
+  - Continued by letting low-overhead tray-only mode reach the 10s ultra-low cadence when no OSD/fan blockers are active, instead of pinning hidden-to-tray sessions at the 5s low-overhead idle cadence.
 - [~] M3 - Provider laziness: ensure optional RGB, tuning, optimizer, and peripheral integrations do not probe until the user opens or invokes those areas.
   - Started by moving Corsair/Logitech/Razer/OpenRGB lighting setup behind the RGB tab or explicit lighting actions, and by removing startup Corsair discovery from `MainWindow_Loaded`.
 - [ ] M4 - Worker and cache policy: keep one authoritative hardware sample pipeline, but allow lower-frequency or suspended expensive sensors when only static tray status is needed.
 - [ ] M5 - Regression guardrails: add tests for cadence blockers and diagnostic evidence, plus a release checklist row for CPU/RAM before/after measurements.
+  - Started by adding cadence guardrails for low-overhead + tray-only precedence and diagnostic reason text.
 
 ### Fan and Performance Reliability
 - Expand readback-first verification for fan and power-limit paths.
 - Extend bounded command-history and external-reset evidence/reporting.
 - Add deeper tests around V1 WMI transitions, max hold, and default handoff behavior.
+- Audit custom fan curve percentage semantics versus firmware fan-level semantics on WMI/V1 systems so UI labels, diagnostics, and applied writes all agree on whether points are true percentages, raw fan levels, or model-scaled ceilings.
+- Verify that `Max` and custom-curve `100%` requests can reach model-appropriate CPU/GPU RPM ceilings where supported, and surface explicit firmware/backend clamp messaging when BIOS accepts the request but caps RPM lower than expected.
+- Add targeted validation for the reported Victus/OMEN cases where `Max` fan mode does not engage correctly, custom curves stop around ~5500 RPM instead of full hardware max, or diagnostics show misleading `100% requested` results with low measured RPM.
 
 ### RGB Reliability
 - Add per-backend control-path diagnostics in UI/export.

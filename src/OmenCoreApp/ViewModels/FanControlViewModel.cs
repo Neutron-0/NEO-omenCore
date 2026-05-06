@@ -204,6 +204,8 @@ namespace OmenCore.ViewModels
                     _selectedPreset = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(CurrentFanModeName));
+                    OnPropertyChanged(nameof(CanDeleteSelectedPreset));
+                    RaisePresetCommandStateChanged();
                     if (value != null)
                     {
                         LoadCurve(value);
@@ -377,6 +379,7 @@ namespace OmenCore.ViewModels
         public ICommand ImportPresetsCommand { get; }
         public ICommand ExportPresetsCommand { get; }
         public ICommand DeleteSelectedPresetCommand { get; }
+        public bool CanDeleteSelectedPreset => SelectedPreset != null && !SelectedPreset.IsBuiltIn;
         
         /// <summary>
         /// Filtered view of FanPresets showing only user-saved (non-built-in) presets.
@@ -674,7 +677,7 @@ namespace OmenCore.ViewModels
             SaveCustomPresetCommand = new RelayCommand(_ => SaveCustomPreset());
             ImportPresetsCommand = new RelayCommand(_ => ImportPresets());
             ExportPresetsCommand = new RelayCommand(_ => ExportPresets());
-            DeleteSelectedPresetCommand = new RelayCommand(_ => DeleteSelectedPreset(), _ => SelectedPreset != null && !SelectedPreset.IsBuiltIn);
+            DeleteSelectedPresetCommand = new RelayCommand(_ => DeleteSelectedPreset(), _ => CanDeleteSelectedPreset);
             
             // Curve editor commands
             AddCurvePointCommand = new RelayCommand(_ => AddDefaultCurvePoint(), _ => CustomFanCurve.Count < 10);
@@ -1470,7 +1473,9 @@ namespace OmenCore.ViewModels
             // Notify UI that saved presets list changed
             OnPropertyChanged(nameof(SavedCustomPresets));
             OnPropertyChanged(nameof(HasSavedPresets));
-            
+            OnPropertyChanged(nameof(CanDeleteSelectedPreset));
+            RaisePresetCommandStateChanged();
+
             _logging.Info($"✓ Saved and applied custom fan preset: '{preset.Name}' with {preset.Curve.Count} points");
         }
         
@@ -1496,8 +1501,15 @@ namespace OmenCore.ViewModels
             // Notify UI that saved presets list changed
             OnPropertyChanged(nameof(SavedCustomPresets));
             OnPropertyChanged(nameof(HasSavedPresets));
-            
+            OnPropertyChanged(nameof(CanDeleteSelectedPreset));
+            RaisePresetCommandStateChanged();
+
             _logging.Info($"🗑️ Deleted custom fan preset: '{presetName}'");
+        }
+
+        private void RaisePresetCommandStateChanged()
+        {
+            (DeleteSelectedPresetCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
         
         private void SavePresetsToConfig()

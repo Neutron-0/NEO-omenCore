@@ -165,6 +165,11 @@ namespace OmenCore.Services
                 return _activeCadenceInterval;
             }
 
+            if (_lowOverheadMode && !_uiWindowActive && _trayOnlyMode)
+            {
+                return _trayOnlyCadenceInterval;
+            }
+
             if (_lowOverheadMode)
             {
                 return _idleCadenceInterval;
@@ -281,6 +286,11 @@ namespace OmenCore.Services
             if (_overlayRealtimeMode)
             {
                 return "overlay-realtime: OSD visible forces active 1s cadence";
+            }
+
+            if (_lowOverheadMode && !_uiWindowActive && _trayOnlyMode && cadence == _trayOnlyCadenceInterval)
+            {
+                return "low-overhead/tray-only: app minimized with no active fan curve/hold";
             }
 
             if (_lowOverheadMode)

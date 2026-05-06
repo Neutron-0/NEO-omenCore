@@ -3114,14 +3114,18 @@ namespace OmenCore.ViewModels
             // Try WMI BIOS first (preferred)
             if (_wmiBios != null && _wmiBios.IsAvailable)
             {
-                var gpuPower = _wmiBios.GetGpuPower();
+                var gpuPower = _wmiBios.GetGpuPowerDetailed();
                 if (gpuPower.HasValue)
                 {
                     GpuPowerBoostAvailable = true;
-                    
+
                     // Detect current state for status display
                     string detectedLevel;
-                    if (gpuPower.Value.customTgp && gpuPower.Value.ppab)
+                    if (gpuPower.Value.customTgp && gpuPower.Value.ppabLevel >= 2)
+                    {
+                        detectedLevel = "Extended";
+                    }
+                    else if (gpuPower.Value.customTgp && gpuPower.Value.ppabLevel >= 1)
                     {
                         detectedLevel = "Maximum";
                     }
@@ -3466,6 +3470,7 @@ namespace OmenCore.ViewModels
                     "Minimum" => HpWmiBios.GpuPowerLevel.Minimum,
                     "Medium" => HpWmiBios.GpuPowerLevel.Medium,
                     "Maximum" => HpWmiBios.GpuPowerLevel.Maximum,
+                    "Extended" => HpWmiBios.GpuPowerLevel.Extended3,
                     _ => HpWmiBios.GpuPowerLevel.Medium
                 };
 
@@ -3483,6 +3488,7 @@ namespace OmenCore.ViewModels
                             "Minimum" => "✓ Minimum (Base TGP only) - Restored",
                             "Medium" => "✓ Medium (Custom TGP) - Restored",
                             "Maximum" => "✓ Maximum (Dynamic Boost) - Restored",
+                            "Extended" => "✓ Extended (PPAB+) - Restored",
                             _ => $"✓ {savedLevel} - Restored"
                         };
                     });
@@ -3498,6 +3504,7 @@ namespace OmenCore.ViewModels
                     "Minimum" => 0,
                     "Medium" => 1,
                     "Maximum" => 2,
+                    "Extended" => 3,
                     _ => 1
                 };
                 
@@ -3532,6 +3539,7 @@ namespace OmenCore.ViewModels
                             "Minimum" => 0,
                             "Medium" => 2,
                             "Maximum" => 3,  // Extreme mode enables PPAB +15W
+                            "Extended" => 3,
                             _ => 2
                         };
                         

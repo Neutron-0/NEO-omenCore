@@ -299,8 +299,15 @@ namespace OmenCoreApp.Tests.Services
 
             // Enter diagnostic mode and attempt to apply another preset - should be ignored
             fanService.EnterDiagnosticMode();
-            fanService.ApplyPreset(presetB);
-            fanService.ActivePresetName.Should().Be(presetA.Name);
+            try
+            {
+                fanService.ApplyPreset(presetB);
+                fanService.ActivePresetName.Should().Be(presetA.Name);
+            }
+            finally
+            {
+                fanService.ExitDiagnosticMode();
+            }
 
             logging.Dispose();
         }

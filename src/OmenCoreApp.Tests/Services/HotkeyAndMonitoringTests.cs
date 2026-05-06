@@ -318,6 +318,28 @@ namespace OmenCoreApp.Tests.Services
         }
 
         [Fact]
+        public void GetEffectiveCadenceInterval_UsesTrayCadence_WhenLowOverheadModeEnabledInTray()
+        {
+            var logging = new LoggingService();
+            logging.Initialize();
+
+            var bridge = new LibreHardwareMonitorBridge();
+            var prefs = new MonitoringPreferences { LowOverheadMode = true };
+            var svc = new HardwareMonitoringService(bridge, logging, prefs, new ResumeRecoveryDiagnosticsService());
+
+            svc.SetUiWindowActive(false);
+            svc.SetTrayOnlyMode(true);
+            svc.SetOverlayRealtimeMode(false);
+
+            var method = typeof(HardwareMonitoringService).GetMethod("GetEffectiveCadenceInterval", BindingFlags.Instance | BindingFlags.NonPublic);
+            method.Should().NotBeNull();
+            var cadence = (TimeSpan)method!.Invoke(svc, null)!;
+
+            cadence.Should().Be(TimeSpan.FromSeconds(10),
+                "tray-only with no active fan/OSD blockers should settle to the lowest safe cadence even when low-overhead mode is enabled");
+        }
+
+        [Fact]
         public void UpdateCadenceTelemetry_RecordsReasonAndTransitionSnapshot()
         {
             var logging = new LoggingService();
@@ -340,6 +362,31 @@ namespace OmenCoreApp.Tests.Services
             transitions.Should().NotBeEmpty();
             transitions[^1].CadenceMs.Should().Be(10000);
             transitions[^1].Reason.Should().Contain("tray-only");
+        }
+
+        [Fact]
+        public void UpdateCadenceTelemetry_RecordsLowOverheadTrayReason()
+        {
+            var logging = new LoggingService();
+            logging.Initialize();
+
+            var bridge = new LibreHardwareMonitorBridge();
+            var prefs = new MonitoringPreferences { LowOverheadMode = true };
+            var svc = new HardwareMonitoringService(bridge, logging, prefs, new ResumeRecoveryDiagnosticsService());
+
+            svc.SetUiWindowActive(false);
+            svc.SetTrayOnlyMode(true);
+            svc.SetOverlayRealtimeMode(false);
+
+            var updateMethod = typeof(HardwareMonitoringService).GetMethod("UpdateCadenceTelemetry", BindingFlags.Instance | BindingFlags.NonPublic);
+            updateMethod.Should().NotBeNull();
+            updateMethod!.Invoke(svc, new object[] { TimeSpan.FromSeconds(10) });
+
+            svc.CurrentCadenceReason.Should().Contain("low-overhead/tray-only");
+            var transitions = svc.GetCadenceTransitionsSnapshot();
+            transitions[^1].CadenceMs.Should().Be(10000);
+            transitions[^1].LowOverheadMode.Should().BeTrue();
+            transitions[^1].TrayOnlyMode.Should().BeTrue();
         }
 
         [Fact]

@@ -28,6 +28,13 @@ The first rule for this release is measurement before claims. Resource improveme
 - 3.6.0 provider laziness: RGB/peripheral startup work is now first-use. `MainWindow_Loaded` no longer triggers Corsair discovery, and `MainViewModel` no longer starts Corsair/Logitech/Razer/OpenRGB manager setup from its constructor. The RGB tab now calls `EnsureLightingInitializedAsync()` when opened, and explicit lighting actions initialize the lighting stack on demand.
 - 3.6.0 startup diet: Opening the General tab no longer constructs the advanced `FanControlViewModel` just to sync preset selection state. It wires to `FanControl` only if that VM was already loaded, while profile apply still goes directly through `FanService`.
 - 3.6.0 regression coverage: Extended `MainViewModelTests` to verify constructor-time Lighting remains unloaded and General does not force either `SystemControl` or `FanControl` lazy-load.
+- 3.6.0 bug fix: Fixed Auto handoff regression where `Auto` presets with explicit curve payloads could be overwritten by BIOS-default restore after `Max`/policy transitions. `FanService` now preserves controller-applied Auto payloads instead of forcing `RestoreAutoControl()` when a curve payload is present.
+- 3.6.0 bug fix: Fixed custom curve delete command requery behavior so selecting a removable preset immediately re-enables Delete without requiring additional UI activity.
+- 3.6.0 bug fix: Hardened GPU power boost verification by splitting payload/readback semantics for `Minimum`, `Medium`, `Maximum`, and `Extended`. Accepted-but-ignored writes now fail verification instead of reporting false success.
+- 3.6.0 bug fix: Added explicit `Extended` GPU mode mapping in both WMI and OGH paths, including startup detection/readback and restore flows.
+- 3.6.0 bug fix: Improved WMI fan `100%` behavior for custom/manual paths by mapping full-speed requests to protocol ceiling, allowing firmware clamp to true hardware max instead of capping to detected classic max level.
+- 3.6.0 optimization: Continued M2/M5 tray-only cadence work so low-overhead + tray-only sessions can settle to the 10s ultra-low cadence when no fan/OSD blockers are active, with explicit diagnostic reason text and transition telemetry coverage.
+- 3.6.0 regression coverage: Added/expanded tests across WMI verification, fan preset/Auto handoff behavior, fan smoothing/diagnostic mode state cleanup, fan command UI command-state requery, GPU power semantics, fan-level mapping, and monitoring cadence telemetry.
 
 ---
 
@@ -39,6 +46,7 @@ Commands run during early 3.6.0 development:
 dotnet test src\OmenCoreApp.Tests\OmenCoreApp.Tests.csproj --no-restore --filter DiagnosticExportSnapshotTests --verbosity quiet
 dotnet test src\OmenCoreApp.Tests\OmenCoreApp.Tests.csproj --no-restore --filter MainViewModelTests --verbosity quiet
 dotnet test src\OmenCoreApp.Tests\OmenCoreApp.Tests.csproj --no-restore --filter "FanPresetVerificationTests|MainViewModelTests|DiagnosticExportSnapshotTests" --verbosity quiet
+dotnet test src\OmenCoreApp.Tests\OmenCoreApp.Tests.csproj --no-restore --verbosity minimal
 dotnet build src\OmenCoreApp\OmenCoreApp.csproj -c Release --no-restore
 ```
 
@@ -46,6 +54,7 @@ Observed outcomes:
 - `DiagnosticExportSnapshotTests`: PASS, 4/4.
 - `MainViewModelTests`: PASS, 5/5.
 - Combined targeted 3.6 regression slice (`FanPresetVerificationTests|MainViewModelTests|DiagnosticExportSnapshotTests`): PASS, 20/20.
+- Full `OmenCoreApp.Tests` suite (`--no-restore`): PASS, 447/447.
 - Windows app Release build: PASS.
 
 Known validation caveat:

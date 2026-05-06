@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using FluentAssertions;
 using OmenCore.Models;
 using OmenCore.Services;
@@ -176,6 +177,38 @@ namespace OmenCoreApp.Tests.ViewModels
             {
                 fanService.ExitDiagnosticMode();
             }
+        }
+
+        [Fact]
+        public void DeleteSelectedPresetCommand_Requeries_WhenSelectedPresetChanges()
+        {
+            var vm = CreateViewModel();
+            var customPreset = new FanPreset
+            {
+                Name = "Field curve",
+                Mode = FanMode.Manual,
+                IsBuiltIn = false,
+                Curve =
+                {
+                    new FanCurvePoint { TemperatureC = 40, FanPercent = 30 },
+                    new FanCurvePoint { TemperatureC = 80, FanPercent = 80 }
+                }
+            };
+            var canExecuteChangedCount = 0;
+            vm.FanPresets.Add(customPreset);
+            vm.DeleteSelectedPresetCommand.CanExecuteChanged += (_, _) => canExecuteChangedCount++;
+
+            vm.SelectedPreset = vm.FanPresets.First(p => p.IsBuiltIn);
+
+            vm.CanDeleteSelectedPreset.Should().BeFalse();
+            vm.DeleteSelectedPresetCommand.CanExecute(null).Should().BeFalse();
+
+            vm.SelectedPreset = customPreset;
+
+            vm.CanDeleteSelectedPreset.Should().BeTrue();
+            vm.DeleteSelectedPresetCommand.CanExecute(null).Should().BeTrue();
+            canExecuteChangedCount.Should().BeGreaterThan(0,
+                "the delete button must re-enable when a saved custom curve is selected");
         }
     }
 }

@@ -810,6 +810,7 @@ namespace OmenCore.Services
 
                 bool isMaxPreset = IsMaxPreset(preset);
                 bool isAutoPreset = IsAutoPreset(preset);
+                bool hasCurvePayload = HasCurvePayload(preset);
 
                 // Verification helper
                 bool VerificationPasses()
@@ -832,7 +833,7 @@ namespace OmenCore.Services
                         // target speed (e.g. at idle, 40% curve target ≈ current 40% idle speed),
                         // causing a false "no change detected" rollback that permanently disables
                         // the curve even though the preset was applied successfully.
-                        if (preset.Curve != null && preset.Curve.Count > 0)
+                        if (hasCurvePayload)
                             return true;
 
                         // 3) For policy-only presets (Auto/Performance/Quiet/etc.) where there is no
@@ -918,10 +919,17 @@ namespace OmenCore.Services
                     DisableCurve();
                     _activePreset = preset;
 
-                    _fanController.RestoreAutoControl();
-                    _logging.Info($"✓ Preset '{preset.Name}' using BIOS auto control (fans can stop at idle)");
+                    if (hasCurvePayload)
+                    {
+                        _logging.Info($"Preset '{preset.Name}' preserved controller-applied Auto policy with explicit curve payload");
+                    }
+                    else
+                    {
+                        _fanController.RestoreAutoControl();
+                        _logging.Info($"✓ Preset '{preset.Name}' using BIOS auto control (fans can stop at idle)");
+                    }
                 }
-                else if (preset.Curve != null && preset.Curve.Any())
+                else if (hasCurvePayload)
                 {
                     EnableCurve(preset.Curve.ToList(), preset);
                     _logging.Info($"✓ Preset '{preset.Name}' curve enabled with {preset.Curve.Count} points");
@@ -974,6 +982,11 @@ namespace OmenCore.Services
             return FanModeNameResolver.IsAutoAlias(preset.Name) ||
                    FanModeNameResolver.IsPerformanceAlias(preset.Name) ||
                    FanModeNameResolver.IsQuietAlias(preset.Name);
+        }
+
+        private static bool HasCurvePayload(FanPreset preset)
+        {
+            return preset.Curve != null && preset.Curve.Count > 0;
         }
 
         private static string ResolvePresetModeLabel(FanPreset preset, bool isMaxPreset, bool isAutoPreset)
