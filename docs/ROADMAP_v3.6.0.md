@@ -3,6 +3,11 @@
 ## Scope Source
 This roadmap captures all forward-looking and deferred items moved out of the v3.5.0 changelog so v3.5.0 remains implementation/evidence focused.
 
+## Planning Kickoff
+- Planning branch: `v3.6.0-planning`.
+- Primary theme: make OmenCore feel genuinely lightweight when idle, minimized, or used only for tray/OSD monitoring, without weakening active fan, tuning, RGB, or diagnostics reliability.
+- First rule for 3.6 work: measure before claiming savings. Every resource optimization should include before/after evidence for visible-window idle, tray-only idle, OSD-visible, fan-hold active, and lighting/tuning pages opened.
+
 ## Carry-Over Reliability Work
 
 ### Fan and Profile State
@@ -24,10 +29,22 @@ This roadmap captures all forward-looking and deferred items moved out of the v3
 ## Resource and Optimization Tracks
 
 ### Idle CPU and RAM Efficiency
-- Further coalesce background timers and remove redundant startup probes.
-- Increase lazy initialization coverage for optional providers/subsystems.
-- Continue reducing recurring keepalive log noise with state-change and periodic summaries.
-- Reuse hardware worker state to avoid repeated capability scans.
+- Add a lightweight resource snapshot to diagnostics export: OmenCore process CPU percent, private bytes, working set, handle/thread count, hardware-worker process footprint, active timer registry entries, current monitoring cadence reason, and optional provider load state.
+- Establish explicit resource budgets after baseline capture. Track at minimum: cold startup to first usable UI, visible dashboard idle, minimized tray-only idle, OSD-visible cadence, fan curve/hold active, and Lighting/Tuning page activation.
+- Audit startup eagerness. `App.xaml.cs` currently triggers Dashboard and SystemControl construction during startup; 3.6 should move synchronous GPU/tuning/provider work behind first-use or a cheap capability summary where possible.
+- Revisit hardware-worker lifecycle. Prefer one shared worker and cached hardware sample state, but avoid keeping expensive sensors hot when no UI, OSD, fan curve, fan hold, logging export, or active tuning workflow needs realtime telemetry.
+- Consolidate timer ownership through `BackgroundTimerRegistry` where practical. Candidates include hardware monitoring, memory optimizer refresh, settings schedule enforcement, thermal chart redraw throttles, RGB/audio-reactive loops, and tray status refresh.
+- Expand provider lazy-load boundaries. RGB/peripheral providers, OpenRGB/Razer/Logitech/Corsair process checks, NVAPI/Afterburner telemetry, optimizer verification, and tuning conflict scans should run on page entry, explicit action, or scheduled low-frequency refresh rather than unconditional startup.
+- Reduce steady-state allocations. Cap in-memory event/log/chart buffers by count and age, reuse monitoring sample DTOs where safe, and avoid repeated LINQ-heavy projections in high-cadence paths.
+- Make "low overhead mode" visible and testable: show the current cadence tier, active blockers that prevent ultra-low cadence, and last reason a subsystem woke up.
+
+### 3.6 Lightweight Milestones
+- M0 - Measurement: add resource diagnostics export and a repeatable manual benchmark checklist.
+- M1 - Startup diet: defer nonessential Dashboard/SystemControl/provider initialization and document any features that must remain eager for safety.
+- M2 - Tray idle: make tray-only idle settle into the lowest safe cadence when no fan curve, hold, OSD, or diagnostics work is active.
+- M3 - Provider laziness: ensure optional RGB, tuning, optimizer, and peripheral integrations do not probe until the user opens or invokes those areas.
+- M4 - Worker and cache policy: keep one authoritative hardware sample pipeline, but allow lower-frequency or suspended expensive sensors when only static tray status is needed.
+- M5 - Regression guardrails: add tests for cadence blockers and diagnostic evidence, plus a release checklist row for CPU/RAM before/after measurements.
 
 ### Fan and Performance Reliability
 - Expand readback-first verification for fan and power-limit paths.
