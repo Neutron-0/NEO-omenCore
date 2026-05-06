@@ -137,6 +137,7 @@ namespace OmenCore.Services
         
         // Diagnostic mode - suspends curve engine to allow manual fan testing
         private volatile bool _diagnosticModeActive = false;
+        private static int _globalDiagnosticModeCount = 0;
         
         // Fan level range note: HP WMI uses 0-55 (krpm) on classic models or 0-100 (percentage) on newer.
         // Actual conversion is handled by WmiFanController which auto-detects the max level.
@@ -239,6 +240,12 @@ namespace OmenCore.Services
         /// Whether diagnostic mode is active (suspends curve engine for manual testing).
         /// </summary>
         public bool IsDiagnosticModeActive => _diagnosticModeActive;
+
+        /// <summary>
+        /// Global guard for lower-level fan backends that must yield while a diagnostic session
+        /// is manually driving fan state.
+        /// </summary>
+        public static bool IsAnyDiagnosticModeActive => System.Threading.Volatile.Read(ref _globalDiagnosticModeCount) > 0;
 
         public IReadOnlyList<FanCommandHistoryEntry> GetCommandHistorySnapshot()
         {
@@ -384,7 +391,13 @@ namespace OmenCore.Services
         /// </summary>
         public void EnterDiagnosticMode()
         {
+            if (_diagnosticModeActive)
+            {
+                return;
+            }
+
             _diagnosticModeActive = true;
+            System.Threading.Interlocked.Increment(ref _globalDiagnosticModeCount);
             _logging.Info("🔧 Entered fan diagnostic mode - curve engine suspended");
         }
         
@@ -393,7 +406,16 @@ namespace OmenCore.Services
         /// </summary>
         public void ExitDiagnosticMode()
         {
+            if (!_diagnosticModeActive)
+            {
+                return;
+            }
+
             _diagnosticModeActive = false;
+            if (System.Threading.Interlocked.Decrement(ref _globalDiagnosticModeCount) < 0)
+            {
+                System.Threading.Volatile.Write(ref _globalDiagnosticModeCount, 0);
+            }
             _logging.Info("✓ Exited fan diagnostic mode - curve engine resumed");
         }
 

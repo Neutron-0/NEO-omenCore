@@ -9,6 +9,7 @@ This roadmap captures all forward-looking and deferred items moved out of the v3
 - Single desired fan-state owner across fan service/controller paths with explicit Auto, Performance, MaxHold, ManualCurve, Transitioning states.
 - Continue tightening requested vs confirmed behavior across sidebar, tray, fan page, OMEN/system page, startup restore, and hotkey flows.
 - Additional regression coverage for profile transitions with fan/performance link on and off.
+- Rebalance aggressive built-in fan curves (especially Gaming/Extreme) so moderate thermals do not ramp to near-max fan speed unnecessarily; keep Max as the explicit full-cooling mode.
 
 ### Linux Hold and Capability UX
 - Continue daemon hold hardening for board and kernel variance.

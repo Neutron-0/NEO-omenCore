@@ -1648,6 +1648,12 @@ namespace OmenCore.Hardware
                     else
                     {
                         var nowUtc = DateTime.UtcNow;
+                        if (FanService.IsAnyDiagnosticModeActive)
+                        {
+                            _wmiBios.ExtendFanCountdown();
+                            return;
+                        }
+
                         if ((nowUtc - _lastPresetModeReapplyUtc).TotalMilliseconds < PresetModeReapplyIntervalMs)
                         {
                             _wmiBios.ExtendFanCountdown();

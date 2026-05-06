@@ -1642,6 +1642,12 @@ namespace OmenCore.ViewModels
         
         private void ApplyGamingMode()
         {
+            if (_fanService.IsDiagnosticModeActive)
+            {
+                _logging.Warn("Skipped Gaming fan mode request because fan diagnostics mode is active");
+                return;
+            }
+
             var gamingPreset = new FanPreset
             {
                 Name = "Gaming",
@@ -1723,6 +1729,12 @@ namespace OmenCore.ViewModels
         
         private void ApplyQuietMode()
         {
+            if (_fanService.IsDiagnosticModeActive)
+            {
+                _logging.Warn("Skipped Quiet fan mode request because fan diagnostics mode is active");
+                return;
+            }
+
             var quietPreset = new FanPreset
             {
                 Name = "Quiet",
@@ -1790,6 +1802,12 @@ namespace OmenCore.ViewModels
         /// </summary>
         public void ApplyFanMode(string modeName)
         {
+            if (_fanService.IsDiagnosticModeActive)
+            {
+                _logging.Warn($"Skipped quick fan mode '{modeName}' because fan diagnostics mode is active");
+                return;
+            }
+
             var preset = FanPresets.FirstOrDefault(p => 
                 p.Name.Equals(modeName, System.StringComparison.OrdinalIgnoreCase));
             

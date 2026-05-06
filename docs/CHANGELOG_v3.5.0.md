@@ -86,6 +86,11 @@ The first 3.5.0 targets are:
 - 3.5.0 Linux perf clarity: `omencore-cli perf` now verifies mode readback and emits explicit backend capability warnings when `--power-limit` cannot be applied because direct EC thermal-power writes are unavailable on the active backend (for example profile-only hp-wmi/acpi paths).
 - 3.5.0 fan/profile wording clarity: fan-policy linkage copy now explicitly states linked vs independent behavior so profile changes are not interpreted as fan apply failures when fan and performance are decoupled.
 - 3.5.0 compact tuning diagnostics panel: `TuningView` now includes a screenshot-friendly quick diagnostics strip (CPU UV state, GPU OC state, conflict presence, startup recovery state, GPU backend availability).
+- 3.5.0 hotfix (post-release): Curve-based fan presets now always preserve the currently active thermal policy mode (including `Auto` when a curve payload is present), preventing fan-preset changes from implicitly collapsing GPU power behavior on OMEN MAX systems.
+- 3.5.0 hotfix (post-release): `PerformanceModeService` now ignores non-positive model-override TDP values and skips EC power-limit writes when both resolved limits are non-positive, preventing accidental `0W` policy writes that can hard-cap dGPU power.
+- 3.5.0 hotfix (post-release): Quick fan-mode actions now no-op cleanly while fan diagnostics mode is active, preventing misleading "Applied Gaming/Quiet" UI/log state when diagnostics intentionally block preset changes.
+- 3.5.0 hotfix (post-release): `WmiFanController` preset keepalive now yields while any fan diagnostic session is active, so diagnostic fan-level verification is not overwritten by background preset mode reassertion.
+- 3.5.0 regression coverage: Added targeted tests for Auto curve preset policy preservation and non-positive TDP override guarding to lock in the above fixes.
 
 ---
 
@@ -394,11 +399,11 @@ Scope caveats:
 ## Release Artifact SHA256 (v3.5.0)
 
 - `OmenCoreSetup-3.5.0.exe`  
-	`730537AA43D81920710C571E9B869CF48D20E3C09A1384F20374A9CE2450C8EB`
+	`8821890923D1C4A59C300FEE8B1F8415AE2B92F4063F71D1FF8A8EA009533E14`
 - `OmenCore-3.5.0-win-x64.zip`  
-	`D9960631C6F13E29BDC603FFA30FF5E5D3A058832413CF2DB9792DFD315CB514`
+	`16DF5B0FD818A5BF358AD82489B49980C5EBA7B987E697E2044F2ED51C3ABC9F`
 - `OmenCore-3.5.0-linux-x64.zip`  
-	`CCD2DA73568420306AA05837149D27821CB0CB3125F04DC637D83022DA53AAA3`
+	`B3892F2BAC699DB3C07EAF6D8A2C5412663711D44DC2AE1076299B3CF77C6744`
 
 Packaging notes:
 - Windows installer + portable package built successfully via `build-installer.ps1`.

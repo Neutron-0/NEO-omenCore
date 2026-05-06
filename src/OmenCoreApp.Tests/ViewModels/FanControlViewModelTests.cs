@@ -83,6 +83,14 @@ namespace OmenCoreApp.Tests.ViewModels
             return new OmenCore.ViewModels.FanControlViewModel(fanService, configService, logging, verificationService);
         }
 
+        private static FanService GetFanService(OmenCore.ViewModels.FanControlViewModel vm)
+        {
+            var field = typeof(OmenCore.ViewModels.FanControlViewModel)
+                .GetField("_fanService", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            field.Should().NotBeNull();
+            return field!.GetValue(vm).Should().BeOfType<FanService>().Subject;
+        }
+
         [Fact]
         public void SettingTransitionProperties_PersistsToConfig_And_AppliesToService()
         {
@@ -144,6 +152,30 @@ namespace OmenCoreApp.Tests.ViewModels
 
             vm.IsFanCalibrationAvailable.Should().BeTrue();
             vm.FanCalibrationUnavailableReason.Should().Contain("available");
+        }
+
+        [Fact]
+        public void QuickFanModeCommands_DoNotChangeUiState_DuringDiagnosticMode()
+        {
+            var vm = CreateViewModel();
+            var fanService = GetFanService(vm);
+
+            fanService.EnterDiagnosticMode();
+            try
+            {
+                var beforeMode = vm.ActiveFanMode;
+
+                vm.ApplyGamingModeCommand.Execute(null);
+                vm.ApplyFanMode("Extreme");
+                vm.ApplyQuietModeCommand.Execute(null);
+
+                vm.ActiveFanMode.Should().Be(beforeMode,
+                    "quick fan mode commands should be ignored while diagnostics own the fans");
+            }
+            finally
+            {
+                fanService.ExitDiagnosticMode();
+            }
         }
     }
 }

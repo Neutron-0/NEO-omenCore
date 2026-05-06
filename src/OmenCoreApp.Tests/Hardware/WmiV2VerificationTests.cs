@@ -3,6 +3,7 @@ using System.Reflection;
 using FluentAssertions;
 using OmenCore.Hardware;
 using OmenCore.Models;
+using OmenCore.Services;
 using Xunit;
 
 namespace OmenCoreApp.Tests.Hardware
@@ -321,6 +322,33 @@ namespace OmenCoreApp.Tests.Hardware
             InvokeCountdownExtensionCallback(controller);
             fake.SetFanModeCalls.Should().Be(1,
                 "preset keepalive should not spam SetFanMode on every countdown tick");
+            fake.ExtendCountdownCalls.Should().BeGreaterThan(0);
+        }
+
+        [Fact]
+        public void CountdownExtensionCallback_PresetMode_YieldsWhileDiagnosticModeActive()
+        {
+            var fake = new PresetMaintenanceFakeWmiBios();
+            var controller = new WmiFanController(null, null, 0, injectedWmiBios: fake);
+
+            controller.SetPerformanceMode("Performance").Should().BeTrue();
+            controller.StopCountdownExtension();
+            fake.SetFanModeCalls = 0;
+            fake.ExtendCountdownCalls = 0;
+            SetPrivateField(controller, "_lastPresetModeReapplyUtc", System.DateTime.MinValue);
+
+            SetPrivateStaticField(typeof(FanService), "_globalDiagnosticModeCount", 1);
+            try
+            {
+                InvokeCountdownExtensionCallback(controller);
+            }
+            finally
+            {
+                SetPrivateStaticField(typeof(FanService), "_globalDiagnosticModeCount", 0);
+            }
+
+            fake.SetFanModeCalls.Should().Be(0,
+                "diagnostic sessions should temporarily own the fan state without preset keepalive reassertion");
             fake.ExtendCountdownCalls.Should().BeGreaterThan(0);
         }
 
@@ -734,6 +762,13 @@ namespace OmenCoreApp.Tests.Hardware
             var field = instance.GetType().GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance);
             field.Should().NotBeNull();
             field!.SetValue(instance, value);
+        }
+
+        private static void SetPrivateStaticField(System.Type type, string fieldName, object value)
+        {
+            var field = type.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Static);
+            field.Should().NotBeNull();
+            field!.SetValue(null, value);
         }
     }
 }
