@@ -39,12 +39,14 @@ This roadmap captures all forward-looking and deferred items moved out of the v3
 - Make "low overhead mode" visible and testable: show the current cadence tier, active blockers that prevent ultra-low cadence, and last reason a subsystem woke up.
 
 ### 3.6 Lightweight Milestones
-- M0 - Measurement: add resource diagnostics export and a repeatable manual benchmark checklist.
-- M1 - Startup diet: defer nonessential Dashboard/SystemControl/provider initialization and document any features that must remain eager for safety.
-- M2 - Tray idle: make tray-only idle settle into the lowest safe cadence when no fan curve, hold, OSD, or diagnostics work is active.
-- M3 - Provider laziness: ensure optional RGB, tuning, optimizer, and peripheral integrations do not probe until the user opens or invokes those areas.
-- M4 - Worker and cache policy: keep one authoritative hardware sample pipeline, but allow lower-frequency or suspended expensive sensors when only static tray status is needed.
-- M5 - Regression guardrails: add tests for cadence blockers and diagnostic evidence, plus a release checklist row for CPU/RAM before/after measurements.
+- [x] M0 - Measurement: add resource diagnostics export and a repeatable manual benchmark checklist.
+  - Started with `resource-footprint.txt` in diagnostics export: app/worker process footprint, monitoring cadence, fan blockers, active timers, GC/runtime state, and optional subsystem load hints.
+- [~] M1 - Startup diet: defer nonessential Dashboard/SystemControl/provider initialization and document any features that must remain eager for safety.
+  - Started by removing tray-startup `Dashboard`/`SystemControl` forced lazy loads and preventing Dashboard/General from constructing SystemControl as a side effect.
+- [ ] M2 - Tray idle: make tray-only idle settle into the lowest safe cadence when no fan curve, hold, OSD, or diagnostics work is active.
+- [ ] M3 - Provider laziness: ensure optional RGB, tuning, optimizer, and peripheral integrations do not probe until the user opens or invokes those areas.
+- [ ] M4 - Worker and cache policy: keep one authoritative hardware sample pipeline, but allow lower-frequency or suspended expensive sensors when only static tray status is needed.
+- [ ] M5 - Regression guardrails: add tests for cadence blockers and diagnostic evidence, plus a release checklist row for CPU/RAM before/after measurements.
 
 ### Fan and Performance Reliability
 - Expand readback-first verification for fan and power-limit paths.

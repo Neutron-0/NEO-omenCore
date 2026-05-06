@@ -145,6 +145,10 @@ namespace OmenCore.ViewModels
         public LightingViewModel? Lighting { get; private set; }
 
         private SystemControlViewModel? _systemControl;
+        public bool IsSystemControlLoaded => _systemControl != null;
+        public SystemControlViewModel? LoadedSystemControl => _systemControl;
+        public bool IsGpuPowerTrayLikelyAvailable => DetectedCapabilities?.ShowGpuPowerBoost ?? true;
+
         public SystemControlViewModel? SystemControl
         {
             get
@@ -178,7 +182,10 @@ namespace OmenCore.ViewModels
                             CurrentPerformanceMode = _systemControl.CurrentPerformanceModeName;
                         }
                     };
+                    _general?.SetSystemControlViewModel(_systemControl);
                     OnPropertyChanged(nameof(SystemControl));
+                    OnPropertyChanged(nameof(IsSystemControlLoaded));
+                    OnPropertyChanged(nameof(LoadedSystemControl));
                 }
                 return _systemControl;
             }
@@ -192,14 +199,19 @@ namespace OmenCore.ViewModels
                 if (_dashboard == null)
                 {
                     _dashboard = new DashboardViewModel(_hardwareMonitoringService);
-                    // Initialize with current values (triggers creation of dependencies if needed)
-                    if (SystemControl != null)
+                    // Initialize with current values without forcing lazy sub-viewmodels to load.
+                    if (_systemControl != null)
                     {
-                        _dashboard.CurrentPerformanceMode = SystemControl.CurrentPerformanceModeName;
+                        _dashboard.CurrentPerformanceMode = _systemControl.CurrentPerformanceModeName;
                         // Sync to tray menu as well
-                        CurrentPerformanceMode = SystemControl.CurrentPerformanceModeName;
+                        CurrentPerformanceMode = _systemControl.CurrentPerformanceModeName;
                     }
-                    if (FanControl != null) _dashboard.CurrentFanMode = FanControl.CurrentFanModeName;
+                    else
+                    {
+                        _dashboard.CurrentPerformanceMode = CurrentPerformanceMode;
+                    }
+
+                    _dashboard.CurrentFanMode = _fanControl?.CurrentFanModeName ?? CurrentFanMode;
                     _dashboard.ModeLinkStatus = FanPerformanceLinkStatus;
                     OnPropertyChanged(nameof(Dashboard));
                 }
@@ -297,8 +309,8 @@ namespace OmenCore.ViewModels
                     _general = new GeneralViewModel(_fanService, _performanceModeService, _configService, _logging, _systemInfoService);
                     // Wire up the FanControlViewModel reference for preset sync
                     _general.SetFanControlViewModel(FanControl);
-                    // v2.8.6: Wire up SystemControlViewModel for OMEN tab sync on quick profile switch
-                    _general.SetSystemControlViewModel(SystemControl);
+                    // Keep SystemControl lazy; wire it only if something else already loaded it.
+                    _general.SetSystemControlViewModel(_systemControl);
                     OnPropertyChanged(nameof(General));
                 }
                 return _general;
@@ -3602,9 +3614,9 @@ namespace OmenCore.ViewModels
                 {
                     await dispatcher.InvokeAsync(() =>
                     {
-                        if (SystemControl != null)
+                        if (_systemControl != null)
                         {
-                            SystemControl.SelectModeByNameNoApply(mode);
+                            _systemControl.SelectModeByNameNoApply(mode);
                         }
 
                         CurrentPerformanceMode = mode;
@@ -3673,8 +3685,8 @@ namespace OmenCore.ViewModels
 
                         CurrentPerformanceMode = performanceMode;
                         CurrentFanMode = confirmedFanMode;
-                        General?.SetSystemControlViewModel(SystemControl);
-                        SystemControl?.SelectModeByNameNoApply(performanceMode);
+                        General?.SetSystemControlViewModel(_systemControl);
+                        _systemControl?.SelectModeByNameNoApply(performanceMode);
                         FanControl?.SelectPresetByNameNoApply(confirmedFanMode);
                         ShowHotkeyOsd("Profile", profile, "Tray");
                         PushEvent($"🎮 Profile: {profile} (fan: {confirmedFanMode})");

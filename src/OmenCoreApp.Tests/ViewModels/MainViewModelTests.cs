@@ -27,7 +27,7 @@ namespace OmenCoreApp.Tests.ViewModels
         public async Task ExportTelemetryCommand_InvokesService_AndLogs()
         {
             // nothing throws during viewmodel construction, so just build one
-            var vm = new MainViewModel();
+            using var vm = new MainViewModel();
             var fake = new FakeTelemetry();
             // replace private field via reflection
             var field = typeof(MainViewModel).GetField("_telemetryService", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -36,6 +36,32 @@ namespace OmenCoreApp.Tests.ViewModels
 
             vm.ExportTelemetryCommand.Execute(null);
             fake.Called.Should().BeTrue();
+        }
+
+        [Fact]
+        public void Dashboard_DoesNotForceSystemControlLazyLoad()
+        {
+            using var vm = new MainViewModel();
+
+            vm.IsSystemControlLoaded.Should().BeFalse();
+
+            _ = vm.Dashboard;
+
+            vm.IsSystemControlLoaded.Should().BeFalse(
+                because: "the dashboard/sidebar summary can use lightweight MainViewModel state at startup");
+        }
+
+        [Fact]
+        public void General_DoesNotForceSystemControlLazyLoad()
+        {
+            using var vm = new MainViewModel();
+
+            vm.IsSystemControlLoaded.Should().BeFalse();
+
+            _ = vm.General;
+
+            vm.IsSystemControlLoaded.Should().BeFalse(
+                because: "the General tab should not initialize tuning/GPU-power providers before the OMEN/Tuning paths need them");
         }
     }
 }
