@@ -45,7 +45,8 @@ This roadmap captures all forward-looking and deferred items moved out of the v3
   - Started by removing tray-startup `Dashboard`/`SystemControl` forced lazy loads and preventing Dashboard/General from constructing SystemControl as a side effect.
 - [~] M2 - Tray idle: make tray-only idle settle into the lowest safe cadence when no fan curve, hold, OSD, or diagnostics work is active.
   - Started by adding a fan curve/hold activity signal so minimized cadence is recalculated when fan ownership starts or stops, not only when the window is hidden/restored.
-- [ ] M3 - Provider laziness: ensure optional RGB, tuning, optimizer, and peripheral integrations do not probe until the user opens or invokes those areas.
+- [~] M3 - Provider laziness: ensure optional RGB, tuning, optimizer, and peripheral integrations do not probe until the user opens or invokes those areas.
+  - Started by moving Corsair/Logitech/Razer/OpenRGB lighting setup behind the RGB tab or explicit lighting actions, and by removing startup Corsair discovery from `MainWindow_Loaded`.
 - [ ] M4 - Worker and cache policy: keep one authoritative hardware sample pipeline, but allow lower-frequency or suspended expensive sensors when only static tray status is needed.
 - [ ] M5 - Regression guardrails: add tests for cadence blockers and diagnostic evidence, plus a release checklist row for CPU/RAM before/after measurements.
 

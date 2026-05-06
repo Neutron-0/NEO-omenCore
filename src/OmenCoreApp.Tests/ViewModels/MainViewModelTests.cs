@@ -23,16 +23,6 @@ namespace OmenCoreApp.Tests.ViewModels
         public void Dispose()
         {
             Environment.SetEnvironmentVariable("OMENCORE_CONFIG_DIR", null);
-            try
-            {
-                if (Directory.Exists(_tempDir))
-                {
-                    Directory.Delete(_tempDir, recursive: true);
-                }
-            }
-            catch
-            {
-            }
         }
 
         private class FakeTelemetry : ITelemetryService
@@ -87,6 +77,28 @@ namespace OmenCoreApp.Tests.ViewModels
 
             vm.IsSystemControlLoaded.Should().BeFalse(
                 because: "the General tab should not initialize tuning/GPU-power providers before the OMEN/Tuning paths need them");
+        }
+
+        [Fact]
+        public void General_DoesNotForceFanControlLazyLoad()
+        {
+            using var vm = new MainViewModel();
+
+            vm.IsFanControlLoaded.Should().BeFalse();
+
+            _ = vm.General;
+
+            vm.IsFanControlLoaded.Should().BeFalse(
+                because: "the General tab can apply profiles through FanService without constructing the advanced FanControl view-model");
+        }
+
+        [Fact]
+        public void Constructor_DoesNotForceLightingLazyLoad()
+        {
+            using var vm = new MainViewModel();
+
+            vm.IsLightingLoaded.Should().BeFalse(
+                because: "RGB/peripheral SDK and provider setup should wait for the RGB page or an explicit lighting action");
         }
     }
 }

@@ -25,6 +25,9 @@ The first rule for this release is measurement before claims. Resource improveme
 - 3.6.0 regression coverage: Added `MainViewModelTests` coverage proving `Dashboard` and `General` do not force `SystemControl` lazy-load.
 - 3.6.0 tray idle cadence: Added `FanService.FanActivityStateChanged` so the app can recalculate minimized/tray-only monitoring cadence when a custom curve or backend fan hold starts/stops. This prevents tray-only cadence from staying too slow while OmenCore is actively maintaining fan ownership, and allows it to return low when ownership ends.
 - 3.6.0 regression coverage: Added fan activity event tests for custom curve start/stop and backend hold transitions between fan commands.
+- 3.6.0 provider laziness: RGB/peripheral startup work is now first-use. `MainWindow_Loaded` no longer triggers Corsair discovery, and `MainViewModel` no longer starts Corsair/Logitech/Razer/OpenRGB manager setup from its constructor. The RGB tab now calls `EnsureLightingInitializedAsync()` when opened, and explicit lighting actions initialize the lighting stack on demand.
+- 3.6.0 startup diet: Opening the General tab no longer constructs the advanced `FanControlViewModel` just to sync preset selection state. It wires to `FanControl` only if that VM was already loaded, while profile apply still goes directly through `FanService`.
+- 3.6.0 regression coverage: Extended `MainViewModelTests` to verify constructor-time Lighting remains unloaded and General does not force either `SystemControl` or `FanControl` lazy-load.
 
 ---
 
@@ -41,8 +44,8 @@ dotnet build src\OmenCoreApp\OmenCoreApp.csproj -c Release --no-restore
 
 Observed outcomes:
 - `DiagnosticExportSnapshotTests`: PASS, 4/4.
-- `MainViewModelTests`: PASS, 3/3.
-- Combined targeted 3.6 regression slice (`FanPresetVerificationTests|MainViewModelTests|DiagnosticExportSnapshotTests`): PASS, 18/18.
+- `MainViewModelTests`: PASS, 5/5.
+- Combined targeted 3.6 regression slice (`FanPresetVerificationTests|MainViewModelTests|DiagnosticExportSnapshotTests`): PASS, 20/20.
 - Windows app Release build: PASS.
 
 Known validation caveat:

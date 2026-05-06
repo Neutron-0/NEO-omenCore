@@ -117,6 +117,7 @@ namespace OmenCore.ViewModels
         
         // Sub-ViewModels for modular UI (Lazy Loaded)
         private FanControlViewModel? _fanControl;
+        public bool IsFanControlLoaded => _fanControl != null;
         public FanControlViewModel? FanControl
         {
             get
@@ -137,12 +138,15 @@ namespace OmenCore.ViewModels
                         }
                     };
                     OnPropertyChanged(nameof(FanControl));
+                    OnPropertyChanged(nameof(IsFanControlLoaded));
                 }
                 return _fanControl;
             }
         }
 
         public LightingViewModel? Lighting { get; private set; }
+        public bool IsLightingLoaded => Lighting != null;
+        private readonly SemaphoreSlim _lightingInitializationLock = new(1, 1);
 
         private SystemControlViewModel? _systemControl;
         public bool IsSystemControlLoaded => _systemControl != null;
@@ -307,8 +311,8 @@ namespace OmenCore.ViewModels
                 if (_general == null)
                 {
                     _general = new GeneralViewModel(_fanService, _performanceModeService, _configService, _logging, _systemInfoService);
-                    // Wire up the FanControlViewModel reference for preset sync
-                    _general.SetFanControlViewModel(FanControl);
+                    // Keep FanControl lazy; wire it only if something else already loaded it.
+                    _general.SetFanControlViewModel(_fanControl);
                     // Keep SystemControl lazy; wire it only if something else already loaded it.
                     _general.SetSystemControlViewModel(_systemControl);
                     OnPropertyChanged(nameof(General));
@@ -1628,9 +1632,6 @@ namespace OmenCore.ViewModels
                 _amdGpuService = null;
             }
             
-            // Services initialized asynchronously
-            _ = InitializeServicesAsync();
-
             // Auto-detect CPU vendor (Intel/AMD) and create appropriate undervolt provider
             var undervoltProvider = CpuUndervoltProviderFactory.Create(out string undervoltBackend);
             _logging.Info($"CPU undervolt provider: {undervoltBackend}");
@@ -1751,12 +1752,7 @@ namespace OmenCore.ViewModels
                 if (SystemControl?.SelectedPerformanceMode != null)
                     SystemControl.ApplyPerformanceModeCommand?.Execute(null);
             }, _ => SystemControl?.SelectedPerformanceMode != null);
-            ApplyLightingProfileCommand = new AsyncRelayCommand(async _ => 
-            {
-                if (Lighting?.ApplyCorsairLightingCommand?.CanExecute(null) == true)
-                    Lighting.ApplyCorsairLightingCommand.Execute(null);
-                await Task.CompletedTask;
-            }, _ => Lighting?.SelectedCorsairDevice != null && Lighting?.SelectedCorsairPreset != null);
+            ApplyLightingProfileCommand = new AsyncRelayCommand(_ => ApplyLightingProfile(), _ => SelectedLightingProfile != null);
             ToggleAnimationsCommand = new RelayCommand(param => _systemOptimizationService.ApplyWindowsAnimations(param as string == "Enable"));
             GamingModeCommand = new RelayCommand(_ => GamingModeActive = !GamingModeActive);
             RestoreDefaultsCommand = new RelayCommand(_ => RestoreDefaults());
@@ -1769,7 +1765,11 @@ namespace OmenCore.ViewModels
             });
             ReloadConfigCommand = new RelayCommand(_ => ReloadConfiguration());
             OpenConfigFolderCommand = new RelayCommand(_ => OpenConfigFolder());
-            DiscoverCorsairCommand = new AsyncRelayCommand(_ => DiscoverCorsairDevices());
+            DiscoverCorsairCommand = new AsyncRelayCommand(async _ =>
+            {
+                await EnsureLightingInitializedAsync();
+                await DiscoverCorsairDevices();
+            });
             ApplyCorsairLightingCommand = new AsyncRelayCommand(_ => ApplyCorsairLighting(), _ => SelectedCorsairDevice != null && SelectedCorsairPreset != null);
             SaveCorsairDpiCommand = new AsyncRelayCommand(_ => SaveCorsairDpi(), _ => SelectedCorsairDevice != null);
             ApplyMacroCommand = new AsyncRelayCommand(_ => ApplyMacroToDevice(), _ => SelectedCorsairDevice != null && SelectedMacroProfile != null);
@@ -2626,6 +2626,9 @@ namespace OmenCore.ViewModels
             {
                 return;
             }
+
+            await EnsureLightingInitializedAsync();
+
             await _keyboardLightingService.ApplyProfile(SelectedLightingProfile);
             if (_corsairDeviceService != null)
             {
@@ -3078,7 +3081,31 @@ namespace OmenCore.ViewModels
             });
         }
 
-        private async Task InitializeServicesAsync()
+        public async Task<LightingViewModel?> EnsureLightingInitializedAsync()
+        {
+            if (Lighting != null)
+            {
+                return Lighting;
+            }
+
+            await _lightingInitializationLock.WaitAsync();
+            try
+            {
+                if (Lighting != null)
+                {
+                    return Lighting;
+                }
+
+                await InitializeLightingServicesAsync();
+                return Lighting;
+            }
+            finally
+            {
+                _lightingInitializationLock.Release();
+            }
+        }
+
+        private async Task InitializeLightingServicesAsync()
         {
             try
             {
@@ -3089,88 +3116,81 @@ namespace OmenCore.ViewModels
                 await DiscoverCorsairDevices();
                 await DiscoverLogitechDevices();
                 
-                // Initialize Lighting sub-ViewModel after async services are ready
+                // Initialize Lighting sub-ViewModel after async services are ready.
+                // This is intentionally first-use for v3.6 lightweight startup: peripheral SDK,
+                // Razer process, OpenRGB, screen-sampling, and audio-reactive paths stay cold
+                // until the RGB page or an explicit lighting action asks for them.
                 if (_corsairDeviceService != null && _logitechDeviceService != null)
                 {
-                    // Show lighting tab if:
-                    // 1. Corsair or Logitech peripheral devices are found, OR
-                    // 2. HP OMEN keyboard lighting is available, OR
-                    // 3. Razer Synapse has already been detected.
-                    // Optional RGB providers are registered without probing here; RgbManager
-                    // initializes them on the first RGB page action or sync request.
                     bool hasPeripherals = _corsairDeviceService.Devices.Any() || _logitechDeviceService.Devices.Any();
                     bool hasKeyboardLighting = _keyboardLightingService?.IsAvailable ?? false;
-                    bool hasRazer = _razerService?.IsAvailable ?? false;
-                    
-                    if (hasPeripherals || hasKeyboardLighting || hasRazer)
+
+                    // Register RGB providers with priority: Corsair -> Logitech -> Razer -> OpenRGB -> SystemGeneric.
+                    // Provider initialization remains lazy inside RgbManager until the RGB page applies/syncs.
+                    var rgbManager = new OmenCore.Services.Rgb.RgbManager(_logging);
+                    var corsairProvider = new OmenCore.Services.Rgb.CorsairRgbProvider(_logging, _configService, _corsairDeviceService);
+                    var logitechProvider = new OmenCore.Services.Rgb.LogitechRgbProvider(_logging, _logitechDeviceService);
+                    var openRgbProvider = new OmenCore.Services.Rgb.OpenRgbProvider(_logging);
+                    rgbManager.RegisterProvider(corsairProvider);
+                    rgbManager.RegisterProvider(logitechProvider);
+
+                    if (_razerService != null)
                     {
-                        // Register RGB providers with priority: Corsair -> Logitech -> Razer -> OpenRGB -> SystemGeneric.
-                        // Provider initialization is lazy to avoid duplicate startup probes.
-                        var rgbManager = new OmenCore.Services.Rgb.RgbManager(_logging);
-                        var corsairProvider = new OmenCore.Services.Rgb.CorsairRgbProvider(_logging, _configService, _corsairDeviceService);
-                        var logitechProvider = new OmenCore.Services.Rgb.LogitechRgbProvider(_logging, _logitechDeviceService);
-                        var openRgbProvider = new OmenCore.Services.Rgb.OpenRgbProvider(_logging);
-                        rgbManager.RegisterProvider(corsairProvider);
-                        rgbManager.RegisterProvider(logitechProvider);
+                        var razerProvider = new OmenCore.Services.Rgb.RazerRgbProvider(_logging, _razerService);
+                        rgbManager.RegisterProvider(razerProvider);
+                    }
 
-                        if (_razerService != null)
-                        {
-                            var razerProvider = new OmenCore.Services.Rgb.RazerRgbProvider(_logging, _razerService);
-                            rgbManager.RegisterProvider(razerProvider);
-                        }
-                        
-                        rgbManager.RegisterProvider(openRgbProvider);
+                    rgbManager.RegisterProvider(openRgbProvider);
 
-                        var systemProvider = new OmenCore.Services.Rgb.SystemRgbProvider(rgbManager, _logging);
-                        rgbManager.RegisterProvider(systemProvider);
+                    var systemProvider = new OmenCore.Services.Rgb.SystemRgbProvider(rgbManager, _logging);
+                    rgbManager.RegisterProvider(systemProvider);
 
-                        _screenSamplingService = new ScreenSamplingService(_logging, rgbManager, _keyboardLightingService);
-                        _audioReactiveRgbService = new AudioReactiveRgbService(_logging, _keyboardLightingService);
+                    _screenSamplingService = new ScreenSamplingService(_logging, rgbManager, _keyboardLightingService);
+                    _audioReactiveRgbService = new AudioReactiveRgbService(_logging, _keyboardLightingService);
 
-                        foreach (var provider in rgbManager.Providers.Where(p => p.ProviderId != "system"))
-                        {
-                            _audioReactiveRgbService.RegisterProvider(provider);
-                        }
+                    foreach (var provider in rgbManager.Providers.Where(p => p.ProviderId != "system"))
+                    {
+                        _audioReactiveRgbService.RegisterProvider(provider);
+                    }
 
-                        _rgbSceneService = new RgbSceneService(
-                            _logging,
-                            rgbManager,
-                            _keyboardLightingService,
-                            _configService,
-                            _screenSamplingService,
-                            _audioReactiveRgbService);
+                    _rgbSceneService = new RgbSceneService(
+                        _logging,
+                        rgbManager,
+                        _keyboardLightingService,
+                        _configService,
+                        _screenSamplingService,
+                        _audioReactiveRgbService);
 
-                        Lighting = new LightingViewModel(
-                            _corsairDeviceService,
-                            _logitechDeviceService,
-                            _logging,
-                            _keyboardLightingService,
-                            _configService,
-                            _razerService,
-                            rgbManager,
-                            sceneService: _rgbSceneService,
-                            screenSamplingService: _screenSamplingService,
-                            audioReactiveRgbService: _audioReactiveRgbService);
-                        OnPropertyChanged(nameof(Lighting));
+                    Lighting = new LightingViewModel(
+                        _corsairDeviceService,
+                        _logitechDeviceService,
+                        _logging,
+                        _keyboardLightingService,
+                        _configService,
+                        _razerService,
+                        rgbManager,
+                        sceneService: _rgbSceneService,
+                        screenSamplingService: _screenSamplingService,
+                        audioReactiveRgbService: _audioReactiveRgbService);
+                    OnPropertyChanged(nameof(Lighting));
+                    OnPropertyChanged(nameof(IsLightingLoaded));
 
-                        // Apply saved keyboard colors on startup
-                        if (hasKeyboardLighting)
-                        {
-                            _ = Lighting.ApplySavedKeyboardColorsAsync();
-                        }
-                        
-                        if (hasKeyboardLighting && !hasPeripherals)
-                        {
-                            _logging.Info("Lighting sub-ViewModel initialized (keyboard lighting available)");
-                        }
-                        else
-                        {
-                            _logging.Info("Lighting sub-ViewModel initialized (devices found)");
-                        }
+                    if (hasKeyboardLighting)
+                    {
+                        _ = Lighting.ApplySavedKeyboardColorsAsync();
+                    }
+
+                    if (hasKeyboardLighting && !hasPeripherals)
+                    {
+                        _logging.Info("Lighting sub-ViewModel initialized on first use (keyboard lighting available)");
+                    }
+                    else if (hasPeripherals)
+                    {
+                        _logging.Info("Lighting sub-ViewModel initialized on first use (devices found)");
                     }
                     else
                     {
-                        _logging.Info("Lighting sub-ViewModel skipped (no devices or keyboard lighting found)");
+                        _logging.Info("Lighting sub-ViewModel initialized on first use (no RGB devices detected yet)");
                     }
                 }
             }
@@ -3178,7 +3198,7 @@ namespace OmenCore.ViewModels
             {
                 _logging.ErrorWithContext(
                     component: "MainViewModel",
-                    operation: "InitializeServicesAsync",
+                    operation: "InitializeLightingServicesAsync",
                     message: "Failed to initialize peripheral services",
                     ex: ex);
             }
@@ -4389,6 +4409,7 @@ namespace OmenCore.ViewModels
             
             // Dispose memory optimizer
             _memoryOptimizer?.Dispose();
+            _lightingInitializationLock.Dispose();
         }
     }
 }
