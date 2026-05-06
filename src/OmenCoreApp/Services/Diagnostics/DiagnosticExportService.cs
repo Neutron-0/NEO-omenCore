@@ -67,6 +67,7 @@ namespace OmenCore.Services.Diagnostics
                 {
                     CollectLogsAsync(exportPath),
                     CollectSystemInfoAsync(exportPath),
+                    CollectResourceFootprintSnapshotAsync(exportPath, effectiveMonitoringService, effectiveFanService),
                     CollectRuntimePerformanceSnapshotAsync(exportPath),
                     CollectBackgroundTimerSnapshotAsync(exportPath),
                     CollectModelIdentityTraceAsync(exportPath),
@@ -94,6 +95,111 @@ namespace OmenCore.Services.Diagnostics
                     message: "Failed to export diagnostics",
                     ex: ex);
                 throw;
+            }
+        }
+
+        private async Task CollectResourceFootprintSnapshotAsync(
+            string exportPath,
+            HardwareMonitoringService? monitoringService,
+            FanService? fanService)
+        {
+            try
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("=== RESOURCE FOOTPRINT SNAPSHOT ===");
+                sb.AppendLine($"CapturedUtc: {DateTime.UtcNow:O}");
+                sb.AppendLine("Purpose: 3.6 lightweight baseline for idle, tray, OSD, fan-hold, and page-activation measurements.");
+                sb.AppendLine();
+
+                AppendProcessFootprint(sb, Process.GetCurrentProcess(), "OmenCore App");
+
+                sb.AppendLine("[Hardware Worker Processes]");
+                var workerProcesses = GetHardwareWorkerProcesses();
+
+                if (workerProcesses.Count == 0)
+                {
+                    sb.AppendLine("No hardware worker process detected.");
+                }
+                else
+                {
+                    foreach (var worker in workerProcesses)
+                    {
+                        AppendProcessFootprint(sb, worker, worker.ProcessName, disposeProcess: true);
+                    }
+                }
+
+                sb.AppendLine();
+                sb.AppendLine("[Monitoring Cadence]");
+                if (monitoringService == null)
+                {
+                    sb.AppendLine("Monitoring service unavailable.");
+                }
+                else
+                {
+                    sb.AppendLine($"Health: {monitoringService.HealthStatus}");
+                    sb.AppendLine($"Source: {monitoringService.MonitoringSource}");
+                    sb.AppendLine($"LastSampleAgeSeconds: {FormatMaybeInfiniteSeconds(monitoringService.LastSampleAge)}");
+                    sb.AppendLine($"LowOverheadMode: {monitoringService.LowOverheadMode}");
+                    sb.AppendLine($"CurrentCadenceReason: {monitoringService.CurrentCadenceReason}");
+                    var transitions = monitoringService.GetCadenceTransitionsSnapshot();
+                    sb.AppendLine($"CadenceTransitionCount: {transitions.Count}");
+                    foreach (var transition in transitions.TakeLast(5))
+                    {
+                        sb.AppendLine($"  {transition.TimestampUtc:O} | {transition.CadenceMs}ms | {transition.Reason}");
+                    }
+                }
+
+                sb.AppendLine();
+                sb.AppendLine("[Fan Activity Blockers]");
+                if (fanService == null)
+                {
+                    sb.AppendLine("Fan service unavailable.");
+                }
+                else
+                {
+                    sb.AppendLine($"CurveActive: {fanService.IsCurveActive}");
+                    sb.AppendLine($"HoldActive: {fanService.IsHoldActive}");
+                    sb.AppendLine($"CurveOrHoldActive: {fanService.IsCurveOrHoldActive}");
+                    sb.AppendLine($"CommandHistoryCount: {fanService.GetCommandHistorySnapshot().Count}");
+                }
+
+                sb.AppendLine();
+                sb.AppendLine("[Background Timers]");
+                var timers = BackgroundTimerRegistry.GetAll();
+                sb.AppendLine($"ActiveTimerCount: {timers.Count}");
+                foreach (var timer in timers)
+                {
+                    sb.AppendLine($"  {timer.Name} | owner={timer.OwnerService} | tier={timer.Tier} | interval={timer.IntervalMs}ms | {timer.Description}");
+                }
+
+                sb.AppendLine();
+                sb.AppendLine("[Managed Runtime]");
+                sb.AppendLine($"ManagedMemoryMB: {GC.GetTotalMemory(false) / 1024d / 1024d:F1}");
+                sb.AppendLine($"Gen0Collections: {GC.CollectionCount(0)}");
+                sb.AppendLine($"Gen1Collections: {GC.CollectionCount(1)}");
+                sb.AppendLine($"Gen2Collections: {GC.CollectionCount(2)}");
+                var gcInfo = GC.GetGCMemoryInfo();
+                sb.AppendLine($"HeapSizeMB: {gcInfo.HeapSizeBytes / 1024d / 1024d:F1}");
+                sb.AppendLine($"MemoryLoadMB: {gcInfo.MemoryLoadBytes / 1024d / 1024d:F1}");
+
+                sb.AppendLine();
+                sb.AppendLine("[Optional Subsystem Load Hints]");
+                AppendAssemblyLoadHint(sb, "LibreHardwareMonitor");
+                AppendAssemblyLoadHint(sb, "NvAPI");
+                AppendAssemblyLoadHint(sb, "Afterburner");
+                AppendAssemblyLoadHint(sb, "Corsair");
+                AppendAssemblyLoadHint(sb, "Logitech");
+                AppendAssemblyLoadHint(sb, "Razer");
+                AppendAssemblyLoadHint(sb, "OpenRGB");
+                AppendAssemblyLoadHint(sb, "RGB");
+
+                File.WriteAllText(Path.Combine(exportPath, "resource-footprint.txt"), sb.ToString());
+                _logging.Info("Collected resource footprint snapshot");
+                await Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                _logging.Warn($"Failed to collect resource footprint snapshot: {ex.Message}");
             }
         }
 
@@ -403,6 +509,89 @@ namespace OmenCore.Services.Diagnostics
             age.TotalHours >= 1   ? $"{age.TotalHours:F1}h" :
             age.TotalMinutes >= 1 ? $"{age.TotalMinutes:F1}min" :
             $"{age.TotalSeconds:F0}s";
+
+        private static void AppendProcessFootprint(
+            StringBuilder sb,
+            Process process,
+            string label,
+            bool disposeProcess = false)
+        {
+            try
+            {
+                sb.AppendLine($"[{label}]");
+                sb.AppendLine($"Name: {SafeGet(() => process.ProcessName, "Unavailable")}");
+                sb.AppendLine($"PID: {SafeGet(() => process.Id.ToString(), "Unavailable")}");
+                sb.AppendLine($"StartTime: {SafeGet(() => process.StartTime.ToString("O"), "Unavailable")}");
+                sb.AppendLine($"UptimeSeconds: {SafeGet(() => (DateTime.Now - process.StartTime).TotalSeconds.ToString("F0"), "Unavailable")}");
+                sb.AppendLine($"TotalProcessorTime: {SafeGet(() => process.TotalProcessorTime.ToString(), "Unavailable")}");
+                sb.AppendLine($"AverageCpuPercentSinceStart: {SafeGet(() => CalculateAverageCpuPercentSinceStart(process).ToString("F2"), "Unavailable")}");
+                sb.AppendLine($"Threads: {SafeGet(() => process.Threads.Count.ToString(), "Unavailable")}");
+                sb.AppendLine($"Handles: {SafeGet(() => process.HandleCount.ToString(), "Unavailable")}");
+                sb.AppendLine($"WorkingSetMB: {SafeGet(() => (process.WorkingSet64 / 1024d / 1024d).ToString("F1"), "Unavailable")}");
+                sb.AppendLine($"PrivateMemoryMB: {SafeGet(() => (process.PrivateMemorySize64 / 1024d / 1024d).ToString("F1"), "Unavailable")}");
+                sb.AppendLine();
+            }
+            finally
+            {
+                if (disposeProcess)
+                {
+                    process.Dispose();
+                }
+            }
+        }
+
+        private static List<Process> GetHardwareWorkerProcesses()
+        {
+            var matches = new List<Process>();
+
+            foreach (var process in Process.GetProcesses())
+            {
+                var keep = false;
+                try
+                {
+                    keep = process.ProcessName.Contains("HardwareWorker", StringComparison.OrdinalIgnoreCase)
+                        || process.ProcessName.Equals("OmenCore.HardwareWorker", StringComparison.OrdinalIgnoreCase);
+
+                    if (keep)
+                    {
+                        matches.Add(process);
+                    }
+                }
+                catch
+                {
+                    keep = false;
+                }
+                finally
+                {
+                    if (!keep)
+                    {
+                        process.Dispose();
+                    }
+                }
+            }
+
+            return matches
+                .OrderBy(p => SafeGet(() => p.ProcessName, string.Empty), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static double CalculateAverageCpuPercentSinceStart(Process process)
+        {
+            var elapsedSeconds = Math.Max((DateTime.Now - process.StartTime).TotalSeconds, 0.001);
+            return process.TotalProcessorTime.TotalSeconds / elapsedSeconds / Math.Max(Environment.ProcessorCount, 1) * 100d;
+        }
+
+        private static string FormatMaybeInfiniteSeconds(TimeSpan value)
+        {
+            return value == TimeSpan.MaxValue ? "No successful sample yet" : value.TotalSeconds.ToString("F1");
+        }
+
+        private static void AppendAssemblyLoadHint(StringBuilder sb, string token)
+        {
+            var loaded = AppDomain.CurrentDomain.GetAssemblies()
+                .Any(a => (a.GetName().Name ?? string.Empty).Contains(token, StringComparison.OrdinalIgnoreCase));
+            sb.AppendLine($"{token}: {(loaded ? "loaded" : "not loaded")}");
+        }
 
         private static string SafeGet(Func<string> getter, string fallback)
         {

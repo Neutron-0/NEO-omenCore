@@ -59,6 +59,65 @@ namespace OmenCoreApp.Tests.Services
         }
 
         [Fact]
+        public async Task ResourceFootprintFile_IsIncludedInExport()
+        {
+            var svc = new DiagnosticExportService(_logging, _tempDir);
+            var zipPath = await svc.CollectAndExportAsync();
+
+            zipPath.Should().NotBeNullOrEmpty();
+
+            if (File.Exists(zipPath))
+            {
+                using var archive = ZipFile.OpenRead(zipPath);
+                var entry = archive.Entries
+                    .FirstOrDefault(e => e.Name.Equals("resource-footprint.txt", StringComparison.OrdinalIgnoreCase));
+                entry.Should().NotBeNull("resource-footprint.txt must be present in the diagnostic bundle");
+            }
+            else
+            {
+                var txtPath = Path.Combine(zipPath, "resource-footprint.txt");
+                File.Exists(txtPath).Should().BeTrue("resource-footprint.txt must be written to the export folder");
+            }
+        }
+
+        [Fact]
+        public async Task ResourceFootprintFile_ContainsLightweightBaselineSections()
+        {
+            const string timerName = "Test_ResourceFootprint_Timer";
+            BackgroundTimerRegistry.Register(
+                timerName,
+                "DiagnosticExportSnapshotTests",
+                "resource footprint test timer",
+                1234,
+                BackgroundTimerTier.Optional);
+
+            try
+            {
+                var svc = new DiagnosticExportService(_logging, _tempDir);
+                var zipPath = await svc.CollectAndExportAsync();
+
+                string content = ReadFileFromExport(zipPath, "resource-footprint.txt");
+
+                content.Should().Contain("RESOURCE FOOTPRINT SNAPSHOT");
+                content.Should().Contain("[OmenCore App]");
+                content.Should().Contain("AverageCpuPercentSinceStart");
+                content.Should().Contain("[Hardware Worker Processes]");
+                content.Should().Contain("[Monitoring Cadence]");
+                content.Should().Contain("Monitoring service unavailable");
+                content.Should().Contain("[Fan Activity Blockers]");
+                content.Should().Contain("Fan service unavailable");
+                content.Should().Contain("[Background Timers]");
+                content.Should().Contain(timerName);
+                content.Should().Contain("[Managed Runtime]");
+                content.Should().Contain("[Optional Subsystem Load Hints]");
+            }
+            finally
+            {
+                BackgroundTimerRegistry.Unregister(timerName);
+            }
+        }
+
+        [Fact]
         public async Task MonitoringCadenceHoldFile_ContainsExpectedSections_WhenServicesUnavailable()
         {
             var svc = new DiagnosticExportService(_logging, _tempDir);
