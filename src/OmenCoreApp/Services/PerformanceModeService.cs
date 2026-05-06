@@ -66,6 +66,17 @@ namespace OmenCore.Services
             {
                 try
                 {
+                    // Defensive guard: never push non-positive limits to EC.
+                    // Misconfigured profiles or bad override data can produce 0W values,
+                    // which may severely cap performance on some platforms.
+                    var hasValidCpuLimit = effectiveMode.CpuPowerLimitWatts > 0;
+                    var hasValidGpuLimit = effectiveMode.GpuPowerLimitWatts > 0;
+                    if (!hasValidCpuLimit && !hasValidGpuLimit)
+                    {
+                        _logging.Warn($"⚠️ Skipping EC power-limit apply for '{effectiveMode.Name}' because both limits are non-positive (CPU={effectiveMode.CpuPowerLimitWatts}W, GPU={effectiveMode.GpuPowerLimitWatts}W)");
+                    }
+                    else
+                    {
                     if (_powerVerificationService != null && _powerVerificationService.IsAvailable)
                     {
                         var before = _powerVerificationService.GetCurrentPowerLimits();
@@ -85,6 +96,7 @@ namespace OmenCore.Services
                     if (_powerVerificationService != null && _powerVerificationService.IsAvailable)
                     {
                         _ = VerifyPowerLimitsAndLogAsync(effectiveMode);
+                    }
                     }
                 }
                 catch (Exception ex)
@@ -195,7 +207,11 @@ namespace OmenCore.Services
                 cpuOverride = _modelCapabilities.EcoCpuPl1Watts;
             }
 
-            if (cpuOverride == null && gpuOverride == null)
+            cpuOverride = NormalizePositiveOverride(cpuOverride, mode.Name, "CPU PL1");
+            boostOverride = NormalizePositiveOverride(boostOverride, mode.Name, "CPU PL2");
+            gpuOverride = NormalizePositiveOverride(gpuOverride, mode.Name, "GPU");
+
+            if (cpuOverride == null && gpuOverride == null && boostOverride == null)
             {
                 return mode;
             }
@@ -220,6 +236,22 @@ namespace OmenCore.Services
                 LinkedPowerPlanGuid = mode.LinkedPowerPlanGuid,
                 Description = mode.Description
             };
+        }
+
+        private int? NormalizePositiveOverride(int? overrideValue, string modeName, string fieldName)
+        {
+            if (!overrideValue.HasValue)
+            {
+                return null;
+            }
+
+            if (overrideValue.Value > 0)
+            {
+                return overrideValue;
+            }
+
+            _logging.Warn($"⚠️ Ignoring invalid model capability override for '{modeName}' {fieldName}: {overrideValue.Value}W (expected > 0)");
+            return null;
         }
 
         private async Task VerifyPowerLimitsAndLogAsync(PerformanceMode mode)

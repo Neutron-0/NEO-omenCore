@@ -166,6 +166,33 @@ namespace OmenCoreApp.Tests.Services
             effective.GpuPowerLimitWatts.Should().Be(150);
         }
 
+        [Fact]
+        public void ResolveEffectiveMode_WithNonPositiveTdpOverrides_IgnoresInvalidValues()
+        {
+            var caps = new ModelCapabilities
+            {
+                ModelName = "Test",
+                PerformanceCpuPl1Watts = 0,
+                PerformanceCpuPl2Watts = -5,
+                PerformanceGpuTgpWatts = 0
+            };
+
+            var service = BuildService(caps);
+
+            var effective = service.ResolveEffectiveMode(
+                new PerformanceMode
+                {
+                    Name = "Performance",
+                    CpuPowerLimitWatts = 65,
+                    CpuBoostPowerLimitWatts = 95,
+                    GpuPowerLimitWatts = 140
+                });
+
+            effective.CpuPowerLimitWatts.Should().Be(65);
+            effective.CpuBoostPowerLimitWatts.Should().Be(95);
+            effective.GpuPowerLimitWatts.Should().Be(140);
+        }
+
         // ─── mode name matching is case-insensitive ───────────────────────────────────
 
         [Theory]
