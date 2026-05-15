@@ -123,6 +123,30 @@ namespace OmenCore.Services.Rgb
             // Exclude "system" provider to avoid infinite recursion (it delegates back to this manager)
             var available = _providers.Where(p => p.IsAvailable && p.ProviderId != "system").ToList();
 
+            if (TryResolveEffectType(effectId, out var effectType))
+            {
+                var unsupportedProviders = available
+                    .Where(p => !p.SupportedEffects.Contains(effectType))
+                    .Select(p => p.ProviderName)
+                    .ToList();
+
+                if (unsupportedProviders.Count > 0)
+                {
+                    _logging?.Info($"RGB effect '{effectType}' unsupported for provider(s): {string.Join(", ", unsupportedProviders)}; skipping unsupported endpoints");
+                }
+
+                available = available
+                    .Where(p => p.SupportedEffects.Contains(effectType))
+                    .ToList();
+            }
+
+            if (available.Count == 0)
+            {
+                _logging?.Warn($"RGB sync '{effectId}' skipped: no available providers support this effect");
+                SyncCompleted?.Invoke(this, new RgbSyncEventArgs(effectId, 0, 0, 0));
+                return;
+            }
+
             // Phase 1: prepare — providers may pre-serialise payloads or acquire handles
             await Task.WhenAll(available.Select(p => SafePrepareEffectAsync(p, effectId)));
 
@@ -323,6 +347,63 @@ namespace OmenCore.Services.Rgb
         private void LogProviderDebug(IRgbProvider provider, string action, Exception ex)
         {
             _logging?.Debug($"RGB provider '{provider.ProviderName}' failed to {action}: {ex.Message}");
+        }
+
+        private static bool TryResolveEffectType(string effectId, out RgbEffectType effectType)
+        {
+            effectType = RgbEffectType.Static;
+            if (string.IsNullOrWhiteSpace(effectId))
+            {
+                return false;
+            }
+
+            if (effectId.StartsWith("color:", StringComparison.OrdinalIgnoreCase))
+            {
+                effectType = RgbEffectType.Static;
+                return true;
+            }
+
+            var normalized = effectId.Trim().ToLowerInvariant();
+            if (normalized.StartsWith("breathing:", StringComparison.Ordinal))
+            {
+                effectType = RgbEffectType.Breathing;
+                return true;
+            }
+
+            if (normalized.StartsWith("pulse:", StringComparison.Ordinal))
+            {
+                effectType = RgbEffectType.Breathing;
+                return true;
+            }
+
+            switch (normalized)
+            {
+                case "effect:static":
+                case "static":
+                case "color":
+                    effectType = RgbEffectType.Static;
+                    return true;
+                case "effect:breathing":
+                case "breathing":
+                    effectType = RgbEffectType.Breathing;
+                    return true;
+                case "effect:spectrum":
+                case "effect:rainbow":
+                case "spectrum":
+                case "rainbow":
+                    effectType = RgbEffectType.Spectrum;
+                    return true;
+                case "effect:wave":
+                case "wave":
+                    effectType = RgbEffectType.Wave;
+                    return true;
+                case "effect:off":
+                case "off":
+                    effectType = RgbEffectType.Off;
+                    return true;
+                default:
+                    return false;
+            }
         }
     }
     

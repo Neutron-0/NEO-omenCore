@@ -32,6 +32,7 @@ namespace OmenCore.Services
         private readonly HpWmiBios? _wmiBios;
         private readonly OghServiceProxy? _oghProxy;
         private readonly SystemInfoService _systemInfoService;
+        private readonly RuntimeEcOperationCoordinator _ecOperationCoordinator;
         
         /// <summary>
         /// The control backend being used
@@ -83,13 +84,15 @@ namespace OmenCore.Services
             IEcAccess? ecAccess, 
             SystemInfoService systemInfoService,
             HpWmiBios? wmiBios = null,
-            OghServiceProxy? oghProxy = null)
+            OghServiceProxy? oghProxy = null,
+            RuntimeEcOperationCoordinator? ecOperationCoordinator = null)
         {
             _logging = logging;
             _ecAccess = ecAccess;
             _systemInfoService = systemInfoService;
             _wmiBios = wmiBios;
             _oghProxy = oghProxy;
+            _ecOperationCoordinator = ecOperationCoordinator ?? new RuntimeEcOperationCoordinator(logging);
             
             // Determine which backend to use (will be re-checked before each operation)
             DetermineActiveBackend();
@@ -443,63 +446,66 @@ namespace OmenCore.Services
         /// </summary>
         private bool EnableMaxFanViaEc()
         {
-            if (_ecAccess == null || !_ecAccess.IsAvailable)
-                return false;
-                
-            try
+            return _ecOperationCoordinator.Execute("FanCleaningService", "EnableMaxFanViaEc", () =>
             {
-                // Read current values for diagnostics
-                byte currentOMCC = _ecAccess.ReadByte(EC_OMCC);
-                byte currentFan1 = _ecAccess.ReadByte(EC_FAN1_DUTY);
-                byte currentFan2 = _ecAccess.ReadByte(EC_FAN2_DUTY);
-                byte currentMax = _ecAccess.ReadByte(EC_FAN_MAX);
-                byte currentHPCM = _ecAccess.ReadByte(EC_HPCM);
-                _logging.Info($"EC fan state before: OMCC=0x{currentOMCC:X2}, XSS1=0x{currentFan1:X2}, XSS2=0x{currentFan2:X2}, FFFF=0x{currentMax:X2}, HPCM=0x{currentHPCM:X2}");
-                
-                // Method 1: Try the FFFF (0xEC) max fan toggle first - simplest approach
-                _ecAccess.WriteByte(EC_FAN_MAX, FAN_MAX_ENABLE);
-                _logging.Info($"Set max fan toggle via EC (wrote 0x{FAN_MAX_ENABLE:X2} to FFFF=0x{EC_FAN_MAX:X2})");
-                
-                // Method 2: Also enable manual control and set fan speeds to 100%
-                _ecAccess.WriteByte(EC_OMCC, FAN_MODE_MANUAL);
-                _logging.Info($"Enabled manual fan control via EC (wrote 0x{FAN_MODE_MANUAL:X2} to OMCC=0x{EC_OMCC:X2})");
-                
-                // Set both fans to 100% (0x64 = 100 in decimal, represents percentage)
-                _ecAccess.WriteByte(EC_FAN1_DUTY, 0x64);
-                _ecAccess.WriteByte(EC_FAN2_DUTY, 0x64);
-                _logging.Info($"Fans set to 100% via EC (wrote 0x64 to XSS1=0x{EC_FAN1_DUTY:X2} and XSS2=0x{EC_FAN2_DUTY:X2})");
-                
-                // Read back to verify
-                byte newOMCC = _ecAccess.ReadByte(EC_OMCC);
-                byte newFan1 = _ecAccess.ReadByte(EC_FAN1_DUTY);
-                byte newFan2 = _ecAccess.ReadByte(EC_FAN2_DUTY);
-                byte newMax = _ecAccess.ReadByte(EC_FAN_MAX);
-                _logging.Info($"EC fan state after: OMCC=0x{newOMCC:X2}, XSS1=0x{newFan1:X2}, XSS2=0x{newFan2:X2}, FFFF=0x{newMax:X2}");
-                
-                // Check if registers actually changed
-                bool registersChanged = (newOMCC != currentOMCC) || (newFan1 != currentFan1) || 
-                                        (newFan2 != currentFan2) || (newMax != currentMax);
-                                        
-                if (!registersChanged)
+                if (_ecAccess == null || !_ecAccess.IsAvailable)
+                    return false;
+
+                try
                 {
-                    // Firmware may be ignoring EC writes - try legacy registers as fallback
-                    _logging.Warn("OmenMon-style EC writes didn't change registers, trying legacy registers...");
-                    return TryLegacyEcRegisters();
+                    // Read current values for diagnostics
+                    byte currentOMCC = _ecAccess.ReadByte(EC_OMCC);
+                    byte currentFan1 = _ecAccess.ReadByte(EC_FAN1_DUTY);
+                    byte currentFan2 = _ecAccess.ReadByte(EC_FAN2_DUTY);
+                    byte currentMax = _ecAccess.ReadByte(EC_FAN_MAX);
+                    byte currentHPCM = _ecAccess.ReadByte(EC_HPCM);
+                    _logging.Info($"EC fan state before: OMCC=0x{currentOMCC:X2}, XSS1=0x{currentFan1:X2}, XSS2=0x{currentFan2:X2}, FFFF=0x{currentMax:X2}, HPCM=0x{currentHPCM:X2}");
+
+                    // Method 1: Try the FFFF (0xEC) max fan toggle first - simplest approach
+                    _ecAccess.WriteByte(EC_FAN_MAX, FAN_MAX_ENABLE);
+                    _logging.Info($"Set max fan toggle via EC (wrote 0x{FAN_MAX_ENABLE:X2} to FFFF=0x{EC_FAN_MAX:X2})");
+
+                    // Method 2: Also enable manual control and set fan speeds to 100%
+                    _ecAccess.WriteByte(EC_OMCC, FAN_MODE_MANUAL);
+                    _logging.Info($"Enabled manual fan control via EC (wrote 0x{FAN_MODE_MANUAL:X2} to OMCC=0x{EC_OMCC:X2})");
+
+                    // Set both fans to 100% (0x64 = 100 in decimal, represents percentage)
+                    _ecAccess.WriteByte(EC_FAN1_DUTY, 0x64);
+                    _ecAccess.WriteByte(EC_FAN2_DUTY, 0x64);
+                    _logging.Info($"Fans set to 100% via EC (wrote 0x64 to XSS1=0x{EC_FAN1_DUTY:X2} and XSS2=0x{EC_FAN2_DUTY:X2})");
+
+                    // Read back to verify
+                    byte newOMCC = _ecAccess.ReadByte(EC_OMCC);
+                    byte newFan1 = _ecAccess.ReadByte(EC_FAN1_DUTY);
+                    byte newFan2 = _ecAccess.ReadByte(EC_FAN2_DUTY);
+                    byte newMax = _ecAccess.ReadByte(EC_FAN_MAX);
+                    _logging.Info($"EC fan state after: OMCC=0x{newOMCC:X2}, XSS1=0x{newFan1:X2}, XSS2=0x{newFan2:X2}, FFFF=0x{newMax:X2}");
+
+                    // Check if registers actually changed
+                    bool registersChanged = (newOMCC != currentOMCC) || (newFan1 != currentFan1) ||
+                                            (newFan2 != currentFan2) || (newMax != currentMax);
+
+                    if (!registersChanged)
+                    {
+                        // Firmware may be ignoring EC writes - try legacy registers as fallback
+                        _logging.Warn("OmenMon-style EC writes didn't change registers, trying legacy registers...");
+                        return TryLegacyEcRegistersCore();
+                    }
+
+                    return true;
                 }
-                
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logging.Error($"EC fan control failed: {ex.Message}");
-                return false;
-            }
+                catch (Exception ex)
+                {
+                    _logging.Error($"EC fan control failed: {ex.Message}");
+                    return false;
+                }
+            });
         }
         
         /// <summary>
         /// Fallback to legacy EC registers (for older 2019-2021 models)
         /// </summary>
-        private bool TryLegacyEcRegisters()
+        private bool TryLegacyEcRegistersCore()
         {
             if (_ecAccess == null || !_ecAccess.IsAvailable)
                 return false;
@@ -570,28 +576,31 @@ namespace OmenCore.Services
         
         private bool RestoreViaEc()
         {
-            if (_ecAccess == null || !_ecAccess.IsAvailable)
-                return false;
-                
-            try
+            return _ecOperationCoordinator.Execute("FanCleaningService", "RestoreViaEc", () =>
             {
-                // Disable max fan toggle (OmenMon style)
-                _ecAccess.WriteByte(EC_FAN_MAX, FAN_MAX_DISABLE);
-                
-                // Restore auto fan control (OmenMon style)
-                _ecAccess.WriteByte(EC_OMCC, FAN_MODE_AUTO);
-                
-                // Also restore legacy registers for older models
-                _ecAccess.WriteByte(EC_LEGACY_FAN_MODE, FAN_MODE_AUTO);
-                
-                _logging.Info("Restored auto fan control via EC (OMCC and legacy registers)");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logging.Warn($"Failed to restore EC fan control: {ex.Message}");
-                return false;
-            }
+                if (_ecAccess == null || !_ecAccess.IsAvailable)
+                    return false;
+
+                try
+                {
+                    // Disable max fan toggle (OmenMon style)
+                    _ecAccess.WriteByte(EC_FAN_MAX, FAN_MAX_DISABLE);
+
+                    // Restore auto fan control (OmenMon style)
+                    _ecAccess.WriteByte(EC_OMCC, FAN_MODE_AUTO);
+
+                    // Also restore legacy registers for older models
+                    _ecAccess.WriteByte(EC_LEGACY_FAN_MODE, FAN_MODE_AUTO);
+
+                    _logging.Info("Restored auto fan control via EC (OMCC and legacy registers)");
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    _logging.Warn($"Failed to restore EC fan control: {ex.Message}");
+                    return false;
+                }
+            });
         }
     }
 

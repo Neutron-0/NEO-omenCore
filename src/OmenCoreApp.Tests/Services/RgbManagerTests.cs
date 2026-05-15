@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -87,6 +88,123 @@ namespace OmenCoreApp.Tests.Services
             provider.LastEffect.Should().Be("static:#AABBCC");
         }
 
+        /// <summary>
+        /// Issue #130: Static RGB path must remain available even if some providers
+        /// don't support certain effects; static color should always work.
+        /// </summary>
+        [Fact]
+        public async Task SyncStaticColorAsync_AlwaysAvailable_DoesNotFailOnPartialSupport()
+        {
+            var manager = new RgbManager();
+            var staticOnlyProvider = new TestRgbProvider("static-only");
+            staticOnlyProvider.SupportedEffects = new[] { RgbEffectType.Static };
+
+            manager.RegisterProvider(staticOnlyProvider);
+
+            await manager.SyncStaticColorAsync(Color.FromArgb(0xFF, 0x00, 0x00));
+
+            staticOnlyProvider.LastEffect.Should().Be("static:#FF0000");
+        }
+
+        /// <summary>
+        /// Issue #130: When an effect is requested but no provider supports it,
+        /// ApplyEffectToAllAsync should exit cleanly without crashing, and log
+        /// the unsupported reason.
+        /// </summary>
+        [Fact]
+        public async Task ApplyEffectToAllAsync_UnsupportedEffect_SkipsCleanlyWithStatus()
+        {
+            var manager = new RgbManager();
+            var staticOnlyProvider = new TestRgbProvider("keyboard")
+            {
+                SupportedEffects = new[] { RgbEffectType.Static }
+            };
+
+            manager.RegisterProvider(staticOnlyProvider);
+            RgbSyncEventArgs? completed = null;
+            manager.SyncCompleted += (_, args) => completed = args;
+
+            // Request breathing effect which this provider doesn't support
+            await manager.ApplyEffectToAllAsync("effect:breathing");
+
+            // Should complete without throwing, but with 0 providers succeeded
+            completed.Should().NotBeNull("completion event should be raised");
+            completed!.ProvidersAffected.Should().Be(0, "no providers support breathing in this scenario");
+            completed.ProvidersFailed.Should().Be(0);
+        }
+
+        /// <summary>
+        /// Issue #130: When multiple providers exist and some support an effect,
+        /// only the supporting providers should execute; unsupported ones skipped cleanly.
+        /// </summary>
+        [Fact]
+        public async Task ApplyEffectToAllAsync_PartialSupport_OnlyCallsSupportingProviders()
+        {
+            var manager = new RgbManager();
+            var staticProvider = new TestRgbProvider("provider1");
+            staticProvider.SupportedEffects = new[] { RgbEffectType.Static };
+            var breathingProvider = new TestRgbProvider("provider2");
+            breathingProvider.SupportedEffects = new[] { RgbEffectType.Breathing, RgbEffectType.Spectrum };
+
+            manager.RegisterProvider(staticProvider);
+            manager.RegisterProvider(breathingProvider);
+            RgbSyncEventArgs? completed = null;
+            manager.SyncCompleted += (_, args) => completed = args;
+
+            // Request breathing effect
+            await manager.ApplyEffectToAllAsync("effect:breathing");
+
+            // Only breathingProvider should have been called
+            staticProvider.LastEffect.Should().BeNull("static-only provider should be skipped");
+            breathingProvider.LastEffect.Should().Be("effect:breathing");
+            completed.Should().NotBeNull();
+            completed!.ProvidersAffected.Should().Be(1, "only breathing provider is affected");
+        }
+
+        [Fact]
+        public async Task ApplyEffectToAllAsync_BreathingPayload_SkipsStaticOnlyProviders()
+        {
+            var manager = new RgbManager();
+            var staticProvider = new TestRgbProvider("static")
+            {
+                SupportedEffects = new[] { RgbEffectType.Static }
+            };
+            var breathingProvider = new TestRgbProvider("breathing")
+            {
+                SupportedEffects = new[] { RgbEffectType.Breathing }
+            };
+
+            manager.RegisterProvider(staticProvider);
+            manager.RegisterProvider(breathingProvider);
+
+            await manager.ApplyEffectToAllAsync("breathing:#FF0000");
+
+            staticProvider.LastEffect.Should().BeNull("static-only provider should not receive breathing payloads");
+            breathingProvider.LastEffect.Should().Be("breathing:#FF0000");
+        }
+
+        [Fact]
+        public async Task ApplyEffectToAllAsync_OffEffect_OnlyCallsOffCapableProviders()
+        {
+            var manager = new RgbManager();
+            var staticProvider = new TestRgbProvider("static")
+            {
+                SupportedEffects = new[] { RgbEffectType.Static }
+            };
+            var offProvider = new TestRgbProvider("off")
+            {
+                SupportedEffects = new[] { RgbEffectType.Off }
+            };
+
+            manager.RegisterProvider(staticProvider);
+            manager.RegisterProvider(offProvider);
+
+            await manager.ApplyEffectToAllAsync("off");
+
+            staticProvider.LastEffect.Should().BeNull("providers without Off support should be skipped");
+            offProvider.LastEffect.Should().Be("off");
+        }
+
         private sealed class TestRgbProvider : IRgbProvider
         {
             public TestRgbProvider(string id)
@@ -108,7 +226,7 @@ namespace OmenCoreApp.Tests.Services
             public bool AvailableAfterInitialize { get; set; } = true;
             public int InitializeCount { get; private set; }
             public string? LastEffect { get; private set; }
-            public System.Collections.Generic.IReadOnlyList<RgbEffectType> SupportedEffects { get; } =
+            public IReadOnlyList<RgbEffectType> SupportedEffects { get; set; } =
                 new[] { RgbEffectType.Static, RgbEffectType.Breathing, RgbEffectType.Spectrum, RgbEffectType.Off };
 
             public Task InitializeAsync()

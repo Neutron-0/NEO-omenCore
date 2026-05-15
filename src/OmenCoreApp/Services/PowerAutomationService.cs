@@ -381,9 +381,16 @@ namespace OmenCore.Services
                 var fanPresetName = isOnAc ? AcFanPreset : BatteryFanPreset;
                 try
                 {
-                    var preset = LookupFanPreset(fanPresetName);
-                    _fanService.ApplyPreset(preset);
-                    _logging.Info($"  [{transitionId}] Fan preset: {fanPresetName}" + (preset.Curve?.Any() == true ? $" ({preset.Curve.Count} curve points)" : ""));
+                    if (string.Equals(previousFanPreset, fanPresetName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logging.Info($"  [{transitionId}] Fan preset already active: {fanPresetName} (skipped)");
+                    }
+                    else
+                    {
+                        var preset = LookupFanPreset(fanPresetName);
+                        _fanService.ApplyPreset(preset);
+                        _logging.Info($"  [{transitionId}] Fan preset: {fanPresetName}" + (preset.Curve?.Any() == true ? $" ({preset.Curve.Count} curve points)" : ""));
+                    }
                 }
                 catch (Exception fanEx)
                 {
@@ -396,9 +403,16 @@ namespace OmenCore.Services
                 var perfMode = isOnAc ? AcPerformanceMode : BatteryPerformanceMode;
                 try
                 {
-                    var mode = new PerformanceMode { Name = perfMode };
-                    _performanceModeService.Apply(mode);
-                    _logging.Info($"  [{transitionId}] Performance mode: {perfMode}");
+                    if (PerformanceModeNameResolver.AreEquivalent(previousPerformanceMode, perfMode))
+                    {
+                        _logging.Info($"  [{transitionId}] Performance mode already active: {perfMode} (skipped)");
+                    }
+                    else
+                    {
+                        var mode = new PerformanceMode { Name = perfMode };
+                        _performanceModeService.Apply(mode);
+                        _logging.Info($"  [{transitionId}] Performance mode: {perfMode}");
+                    }
                 }
                 catch (Exception perfEx)
                 {
@@ -501,53 +515,16 @@ namespace OmenCore.Services
                 Name = presetName,
                 Mode = mode,
                 IsBuiltIn = true,
-                Curve = GetBuiltInCurve(mode)
+                Curve = FanModeNameResolver.BuildBuiltInCurve(presetName, mode)
             };
             
             _logging.Debug($"Power automation: Using built-in preset definition for '{presetName}'");
             return preset;
         }
 
-        /// <summary>
-        /// Get the default curve for a built-in fan mode.
-        /// </summary>
-        private static List<FanCurvePoint> GetBuiltInCurve(FanMode mode)
-        {
-            return mode switch
-            {
-                FanMode.Max => new() { new FanCurvePoint { TemperatureC = 0, FanPercent = 100 } },
-                FanMode.Performance => new()
-                {
-                    new FanCurvePoint { TemperatureC = 40, FanPercent = 35 },
-                    new FanCurvePoint { TemperatureC = 50, FanPercent = 45 },
-                    new FanCurvePoint { TemperatureC = 60, FanPercent = 58 },
-                    new FanCurvePoint { TemperatureC = 70, FanPercent = 72 },
-                    new FanCurvePoint { TemperatureC = 80, FanPercent = 88 },
-                    new FanCurvePoint { TemperatureC = 90, FanPercent = 100 },
-                },
-                FanMode.Quiet => new()
-                {
-                    new FanCurvePoint { TemperatureC = 40, FanPercent = 20 },
-                    new FanCurvePoint { TemperatureC = 50, FanPercent = 25 },
-                    new FanCurvePoint { TemperatureC = 60, FanPercent = 35 },
-                    new FanCurvePoint { TemperatureC = 70, FanPercent = 50 },
-                    new FanCurvePoint { TemperatureC = 80, FanPercent = 65 },
-                    new FanCurvePoint { TemperatureC = 90, FanPercent = 80 },
-                },
-                _ => new() // Auto/Default - empty curve lets BIOS control
-            };
-        }
-
         private FanMode MapPresetNameToFanMode(string presetName)
         {
-            return presetName.ToLowerInvariant() switch
-            {
-                "max" or "maximum" => FanMode.Max,
-                "performance" or "turbo" or "gaming" => FanMode.Performance,
-                "quiet" or "silent" or "cool" => FanMode.Quiet,
-                "manual" or "custom" => FanMode.Manual,
-                _ => FanMode.Auto
-            };
+            return FanModeNameResolver.ResolveBuiltInFanMode(presetName);
         }
 
         /// <summary>

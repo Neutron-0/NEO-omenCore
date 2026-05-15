@@ -46,6 +46,7 @@ namespace OmenCore.Services
 
         // Events for hotkey actions
         public event EventHandler? ToggleFanModeRequested;
+        public event EventHandler? ToggleMaxFanRequested;
         public event EventHandler? TogglePerformanceModeRequested;
         public event EventHandler? ToggleBoostModeRequested;
         public event EventHandler? ToggleQuietModeRequested;
@@ -79,6 +80,13 @@ namespace OmenCore.Services
         /// </summary>
         public void Initialize(IntPtr windowHandle)
         {
+            if (_source != null)
+            {
+                _source.RemoveHook(WndProc);
+                _source.Dispose();
+                _source = null;
+            }
+
             _windowHandle = windowHandle;
             _source = HwndSource.FromHwnd(windowHandle);
             _source?.AddHook(WndProc);
@@ -95,6 +103,9 @@ namespace OmenCore.Services
         /// </summary>
         public void InitializeWithRetry(Func<IntPtr> getWindowHandle)
         {
+            _retryTimer?.Dispose();
+            _retryTimer = null;
+
             var handle = getWindowHandle();
             if (handle != IntPtr.Zero)
             {
@@ -164,6 +175,9 @@ namespace OmenCore.Services
         {
             // Ctrl+Shift+F = Cycle fan modes
             RegisterHotkey(HotkeyAction.ToggleFanMode, ModifierKeys.Control | ModifierKeys.Shift, Key.F);
+
+            // Ctrl+Shift+M = Toggle max fan mode
+            RegisterHotkey(HotkeyAction.ToggleMaxFan, ModifierKeys.Control | ModifierKeys.Shift, Key.M);
             
             // Ctrl+Shift+P = Cycle performance modes
             RegisterHotkey(HotkeyAction.TogglePerformanceMode, ModifierKeys.Control | ModifierKeys.Shift, Key.P);
@@ -292,6 +306,7 @@ namespace OmenCore.Services
                 UnregisterHotKey(_windowHandle, id);
             }
             _registeredHotkeys.Clear();
+            _pendingHotkeys.Clear();
             _logging.Info("Unregistered all hotkeys");
         }
 
@@ -337,6 +352,10 @@ namespace OmenCore.Services
                 UnregisterHotkey(existingId.Value);
             }
 
+            // If the action was queued before window initialization, replace that pending
+            // entry so update requests don't silently keep stale key chords.
+            _pendingHotkeys.RemoveAll(p => p.Action == action);
+
             // Register new binding
             return RegisterHotkey(action, modifiers, key);
         }
@@ -370,6 +389,9 @@ namespace OmenCore.Services
             {
                 case HotkeyAction.ToggleFanMode:
                     ToggleFanModeRequested?.Invoke(this, EventArgs.Empty);
+                    break;
+                case HotkeyAction.ToggleMaxFan:
+                    ToggleMaxFanRequested?.Invoke(this, EventArgs.Empty);
                     break;
                 case HotkeyAction.TogglePerformanceMode:
                     TogglePerformanceModeRequested?.Invoke(this, EventArgs.Empty);
@@ -442,6 +464,7 @@ namespace OmenCore.Services
         {
             _retryTimer?.Dispose();
             _retryTimer = null;
+            _pendingHotkeys.Clear();
             UnregisterAllHotkeys();
             _source?.RemoveHook(WndProc);
             _source?.Dispose();
@@ -454,6 +477,7 @@ namespace OmenCore.Services
     public enum HotkeyAction
     {
         ToggleFanMode,
+        ToggleMaxFan,
         TogglePerformanceMode,
         ToggleBoostMode,
         ToggleQuietMode,

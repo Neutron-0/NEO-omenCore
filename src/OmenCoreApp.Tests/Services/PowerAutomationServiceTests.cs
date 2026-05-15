@@ -1,9 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using FluentAssertions;
 using OmenCore.Models;
-using OmenCore.Services;
 using Xunit;
 
 namespace OmenCoreApp.Tests.Services
@@ -13,10 +11,7 @@ namespace OmenCoreApp.Tests.Services
         [Fact]
         public void BuiltInPerformanceCurve_ReservesMaxForHighThermals()
         {
-            var method = typeof(PowerAutomationService).GetMethod("GetBuiltInCurve", BindingFlags.NonPublic | BindingFlags.Static);
-            method.Should().NotBeNull();
-
-            var curve = ((List<FanCurvePoint>)method!.Invoke(null, new object[] { FanMode.Performance })!)
+            var curve = FanModeNameResolver.BuildBuiltInCurve("Performance", FanMode.Performance)
                 .OrderBy(p => p.TemperatureC)
                 .ToList();
 

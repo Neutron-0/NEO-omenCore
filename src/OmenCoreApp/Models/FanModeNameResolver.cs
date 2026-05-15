@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace OmenCore.Models
@@ -66,6 +67,50 @@ namespace OmenCore.Models
             if (IsPerformanceAlias(value)) return FanMode.Performance;
             if (IsCustomAlias(value)) return FanMode.Manual;
             return FanMode.Auto;
+        }
+
+        public static List<FanCurvePoint> BuildBuiltInCurve(string? presetName, FanMode mode)
+        {
+            if (mode == FanMode.Max || IsMaxAlias(presetName))
+            {
+                return new() { new FanCurvePoint { TemperatureC = 0, FanPercent = 100 } };
+            }
+
+            if (IsQuietAlias(presetName))
+            {
+                return new()
+                {
+                    new FanCurvePoint { TemperatureC = 50, FanPercent = 25 },
+                    new FanCurvePoint { TemperatureC = 65, FanPercent = 35 },
+                    new FanCurvePoint { TemperatureC = 75, FanPercent = 50 },
+                    new FanCurvePoint { TemperatureC = 85, FanPercent = 70 },
+                    new FanCurvePoint { TemperatureC = 95, FanPercent = 100 }
+                };
+            }
+
+            if (IsPerformanceAlias(presetName))
+            {
+                return new()
+                {
+                    new FanCurvePoint { TemperatureC = 40, FanPercent = 35 },
+                    new FanCurvePoint { TemperatureC = 50, FanPercent = 45 },
+                    new FanCurvePoint { TemperatureC = 60, FanPercent = 58 },
+                    new FanCurvePoint { TemperatureC = 70, FanPercent = 72 },
+                    new FanCurvePoint { TemperatureC = 80, FanPercent = 88 },
+                    new FanCurvePoint { TemperatureC = 90, FanPercent = 100 }
+                };
+            }
+
+            return new()
+            {
+                new FanCurvePoint { TemperatureC = 40, FanPercent = 30 },
+                new FanCurvePoint { TemperatureC = 50, FanPercent = 38 },
+                new FanCurvePoint { TemperatureC = 60, FanPercent = 50 },
+                new FanCurvePoint { TemperatureC = 70, FanPercent = 62 },
+                new FanCurvePoint { TemperatureC = 80, FanPercent = 78 },
+                new FanCurvePoint { TemperatureC = 88, FanPercent = 92 },
+                new FanCurvePoint { TemperatureC = 95, FanPercent = 100 }
+            };
         }
 
         public static string ResolveCardMode(FanPreset preset)

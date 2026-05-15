@@ -40,6 +40,11 @@ namespace OmenCore.ViewModels
         private bool _showRpmSanityWarning = false;
         private string _rpmSanityWarningMessage = string.Empty;
         private readonly SemaphoreSlim _fanApplySemaphore = new(1, 1);
+        private DateTime _lastCurveVerificationKickUtc = DateTime.MinValue;
+        private string? _lastCurveVerificationKickKey;
+        private static readonly TimeSpan CurveVerificationKickCooldown = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan CurveVerificationKickTimeout = TimeSpan.FromSeconds(15);
+        private const int CurveVerificationKickFanLimit = 1;
 
         public ObservableCollection<FanPreset> FanPresets { get; } = new();
         public ObservableCollection<FanCurvePoint> CustomFanCurve { get; } = new();
@@ -820,12 +825,19 @@ namespace OmenCore.ViewModels
                 IsBuiltIn = true,
                 Curve = GetDefaultAutoCurve()
             });
-            FanPresets.Add(new FanPreset 
-            { 
-                Name = "Manual", 
-                Mode = FanMode.Manual,
-                IsBuiltIn = false,
-                Curve = GetDefaultManualCurve()
+            FanPresets.Add(new FanPreset
+            {
+                Name = "Gaming",
+                Mode = FanMode.Performance,
+                IsBuiltIn = true,
+                Curve = GetGamingCurve()
+            });
+            FanPresets.Add(new FanPreset
+            {
+                Name = "Quiet",
+                Mode = FanMode.Quiet,
+                IsBuiltIn = true,
+                Curve = GetQuietCurve()
             });
             
             // Load custom presets from config file
@@ -1212,7 +1224,9 @@ namespace OmenCore.ViewModels
             try
             {
                 CurveApplyStatus = $"Applying '{preset.Name}'… (transitioning)";
-                var applied = await Task.Run(() => _fanService.ApplyPreset(preset));
+                var immediateApply = preset.Name.Equals("Extreme", StringComparison.OrdinalIgnoreCase)
+                    || preset.Name.Contains("Extreme", StringComparison.OrdinalIgnoreCase);
+                var applied = await Task.Run(() => _fanService.ApplyPreset(preset, immediate: immediateApply));
                 if (!applied)
                 {
                     CurveApplyStatus = $"Preset '{preset.Name}' failed verification";
@@ -1322,9 +1336,10 @@ namespace OmenCore.ViewModels
 
             var customPreset = new FanPreset
             {
-                Name = "Custom (Applied)",
+                Name = "Custom",
                 Mode = FanMode.Manual,
-                Curve = CustomFanCurve.ToList()
+                Curve = CustomFanCurve.ToList(),
+                IsBuiltIn = true
             };
 
             IsApplyingCustomCurve = true;
@@ -1382,19 +1397,39 @@ namespace OmenCore.ViewModels
                 ? $"{targetPercent}%"
                 : $"{targetPercent}% (curve requested {requestedPercent}%; thermal guard raised it)";
 
+            var verificationKey = $"{sourceLabel}|{targetPercent}";
+            var nowUtc = DateTime.UtcNow;
+            if (string.Equals(_lastCurveVerificationKickKey, verificationKey, StringComparison.Ordinal) &&
+                nowUtc - _lastCurveVerificationKickUtc < CurveVerificationKickCooldown)
+            {
+                CurveApplyStatus = $"{sourceLabel} applied; verification recently checked";
+                _logging.Info($"[FanCurve] Skipped post-apply verification kick for {sourceLabel}; recent check still inside cooldown");
+                return;
+            }
+
+            _lastCurveVerificationKickKey = verificationKey;
+            _lastCurveVerificationKickUtc = nowUtc;
+
             CurveApplyStatus = $"Verifying {sourceLabel.ToLowerInvariant()} at {controlTemp:F0}C -> {verificationTargetText}...";
             _logging.Info($"[FanCurve] Running post-apply verification kick for {sourceLabel} at {controlTemp:F1}C -> {verificationTargetText}");
 
-            var fanCount = Math.Min(2, FanTelemetry.Count);
+            var fanCount = Math.Min(CurveVerificationKickFanLimit, FanTelemetry.Count);
             var results = new System.Collections.Generic.List<FanApplyResult>();
 
             _fanService.EnterDiagnosticMode();
+            using var verificationCts = new CancellationTokenSource(CurveVerificationKickTimeout);
             try
             {
                 for (int fanIndex = 0; fanIndex < fanCount; fanIndex++)
                 {
-                    results.Add(await _fanVerificationService.ApplyAndVerifyFanSpeedAsync(fanIndex, targetPercent));
+                    results.Add(await _fanVerificationService.ApplyAndVerifyFanSpeedAsync(fanIndex, targetPercent, verificationCts.Token));
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                CurveApplyStatus = $"{sourceLabel} applied; verification timed out";
+                _logging.Warn($"[FanCurve] Post-apply verification kick for {sourceLabel} timed out after {CurveVerificationKickTimeout.TotalSeconds:F0}s; curve was restored");
+                return;
             }
             finally
             {
@@ -1753,27 +1788,11 @@ namespace OmenCore.ViewModels
                 return;
             }
 
-            var gamingPreset = new FanPreset
+            var preset = FanPresets.FirstOrDefault(p => p.Name == "Gaming");
+            if (preset != null)
             {
-                Name = "Gaming",
-                Mode = FanMode.Performance, // Use Performance thermal policy for aggressive cooling
-                Curve = GetGamingCurve(),
-                IsBuiltIn = false
-            };
-            
-            // Add if not exists, select it
-            var existing = FanPresets.FirstOrDefault(p => p.Name == "Gaming");
-            if (existing == null)
-            {
-                FanPresets.Add(gamingPreset);
-                SelectedPreset = gamingPreset;
+                SelectedPreset = preset;
             }
-            else
-            {
-                SelectedPreset = existing;
-            }
-            
-            ActiveFanMode = "Gaming";
             _logging.Info("Applied Gaming fan mode (Performance thermal policy with aggressive curve)");
         }
 
@@ -1840,27 +1859,11 @@ namespace OmenCore.ViewModels
                 return;
             }
 
-            var quietPreset = new FanPreset
+            var preset = FanPresets.FirstOrDefault(p => p.Name == "Quiet");
+            if (preset != null)
             {
-                Name = "Quiet",
-                Mode = FanMode.Manual,
-                Curve = GetQuietCurve(),
-                IsBuiltIn = false
-            };
-            
-            // Add if not exists, select it
-            var existing = FanPresets.FirstOrDefault(p => p.Name == "Quiet");
-            if (existing == null)
-            {
-                FanPresets.Add(quietPreset);
-                SelectedPreset = quietPreset;
+                SelectedPreset = preset;
             }
-            else
-            {
-                SelectedPreset = existing;
-            }
-            
-            ActiveFanMode = "Silent";
             _logging.Info("Applied Quiet fan mode");
         }
         
@@ -1930,7 +1933,6 @@ namespace OmenCore.ViewModels
                 else if (FanModeNameResolver.IsQuietAlias(modeName))
                 {
                     preset = FanPresets.FirstOrDefault(p => p.Name == "Quiet" || p.Name == "Silent")
-                        ?? FanPresets.FirstOrDefault(p => p.Mode == FanMode.Manual)
                         ?? FanPresets.FirstOrDefault(p => p.Name == "Auto");
                 }
                 else if (FanModeNameResolver.IsAutoAlias(modeName))
@@ -1940,9 +1942,15 @@ namespace OmenCore.ViewModels
                 }
                 else if (FanModeNameResolver.IsPerformanceAlias(modeName))
                 {
-                    preset = FanPresets.FirstOrDefault(p => p.Name == "Extreme")
-                        ?? FanPresets.FirstOrDefault(p => p.Name == "Gaming")
-                        ?? FanPresets.FirstOrDefault(p => p.Name == "Max");
+                    // Prefer explicit name match: Gaming → Gaming, Extreme → Extreme.
+                    // IsPerformanceAlias lumps both together; separate here to preserve cycle identity.
+                    if (modeName.Contains("gaming", System.StringComparison.OrdinalIgnoreCase))
+                        preset = FanPresets.FirstOrDefault(p => p.Name == "Gaming")
+                            ?? FanPresets.FirstOrDefault(p => p.Name == "Extreme");
+                    else
+                        preset = FanPresets.FirstOrDefault(p => p.Name == "Extreme")
+                            ?? FanPresets.FirstOrDefault(p => p.Name == "Gaming")
+                            ?? FanPresets.FirstOrDefault(p => p.Name == "Max");
                 }
                 else
                 {

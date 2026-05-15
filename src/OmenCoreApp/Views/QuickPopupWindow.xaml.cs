@@ -30,6 +30,15 @@ namespace OmenCore.Views
         private bool _isFanPerformanceLinked;
         private List<DisplayTarget> _displayTargets = new();
         private int _activeDisplayTargetIndex;
+        private PopupTelemetryDisplayState? _lastRenderedTelemetryState;
+
+        private readonly record struct PopupTelemetryDisplayState(
+            string CpuTemp,
+            string GpuTemp,
+            string CpuLoad,
+            string GpuLoad,
+            string MonitoringHealth,
+            string LinkMode);
         
         /// <summary>
         /// Raised when user requests a fan mode change.
@@ -96,7 +105,13 @@ namespace OmenCore.Views
         /// </summary>
         public void UpdateFanMode(string mode)
         {
-            _currentFanMode = mode;
+            var normalizedMode = NormalizeFanModeForDisplay(mode);
+            if (string.Equals(_currentFanMode, normalizedMode, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _currentFanMode = normalizedMode;
             UpdateFanModeButtons();
         }
 
@@ -106,11 +121,19 @@ namespace OmenCore.Views
         /// </summary>
         public void UpdateCurvePresetName(string? presetName)
         {
+            if (string.Equals(_curvePresetName, presetName, StringComparison.Ordinal))
+            {
+                return;
+            }
+
             _curvePresetName = presetName;
             var tooltip = string.IsNullOrWhiteSpace(presetName)
                 ? "Apply saved fan curve"
                 : $"Curve: {presetName}";
-            FanCustomBtn.ToolTip = tooltip;
+            if (!string.Equals(FanCustomBtn.ToolTip as string, tooltip, StringComparison.Ordinal))
+            {
+                FanCustomBtn.ToolTip = tooltip;
+            }
             UpdatePerformanceModeTooltips();
         }
 
@@ -119,14 +142,55 @@ namespace OmenCore.Views
         /// </summary>
         public void UpdatePerformanceMode(string mode)
         {
-            _currentPerformanceMode = mode;
+            var normalizedMode = PerformanceModeNameResolver.Normalize(mode);
+            if (string.Equals(_currentPerformanceMode, normalizedMode, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _currentPerformanceMode = normalizedMode;
             UpdatePerformanceModeButtons();
+        }
+
+        private static string NormalizeFanModeForDisplay(string? mode)
+        {
+            if (FanModeNameResolver.IsMaxAlias(mode))
+            {
+                return "Max";
+            }
+
+            if (FanModeNameResolver.IsQuietAlias(mode))
+            {
+                return "Quiet";
+            }
+
+            if (FanModeNameResolver.IsAutoAlias(mode))
+            {
+                return "Auto";
+            }
+
+            if (FanModeNameResolver.IsCustomAlias(mode))
+            {
+                return "Custom";
+            }
+
+            return string.IsNullOrWhiteSpace(mode) ? "Auto" : mode.Trim();
         }
 
         public void UpdateMonitoringHealth(string health)
         {
-            _monitoringHealth = string.IsNullOrWhiteSpace(health) ? "Unknown" : health;
-            HealthStatusText.Text = $"Monitoring: {_monitoringHealth}";
+            var normalizedHealth = string.IsNullOrWhiteSpace(health) ? "Unknown" : health;
+            if (string.Equals(_monitoringHealth, normalizedHealth, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _monitoringHealth = normalizedHealth;
+            var healthText = $"Monitoring: {_monitoringHealth}";
+            if (!string.Equals(HealthStatusText.Text, healthText, StringComparison.Ordinal))
+            {
+                HealthStatusText.Text = healthText;
+            }
             HealthStatusText.Foreground = _monitoringHealth switch
             {
                 "Healthy" => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0xC8, 0xC8)),  // Teal
@@ -138,6 +202,11 @@ namespace OmenCore.Views
 
         public void UpdateLinkedMode(bool linked)
         {
+            if (_isFanPerformanceLinked == linked)
+            {
+                return;
+            }
+
             _isFanPerformanceLinked = linked;
             UpdateLinkModeText();
             LinkModeText.Foreground = linked
@@ -152,19 +221,49 @@ namespace OmenCore.Views
         private void UpdateDisplay(object? sender, EventArgs e)
         {
             if (_latestSample == null) return;
+
+            var displayState = BuildTelemetryDisplayState(_latestSample);
+            if (_lastRenderedTelemetryState.HasValue && _lastRenderedTelemetryState.Value.Equals(displayState))
+            {
+                   // v3.6.2: Cache hit - popup display state unchanged, no text update needed
+                   RuntimeUiPerformanceCounters.RecordPopupRenderCacheHit();
+                return;
+            }
             
-            // Update temperature displays (show — when sensor data unavailable)
-            CpuTempText.Text = _latestSample.CpuTemperatureC > 0 ? _latestSample.CpuTemperatureC.ToString("0") : "—";
-            GpuTempText.Text = _latestSample.GpuTemperatureC > 0 ? _latestSample.GpuTemperatureC.ToString("0") : "—";
-            CpuLoadText.Text = $"{_latestSample.CpuLoadPercent:0}%";
-            GpuLoadText.Text = $"{_latestSample.GpuLoadPercent:0}%";
-            HealthStatusText.Text = $"Monitoring: {_monitoringHealth}";
-            UpdateLinkModeText();
+               // v3.6.2: Cache miss - popup display state changed, update text fields
+               RuntimeUiPerformanceCounters.RecordPopupRenderCacheMiss();
+            CpuTempText.Text = displayState.CpuTemp;
+            GpuTempText.Text = displayState.GpuTemp;
+            CpuLoadText.Text = displayState.CpuLoad;
+            GpuLoadText.Text = displayState.GpuLoad;
+            HealthStatusText.Text = displayState.MonitoringHealth;
+            LinkModeText.Text = displayState.LinkMode;
+            _lastRenderedTelemetryState = displayState;
+        }
+
+        private PopupTelemetryDisplayState BuildTelemetryDisplayState(MonitoringSample sample)
+        {
+            return new PopupTelemetryDisplayState(
+                sample.CpuTemperatureC > 0 ? sample.CpuTemperatureC.ToString("0") : "—",
+                sample.GpuTemperatureC > 0 ? sample.GpuTemperatureC.ToString("0") : "—",
+                $"{sample.CpuLoadPercent:0}%",
+                $"{sample.GpuLoadPercent:0}%",
+                $"Monitoring: {_monitoringHealth}",
+                BuildLinkModeText());
         }
 
         private void UpdateLinkModeText()
         {
-            LinkModeText.Text = _isFanPerformanceLinked
+            var linkModeText = BuildLinkModeText();
+            if (!string.Equals(LinkModeText.Text, linkModeText, StringComparison.Ordinal))
+            {
+                LinkModeText.Text = linkModeText;
+            }
+        }
+
+        private string BuildLinkModeText()
+        {
+            return _isFanPerformanceLinked
                 ? "Fan/Perf: Linked"
                 : "Fan/Perf: Decoupled - fan stays";
         }

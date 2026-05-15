@@ -136,6 +136,14 @@ public static class KeyboardCommand
         if (brightness.HasValue)
         {
             var level = Math.Clamp(brightness.Value, 0, 100);
+            if (!keyboard.SupportsBrightnessControl)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"⚠ Keyboard brightness unsupported: {keyboard.GetBrightnessUnavailableReason()}");
+                Console.ResetColor();
+                return;
+            }
+
             if (keyboard.SetBrightness(level))
             {
                 Console.ForegroundColor = ConsoleColor.Green;
@@ -145,7 +153,7 @@ public static class KeyboardCommand
             else
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("✗ Failed to set keyboard brightness");
+                Console.WriteLine($"✗ Failed to set keyboard brightness: {keyboard.GetBrightnessUnavailableReason()}");
                 Console.ResetColor();
             }
             return;

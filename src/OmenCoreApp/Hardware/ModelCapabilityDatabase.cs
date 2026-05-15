@@ -1002,6 +1002,28 @@ namespace OmenCore.Hardware
                 HasFourZoneRgb = true, // Victus 16 has 4-zone
                 UserVerified = true
             });
+
+            // Victus 16-e0xxx family reported as unresolved (Issue #128).
+            // Keep conservative feature flags until confirmed by hardware reports.
+            AddModel(new ModelCapabilities
+            {
+                ProductId = "88EC",
+                ModelName = "HP Victus 16-e0xxx",
+                ModelNamePattern = "16-e0",
+                ModelYear = 2022,
+                Family = OmenModelFamily.Victus,
+                SupportsFanControlWmi = true,
+                SupportsFanCurves = true,
+                SupportsIndependentFanCurves = false,
+                FanZoneCount = 2,
+                HasMuxSwitch = false,
+                SupportsGpuPowerBoost = false,
+                SupportsUndervolt = false,
+                HasFourZoneRgb = false,
+                HasKeyboardBacklight = true,
+                UserVerified = false,
+                Notes = "Issue #128 — explicit Victus 16-e0xxx mapping (88EC) to avoid low-confidence family fallback; feature flags intentionally conservative pending field verification"
+            });
             
             // ═══════════════════════════════════════════════════════════════════════════════════
             // OMEN Desktop Series (WMI fan control + desktop RGB)

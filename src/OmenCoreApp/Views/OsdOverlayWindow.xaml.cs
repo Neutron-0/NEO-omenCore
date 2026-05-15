@@ -146,13 +146,13 @@ namespace OmenCore.Views
         public string CpuPower { get => _cpuPower; set { _cpuPower = value; OnPropertyChanged(); } }
         public string GpuPower { get => _gpuPower; set { _gpuPower = value; OnPropertyChanged(); } }
         public bool IsThrottling { get => _isThrottling; set { _isThrottling = value; OnPropertyChanged(); } }
-        public string CurrentMode { get => _currentMode; set { _currentMode = value; OnPropertyChanged(); } }
+        public string CurrentMode { get => _currentMode; set { _currentMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowCurrentModeRow)); } }
         public double Fps { get => _fps; set { _fps = value; OnPropertyChanged(); } }
         public string FpsLabel { get => _fpsLabel; set { _fpsLabel = value; OnPropertyChanged(); } }
         public string FpsDisplay { get => _fpsDisplay; set { _fpsDisplay = value; OnPropertyChanged(); } }
         public string FrametimeDisplay { get => _frametimeDisplay; set { _frametimeDisplay = value; OnPropertyChanged(); } }
         public string FanMode { get => _fanMode; set { _fanMode = value; OnPropertyChanged(); } }
-        public string PerformanceMode { get => _performanceMode; set { _performanceMode = value; OnPropertyChanged(); } }
+        public string PerformanceMode { get => _performanceMode; set { _performanceMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowCurrentModeRow)); } }
         public double Frametime { get => _frametime; set { _frametime = value; OnPropertyChanged(); } }
         public string ClockTime { get => _clockTime; set { _clockTime = value; OnPropertyChanged(); } }
         public string NetworkLatency { get => _networkLatency; set { _networkLatency = value; OnPropertyChanged(); } }
@@ -205,10 +205,10 @@ namespace OmenCore.Views
         public bool ShowGpuLoad { get => _showGpuLoad; set { _showGpuLoad = value; OnPropertyChanged(); } }
         public bool ShowFanSpeed { get => _showFanSpeed; set { _showFanSpeed = value; OnPropertyChanged(); } }
         public bool ShowRamUsage { get => _showRamUsage; set { _showRamUsage = value; OnPropertyChanged(); } }
-        public bool ShowCurrentMode { get => _showCurrentMode; set { _showCurrentMode = value; OnPropertyChanged(); } }
+        public bool ShowCurrentMode { get => _showCurrentMode; set { _showCurrentMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowCurrentModeRow)); } }
         public bool ShowFps { get => _showFps; set { _showFps = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowSeparator2)); } }
         public bool ShowFanMode { get => _showFanMode; set { _showFanMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowSeparator1)); } }
-        public bool ShowPerformanceMode { get => _showPerformanceMode; set { _showPerformanceMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowSeparator1)); } }
+        public bool ShowPerformanceMode { get => _showPerformanceMode; set { _showPerformanceMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowCurrentModeRow)); OnPropertyChanged(nameof(ShowSeparator1)); } }
         public bool ShowFrametime { get => _showFrametime; set { _showFrametime = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowSeparator2)); } }
         public bool ShowTime { get => _showTime; set { _showTime = value; OnPropertyChanged(); } }
         public bool ShowGpuPower { get => _showGpuPower; set { _showGpuPower = value; OnPropertyChanged(); } }
@@ -224,12 +224,16 @@ namespace OmenCore.Views
         public bool ShowGpuClock { get => _showGpuClock; set { _showGpuClock = value; OnPropertyChanged(); } }
 
         public bool ShowThermalsGroup { get => _showThermalsGroup; set { _showThermalsGroup = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowSeparator1)); OnPropertyChanged(nameof(ShowSeparator2)); OnPropertyChanged(string.Empty); } }
-        public bool ShowPerformanceGroup { get => _showPerformanceGroup; set { _showPerformanceGroup = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowSeparator1)); OnPropertyChanged(nameof(ShowSeparator2)); OnPropertyChanged(string.Empty); } }
+        public bool ShowPerformanceGroup { get => _showPerformanceGroup; set { _showPerformanceGroup = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowCurrentModeRow)); OnPropertyChanged(nameof(ShowSeparator1)); OnPropertyChanged(nameof(ShowSeparator2)); OnPropertyChanged(string.Empty); } }
         public bool ShowNetworkGroup { get => _showNetworkGroup; set { _showNetworkGroup = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowSeparator2)); OnPropertyChanged(string.Empty); } }
         public bool ShowSystemGroup { get => _showSystemGroup; set { _showSystemGroup = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowSeparator1)); OnPropertyChanged(nameof(ShowSeparator2)); OnPropertyChanged(string.Empty); } }
 
         public bool ShowClockTimeRow => _showSystemGroup && _showTime;
-        public bool ShowCurrentModeRow => _showPerformanceGroup && _showCurrentMode;
+        public bool ShowCurrentModeRow =>
+            _showPerformanceGroup &&
+            _showCurrentMode &&
+            !string.IsNullOrWhiteSpace(CurrentMode) &&
+            (!_showPerformanceMode || !string.Equals(CurrentMode, PerformanceMode, StringComparison.OrdinalIgnoreCase));
         public bool ShowPerformanceModeRow => _showPerformanceGroup && _showPerformanceMode;
         public bool ShowFanModeRow => _showPerformanceGroup && _showFanMode;
         public bool ShowCpuTempRow => _showThermalsGroup && _showCpuTemp;

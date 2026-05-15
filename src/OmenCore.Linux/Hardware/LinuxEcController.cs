@@ -24,6 +24,7 @@ public class LinuxEcController
     // HP-WMI paths (for newer models like OMEN 16 2023+)
     private const string HP_WMI_PATH = "/sys/devices/platform/hp-wmi";
     private const string HP_WMI_THERMAL = "/sys/devices/platform/hp-wmi/thermal_profile";
+    private const string HP_WMI_THERMAL_ALT = "/sys/devices/platform/hp-wmi/thermal-profile";
     private const string HP_WMI_FAN_ALWAYS_ON = "/sys/devices/platform/hp-wmi/fan_always_on";
     private const string HP_WMI_FAN1 = "/sys/devices/platform/hp-wmi/fan1_output";
     private const string HP_WMI_FAN2 = "/sys/devices/platform/hp-wmi/fan2_output";
@@ -32,8 +33,11 @@ public class LinuxEcController
     private const string ACPI_PLATFORM_PROFILE = "/sys/firmware/acpi/platform_profile";
     private const string ACPI_PLATFORM_PROFILE_CHOICES = "/sys/firmware/acpi/platform_profile_choices";
     private const string HP_WMI_THERMAL_CHOICES = "/sys/devices/platform/hp-wmi/thermal_profile_choices";
+    private const string HP_WMI_THERMAL_CHOICES_ALT = "/sys/devices/platform/hp-wmi/thermal-profile-choices";
     private const string HP_WMI_PLATFORM_PROFILE = "/sys/devices/platform/hp-wmi/platform_profile";
+    private const string HP_WMI_PLATFORM_PROFILE_ALT = "/sys/devices/platform/hp-wmi/platform-profile";
     private const string HP_WMI_PLATFORM_PROFILE_CHOICES = "/sys/devices/platform/hp-wmi/platform_profile_choices";
+    private const string HP_WMI_PLATFORM_PROFILE_CHOICES_ALT = "/sys/devices/platform/hp-wmi/platform-profile-choices";
     
     // HP-WMI hwmon paths (2025+ models use standard hwmon interface for fan control)
     // Discovered at runtime since hwmon number varies
@@ -110,7 +114,7 @@ public class LinuxEcController
         
         // HP-WMI is available if directory exists AND has actual control files
         HasHpWmiAccess = Directory.Exists(HP_WMI_PATH) && (
-            File.Exists(HP_WMI_THERMAL) ||
+            ResolveHpWmiThermalPath() != null ||
             File.Exists(HP_WMI_FAN_ALWAYS_ON) ||
             File.Exists(HP_WMI_FAN1) ||
             File.Exists(HP_WMI_FAN2));
@@ -158,6 +162,24 @@ public class LinuxEcController
         }
         catch { }
         return null;
+    }
+
+    private static string? ResolveFirstExistingPath(params string[] candidates)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? ResolveHpWmiThermalPath()
+    {
+        return ResolveFirstExistingPath(HP_WMI_THERMAL, HP_WMI_THERMAL_ALT);
     }
 
     /// <summary>
@@ -275,7 +297,7 @@ public class LinuxEcController
         }
         
         // Check HP-WMI files
-        var wmiFiles = new[] { HP_WMI_THERMAL, HP_WMI_FAN_ALWAYS_ON, HP_WMI_FAN1, HP_WMI_FAN2 };
+        var wmiFiles = new[] { HP_WMI_THERMAL, HP_WMI_THERMAL_ALT, HP_WMI_FAN_ALWAYS_ON, HP_WMI_FAN1, HP_WMI_FAN2 };
         foreach (var file in wmiFiles)
         {
             diagnostics[$"hp_wmi_{Path.GetFileName(file)}"] = File.Exists(file);
@@ -426,7 +448,8 @@ public class LinuxEcController
     /// </summary>
     public bool SetHpWmiThermalProfile(string profile)
     {
-        if (!HasHpWmiAccess || !File.Exists(HP_WMI_THERMAL))
+        var thermalPath = ResolveHpWmiThermalPath();
+        if (!HasHpWmiAccess || thermalPath == null)
             return false;
 
         try
@@ -435,7 +458,7 @@ public class LinuxEcController
             if (!validProfiles.Contains(profile.ToLower()))
                 return false;
 
-            File.WriteAllText(HP_WMI_THERMAL, profile.ToLower());
+            File.WriteAllText(thermalPath, profile.ToLower());
             return true;
         }
         catch
@@ -449,12 +472,13 @@ public class LinuxEcController
     /// </summary>
     public string? GetHpWmiThermalProfile()
     {
-        if (!HasHpWmiAccess || !File.Exists(HP_WMI_THERMAL))
+        var thermalPath = ResolveHpWmiThermalPath();
+        if (!HasHpWmiAccess || thermalPath == null)
             return null;
 
         try
         {
-            return File.ReadAllText(HP_WMI_THERMAL).Trim();
+            return File.ReadAllText(thermalPath).Trim();
         }
         catch
         {
@@ -531,7 +555,7 @@ public class LinuxEcController
     /// </summary>
     public bool HasHpWmiThermalProfile()
     {
-        return HasHpWmiAccess && File.Exists(HP_WMI_THERMAL);
+        return HasHpWmiAccess && ResolveHpWmiThermalPath() != null;
     }
     
     #endregion
@@ -548,7 +572,9 @@ public class LinuxEcController
         {
             ACPI_PLATFORM_PROFILE_CHOICES,
             HP_WMI_PLATFORM_PROFILE_CHOICES,
-            HP_WMI_THERMAL_CHOICES
+            HP_WMI_PLATFORM_PROFILE_CHOICES_ALT,
+            HP_WMI_THERMAL_CHOICES,
+            HP_WMI_THERMAL_CHOICES_ALT
         };
 
         foreach (var path in choicePaths)
@@ -845,7 +871,7 @@ public class LinuxEcController
     public bool SetFanProfile(FanProfile profile)
     {
         // Try hp-wmi thermal_profile first (newer 2023+ models)
-        if (HasHpWmiAccess && File.Exists(HP_WMI_THERMAL))
+        if (HasHpWmiAccess && ResolveHpWmiThermalPath() != null)
         {
             return SetHpWmiThermalProfile(profile);
         }
@@ -888,7 +914,13 @@ public class LinuxEcController
         
         try
         {
-            File.WriteAllText(HP_WMI_THERMAL, profileValue);
+            var thermalPath = ResolveHpWmiThermalPath();
+            if (thermalPath == null)
+            {
+                return false;
+            }
+
+            File.WriteAllText(thermalPath, profileValue);
             
             // For Max mode, also enable fan_always_on if available
             if (profile == FanProfile.Max && File.Exists(HP_WMI_FAN_ALWAYS_ON))
@@ -967,7 +999,7 @@ public class LinuxEcController
     public bool RestoreAutoMode()
     {
         // Try hp-wmi first (newer models like OMEN 16 2023+)
-        if (HasHpWmiAccess && File.Exists(HP_WMI_THERMAL))
+        if (HasHpWmiAccess && ResolveHpWmiThermalPath() != null)
         {
             return RestoreAutoModeViaHpWmi();
         }
@@ -1028,9 +1060,10 @@ public class LinuxEcController
         try
         {
             // Set thermal profile to balanced (auto)
-            if (File.Exists(HP_WMI_THERMAL))
+            var thermalPath = ResolveHpWmiThermalPath();
+            if (thermalPath != null)
             {
-                File.WriteAllText(HP_WMI_THERMAL, "balanced");
+                File.WriteAllText(thermalPath, "balanced");
             }
             
             // Disable fan_always_on to let BIOS control
@@ -1123,11 +1156,12 @@ public class LinuxEcController
     public PerformanceMode GetPerformanceMode()
     {
         // Priority 1: hp-wmi — read the current thermal_profile string
-        if (HasHpWmiAccess && File.Exists(HP_WMI_THERMAL))
+        var thermalPath = ResolveHpWmiThermalPath();
+        if (HasHpWmiAccess && thermalPath != null)
         {
             try
             {
-                var profile = File.ReadAllText(HP_WMI_THERMAL).Trim().ToLowerInvariant();
+                var profile = File.ReadAllText(thermalPath).Trim().ToLowerInvariant();
                 return profile switch
                 {
                     "performance" => PerformanceMode.Performance,

@@ -39,6 +39,7 @@ public class LinuxKeyboardController
     public bool IsAvailable { get; }
     public bool HasZoneControl { get; }
     public bool IsPerKeyRgb { get; }
+    public bool SupportsBrightnessControl => File.Exists(Path.Combine(KEYBOARD_BACKLIGHT_PATH, "brightness"));
     public string KeyboardType => IsPerKeyRgb ? "Per-Key RGB" : "4-Zone";
     public int ZoneCount => IsPerKeyRgb ? 0 : 4;
     
@@ -146,15 +147,15 @@ public class LinuxKeyboardController
     {
         if (!IsAvailable)
             return false;
-            
+
         try
         {
             var brightnessPath = Path.Combine(KEYBOARD_BACKLIGHT_PATH, "brightness");
             var maxBrightnessPath = Path.Combine(KEYBOARD_BACKLIGHT_PATH, "max_brightness");
-            
+
             if (!File.Exists(brightnessPath))
                 return false;
-                
+
             int maxBrightness = 3; // Default for many HP laptops
             if (File.Exists(maxBrightnessPath))
             {
@@ -162,7 +163,7 @@ public class LinuxKeyboardController
                 int.TryParse(maxContent, out maxBrightness);
                 if (maxBrightness == 0) maxBrightness = 3;
             }
-            
+
             var brightness = Math.Clamp(percent * maxBrightness / 100, 0, maxBrightness);
             File.WriteAllText(brightnessPath, brightness.ToString());
             return true;
@@ -171,6 +172,22 @@ public class LinuxKeyboardController
         {
             return false;
         }
+    }
+
+    public string GetBrightnessUnavailableReason()
+    {
+        if (!IsAvailable)
+        {
+            return "HP WMI keyboard interface is not available.";
+        }
+
+        var brightnessPath = Path.Combine(KEYBOARD_BACKLIGHT_PATH, "brightness");
+        if (!File.Exists(brightnessPath))
+        {
+            return $"Brightness sysfs path not found: {brightnessPath}";
+        }
+
+        return "Unknown keyboard brightness error.";
     }
     
     /// <summary>

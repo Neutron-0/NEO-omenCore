@@ -9,6 +9,7 @@ using Xunit;
 
 namespace OmenCoreApp.Tests.Services
 {
+    [Collection("STA Isolation")]
     public class ModelReportServiceTests
     {
         [Fact]
@@ -39,10 +40,21 @@ namespace OmenCoreApp.Tests.Services
             var clipboardText = $"Model: {model}\nDiagnostics: {path}";
             try
             {
-                Thread staThread = new Thread(() => Clipboard.SetText(clipboardText));
+                Thread staThread = new Thread(() =>
+                {
+                    try
+                    {
+                        Clipboard.SetText(clipboardText);
+                    }
+                    catch
+                    {
+                        // clipboard may not be available in CI; ignore
+                    }
+                });
+                staThread.IsBackground = true;
                 staThread.SetApartmentState(ApartmentState.STA);
                 staThread.Start();
-                staThread.Join();
+                staThread.Join(millisecondsTimeout: 2000);
             }
             catch
             {

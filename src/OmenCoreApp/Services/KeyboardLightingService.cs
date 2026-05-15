@@ -24,6 +24,7 @@ namespace OmenCore.Services
         private readonly ConfigurationService? _configService;
         private readonly OghServiceProxy? _oghProxy;
         private readonly KeyboardLightingServiceV2? _v2Service;
+        private readonly RuntimeEcOperationCoordinator _ecOperationCoordinator;
         private bool _useV2Backend;
         private bool _wmiAvailable;
         private bool _wmiBiosAvailable;
@@ -145,18 +146,19 @@ namespace OmenCore.Services
             }
         }
 
-        public KeyboardLightingService(LoggingService logging, IEcAccess? ecAccess = null, HpWmiBios? wmiBios = null, ConfigurationService? configService = null, SystemInfoService? systemInfoService = null)
+        public KeyboardLightingService(LoggingService logging, IEcAccess? ecAccess = null, HpWmiBios? wmiBios = null, ConfigurationService? configService = null, SystemInfoService? systemInfoService = null, RuntimeEcOperationCoordinator? ecOperationCoordinator = null)
         {
             _logging = logging;
             _ecAccess = ecAccess;
             _wmiBios = wmiBios;
             _configService = configService;
+            _ecOperationCoordinator = ecOperationCoordinator ?? new RuntimeEcOperationCoordinator(logging);
             _oghProxy = new OghServiceProxy(_logging);
 
             // Initialize V2 service for model-aware backend with PawnIO/EC fallback
             try
             {
-                _v2Service = new KeyboardLightingServiceV2(logging, wmiBios, ecAccess, configService, systemInfoService);
+                _v2Service = new KeyboardLightingServiceV2(logging, wmiBios, ecAccess, configService, systemInfoService, _ecOperationCoordinator);
                 var probeResult = _v2Service.InitializeAsync().GetAwaiter().GetResult();
                 if (probeResult.Success)
                 {
@@ -575,9 +577,12 @@ namespace OmenCore.Services
                 _ => EC_KB_ZONE1_R
             };
 
-            _ecAccess.WriteByte(baseReg, color.R);
-            _ecAccess.WriteByte((byte)(baseReg + 1), color.G);
-            _ecAccess.WriteByte((byte)(baseReg + 2), color.B);
+            _ecOperationCoordinator.Execute("KeyboardLightingService", $"SetZoneColorViaEc:{zone}", () =>
+            {
+                _ecAccess.WriteByte(baseReg, color.R);
+                _ecAccess.WriteByte((byte)(baseReg + 1), color.G);
+                _ecAccess.WriteByte((byte)(baseReg + 2), color.B);
+            });
         }
 
         private bool SetZoneColorInternal(KeyboardZone zone, Color color)

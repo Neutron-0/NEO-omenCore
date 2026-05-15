@@ -10,12 +10,14 @@ namespace OmenCore.Services
 {
     public class PerformanceModeService
     {
+        private readonly object _applyLock = new();
         private readonly IFanController _fanController;
         private readonly PowerPlanService _powerPlanService;
         private readonly PowerLimitController? _powerLimitController;
         private readonly IPowerVerificationService? _powerVerificationService;
         private readonly LoggingService _logging;
         private readonly ModelCapabilities? _modelCapabilities;
+        private readonly RuntimeEcOperationCoordinator _ecOperationCoordinator;
         private PerformanceMode? _currentMode;
 
         /// <summary>
@@ -36,7 +38,8 @@ namespace OmenCore.Services
             PowerLimitController? powerLimitController,
             LoggingService logging,
             IPowerVerificationService? powerVerificationService = null,
-            ModelCapabilities? modelCapabilities = null)
+            ModelCapabilities? modelCapabilities = null,
+            RuntimeEcOperationCoordinator? ecOperationCoordinator = null)
         {
             _fanController = fanController;
             _powerPlanService = powerPlanService;
@@ -44,150 +47,157 @@ namespace OmenCore.Services
             _powerVerificationService = powerVerificationService;
             _logging = logging;
             _modelCapabilities = modelCapabilities;
+            _ecOperationCoordinator = ecOperationCoordinator ?? new RuntimeEcOperationCoordinator(logging);
         }
 
         public void Apply(PerformanceMode mode)
         {
-            _currentMode = mode;
-            // Apply model-specific TDP overrides if the database has values for this model/mode.
-            var effectiveMode = ApplyModelCapabilityOverrides(mode);
-            var hasValidCpuLimit = effectiveMode.CpuPowerLimitWatts > 0;
-            var hasValidGpuLimit = effectiveMode.GpuPowerLimitWatts > 0;
-            var hasAnyValidEcLimit = hasValidCpuLimit || hasValidGpuLimit;
-            var modeInfo = $"⚡ Applying performance mode: '{effectiveMode.Name}'";
-            if (!string.IsNullOrEmpty(effectiveMode.LinkedPowerPlanGuid))
+            lock (_applyLock)
             {
-                modeInfo += $" (Power Plan: {effectiveMode.LinkedPowerPlanGuid})";
-            }
-            _logging.Info(modeInfo);
-            
-            // Step 1: Apply Windows power plan
-            _powerPlanService.Apply(effectiveMode);
-            
-            // Step 2: Apply EC-level power limits (CPU PL1/PL2, GPU TGP)
-            if (_powerLimitController != null && _powerLimitController.IsAvailable)
-            {
-                try
+                _currentMode = mode;
+                // Apply model-specific TDP overrides if the database has values for this model/mode.
+                var effectiveMode = ApplyModelCapabilityOverrides(mode);
+                var hasValidCpuLimit = effectiveMode.CpuPowerLimitWatts > 0;
+                var hasValidGpuLimit = effectiveMode.GpuPowerLimitWatts > 0;
+                var hasAnyValidEcLimit = hasValidCpuLimit || hasValidGpuLimit;
+                var modeInfo = $"⚡ Applying performance mode: '{effectiveMode.Name}'";
+                if (!string.IsNullOrEmpty(effectiveMode.LinkedPowerPlanGuid))
                 {
-                    // Defensive guard: never push non-positive limits to EC.
-                    // Misconfigured profiles or bad override data can produce 0W values,
-                    // which may severely cap performance on some platforms.
-                    if (!hasValidCpuLimit && !hasValidGpuLimit)
+                    modeInfo += $" (Power Plan: {effectiveMode.LinkedPowerPlanGuid})";
+                }
+                _logging.Info(modeInfo);
+                
+                // Step 1: Apply Windows power plan
+                _powerPlanService.Apply(effectiveMode);
+                
+                // Step 2: Apply EC-level power limits (CPU PL1/PL2, GPU TGP)
+                if (_powerLimitController != null && _powerLimitController.IsAvailable)
+                {
+                    try
                     {
-                        _logging.Warn($"⚠️ Skipping EC power-limit apply for '{effectiveMode.Name}' because both limits are non-positive (CPU={effectiveMode.CpuPowerLimitWatts}W, GPU={effectiveMode.GpuPowerLimitWatts}W)");
-                    }
-                    else
-                    {
-                    if (_powerVerificationService != null && _powerVerificationService.IsAvailable)
-                    {
-                        var before = _powerVerificationService.GetCurrentPowerLimits();
-                        _logging.Info($"⚡ Power limits before apply ({effectiveMode.Name}): PL1={before.cpuPl1}W, PL2={before.cpuPl2}W, GPU={before.gpuTgp}W, ModeReg={before.performanceMode}");
-                    }
+                        // Defensive guard: never push non-positive limits to EC.
+                        // Misconfigured profiles or bad override data can produce 0W values,
+                        // which may severely cap performance on some platforms.
+                        if (!hasValidCpuLimit && !hasValidGpuLimit)
+                        {
+                            _logging.Warn($"⚠️ Skipping EC power-limit apply for '{effectiveMode.Name}' because both limits are non-positive (CPU={effectiveMode.CpuPowerLimitWatts}W, GPU={effectiveMode.GpuPowerLimitWatts}W)");
+                        }
+                        else
+                        {
+                        _ecOperationCoordinator.Execute("PerformanceModeService", "ApplyPerformanceLimits", () =>
+                        {
+                            if (_powerVerificationService != null && _powerVerificationService.IsAvailable)
+                            {
+                                var before = _powerVerificationService.GetCurrentPowerLimits();
+                                _logging.Info($"⚡ Power limits before apply ({effectiveMode.Name}): PL1={before.cpuPl1}W, PL2={before.cpuPl2}W, GPU={before.gpuTgp}W, ModeReg={before.performanceMode}");
+                            }
 
-                    _powerLimitController.ApplyPerformanceLimits(effectiveMode);
-                    _logging.Info($"⚡ Power limits applied: CPU={effectiveMode.CpuPowerLimitWatts}W, GPU={effectiveMode.GpuPowerLimitWatts}W");
+                            _powerLimitController!.ApplyPerformanceLimits(effectiveMode);
+                            _logging.Info($"⚡ Power limits applied: CPU={effectiveMode.CpuPowerLimitWatts}W, GPU={effectiveMode.GpuPowerLimitWatts}W");
 
-                    if (_powerVerificationService != null && _powerVerificationService.IsAvailable)
-                    {
-                        var after = _powerVerificationService.GetCurrentPowerLimits();
-                        _logging.Info($"⚡ Power limits after apply ({effectiveMode.Name}): PL1={after.cpuPl1}W, PL2={after.cpuPl2}W, GPU={after.gpuTgp}W, ModeReg={after.performanceMode}");
-                    }
+                            if (_powerVerificationService != null && _powerVerificationService.IsAvailable)
+                            {
+                                var after = _powerVerificationService.GetCurrentPowerLimits();
+                                _logging.Info($"⚡ Power limits after apply ({effectiveMode.Name}): PL1={after.cpuPl1}W, PL2={after.cpuPl2}W, GPU={after.gpuTgp}W, ModeReg={after.performanceMode}");
+                            }
+                        });
 
-                    // Verify the power limits were applied correctly
-                    if (_powerVerificationService != null && _powerVerificationService.IsAvailable)
-                    {
-                        _ = VerifyPowerLimitsAndLogAsync(effectiveMode);
+                        // Verify the power limits were applied correctly (non-blocking, outside EC gate)
+                        if (_powerVerificationService != null && _powerVerificationService.IsAvailable)
+                        {
+                            _ = VerifyPowerLimitsAndLogAsync(effectiveMode);
+                        }
+                        }
                     }
+                    catch (Exception ex)
+                    {
+                        // Type-safe contention check: both TimeoutException (PawnIO mutex timeout) and
+                        // AbandonedMutexException (.NET mutex abandoned by dying thread) indicate EC
+                        // contention and should be treated identically. Do NOT use ex.Message.Contains
+                        // — exception messages are locale-dependent.
+                        if (ex is TimeoutException or AbandonedMutexException)
+                        {
+                            if (!Hardware.PawnIOEcAccess.EcContentionWarningLogged)
+                            {
+                                Hardware.PawnIOEcAccess.EcContentionWarningLogged = true;
+                                _logging.Warn($"⚠️ Could not apply EC power limits due to contention: {ex.Message}. This warning will only appear once per session.");
+                            }
+                        }
+                        else
+                        {
+                            _logging.Warn($"⚠️ Could not apply EC power limits: {ex.Message}");
+                        }
                     }
                 }
-                catch (Exception ex)
+                else
                 {
-                    // Type-safe contention check: both TimeoutException (PawnIO mutex timeout) and
-                    // AbandonedMutexException (.NET mutex abandoned by dying thread) indicate EC
-                    // contention and should be treated identically. Do NOT use ex.Message.Contains
-                    // — exception messages are locale-dependent.
-                    if (ex is TimeoutException or AbandonedMutexException)
+                    _logging.Info("ℹ️ EC power limit control not available - using Windows power plan only");
+                }
+                
+                // Step 3: Adjust fan curve based on power profile.
+                // Only runs when LinkFanToPerformanceMode is true (opt-in, default off).
+                // By default, performance mode switches only affect power plan and EC power limits;
+                // existing fan presets or curves set by the user are left untouched.
+                if (LinkFanToPerformanceMode)
+                {
+                    if (_fanController.IsAvailable)
                     {
-                        if (!Hardware.PawnIOEcAccess.EcContentionWarningLogged)
+                        // Try to set performance mode via WMI BIOS first
+                        if (_fanController.SetPerformanceMode(effectiveMode.Name))
                         {
-                            Hardware.PawnIOEcAccess.EcContentionWarningLogged = true;
-                            _logging.Warn($"⚠️ Could not apply EC power limits due to contention: {ex.Message}. This warning will only appear once per session.");
+                            _logging.Info($"🌀 Fan mode set to '{effectiveMode.Name}' via {_fanController.Backend}");
+                        }
+                        else
+                        {
+                            // Fallback to custom curve
+                            var fanPercent = Math.Max(20, effectiveMode.CpuPowerLimitWatts / 2);
+                            _fanController.ApplyCustomCurve(new[]
+                            {
+                                new FanCurvePoint { TemperatureC = 0, FanPercent = fanPercent }
+                            });
+                            _logging.Info($"🌀 Fan speed set to {fanPercent}% for '{effectiveMode.Name}' mode");
                         }
                     }
                     else
                     {
-                        _logging.Warn($"⚠️ Could not apply EC power limits: {ex.Message}");
-                    }
-                }
-            }
-            else
-            {
-                _logging.Info("ℹ️ EC power limit control not available - using Windows power plan only");
-            }
-            
-            // Step 3: Adjust fan curve based on power profile.
-            // Only runs when LinkFanToPerformanceMode is true (opt-in, default off).
-            // By default, performance mode switches only affect power plan and EC power limits;
-            // existing fan presets or curves set by the user are left untouched.
-            if (LinkFanToPerformanceMode)
-            {
-                if (_fanController.IsAvailable)
-                {
-                    // Try to set performance mode via WMI BIOS first
-                    if (_fanController.SetPerformanceMode(effectiveMode.Name))
-                    {
-                        _logging.Info($"🌀 Fan mode set to '{effectiveMode.Name}' via {_fanController.Backend}");
-                    }
-                    else
-                    {
-                        // Fallback to custom curve
-                        var fanPercent = Math.Max(20, effectiveMode.CpuPowerLimitWatts / 2);
-                        _fanController.ApplyCustomCurve(new[]
-                        {
-                            new FanCurvePoint { TemperatureC = 0, FanPercent = fanPercent }
-                        });
-                        _logging.Info($"🌀 Fan speed set to {fanPercent}% for '{effectiveMode.Name}' mode");
+                        _logging.Warn("⚠️ Fan control unavailable");
                     }
                 }
                 else
                 {
-                    _logging.Warn("⚠️ Fan control unavailable");
-                }
-            }
-            else
-            {
-                // WMI BIOS thermal policy is not purely a fan concern on some OMEN models.
-                // When EC limits are unavailable/non-positive, the WMI Performance/Cool policy
-                // keepalive is the only path that holds the requested TDP/boost behavior.
-                // Preserve the user's decoupled fan preset model by using this only as a narrow
-                // fallback for non-auto modes when no valid EC limits exist.
-                var shouldUseWmiThermalPolicyFallback =
-                    _fanController.IsAvailable &&
-                    string.Equals(_fanController.Backend, "WMI BIOS", StringComparison.OrdinalIgnoreCase) &&
-                    !hasAnyValidEcLimit &&
-                    !FanModeNameResolver.IsAutoAlias(effectiveMode.Name);
+                    // WMI BIOS thermal policy is not purely a fan concern on some OMEN models.
+                    // When EC limits are unavailable/non-positive, the WMI Performance/Cool policy
+                    // keepalive is the only path that holds the requested TDP/boost behavior.
+                    // Preserve the user's decoupled fan preset model by using this only as a narrow
+                    // fallback for non-auto modes when no valid EC limits exist.
+                    var shouldUseWmiThermalPolicyFallback =
+                        _fanController.IsAvailable &&
+                        string.Equals(_fanController.Backend, "WMI BIOS", StringComparison.OrdinalIgnoreCase) &&
+                        !hasAnyValidEcLimit &&
+                        !FanModeNameResolver.IsAutoAlias(effectiveMode.Name);
 
-                if (shouldUseWmiThermalPolicyFallback)
-                {
-                    if (_fanController.SetPerformanceMode(effectiveMode.Name))
+                    if (shouldUseWmiThermalPolicyFallback)
                     {
-                        _logging.Info($"🌀 Applied decoupled WMI thermal policy hold for '{effectiveMode.Name}' because EC power limits are unavailable");
+                        if (_fanController.SetPerformanceMode(effectiveMode.Name))
+                        {
+                            _logging.Info($"🌀 Applied decoupled WMI thermal policy hold for '{effectiveMode.Name}' because EC power limits are unavailable");
+                        }
+                        else
+                        {
+                            _logging.Warn($"⚠️ WMI thermal policy fallback failed for '{effectiveMode.Name}' while EC power limits were unavailable");
+                        }
                     }
                     else
                     {
-                        _logging.Warn($"⚠️ WMI thermal policy fallback failed for '{effectiveMode.Name}' while EC power limits were unavailable");
+                        _logging.Info("ℹ️ Fan policy unchanged — LinkFanToPerformanceMode is off");
                     }
                 }
-                else
-                {
-                    _logging.Info("ℹ️ Fan policy unchanged — LinkFanToPerformanceMode is off");
-                }
+                
+                _logging.Info($"✓ Performance mode '{effectiveMode.Name}' applied successfully");
+                
+                // Raise event for UI synchronization (sidebar, tray, etc.)
+                ModeApplied?.Invoke(this, effectiveMode.Name);
             }
-            
-            _logging.Info($"✓ Performance mode '{effectiveMode.Name}' applied successfully");
-            
-            // Raise event for UI synchronization (sidebar, tray, etc.)
-            ModeApplied?.Invoke(this, effectiveMode.Name);
         }
 
         /// <summary>

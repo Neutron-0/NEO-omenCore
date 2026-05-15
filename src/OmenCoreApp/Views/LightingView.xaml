@@ -40,13 +40,11 @@
     </UserControl.Resources>
     
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+        <ScrollViewer Style="{StaticResource SmoothScrollViewer}" Panel.ZIndex="0">
+        <StackPanel Margin="0,0,0,24">
 
         <!-- Header with Connection Overview and Sync All -->
-        <Grid Grid.Row="0" Margin="0,0,0,20">
+        <Grid Margin="0,0,0,20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -299,8 +297,7 @@
             </Button>
         </Grid>
 
-        <ScrollViewer Grid.Row="1">
-            <StackPanel>
+
                 <!-- Scene Quick Select Section -->
                 <Border Style="{StaticResource SurfaceCard}" Padding="24" Margin="0,0,0,16"
                         Visibility="{Binding IsSceneServiceEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -1769,6 +1766,6 @@
         </ScrollViewer>
         
         <!-- Loading Overlay -->
-        <controls:LoadingOverlay Grid.RowSpan="2" Panel.ZIndex="1000" />
+        <controls:LoadingOverlay Panel.ZIndex="1000" />
     </Grid>
 </UserControl>

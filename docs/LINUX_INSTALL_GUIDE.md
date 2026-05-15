@@ -239,6 +239,29 @@ cat /sys/firmware/acpi/platform_profile 2>/dev/null
 cat /sys/firmware/acpi/platform_profile_choices 2>/dev/null
 ```
 
+### When hp-wmi is present but profiles are missing
+
+Some boards expose non-standard or incomplete hp-wmi interfaces. Check what the kernel actually exported:
+
+```bash
+ls /sys/devices/platform/hp-wmi/*profile* 2>/dev/null
+```
+
+On selected OMEN firmware variants, forcing multiplexed hp-wmi routing can help:
+
+```bash
+# kernel cmdline parameter (set in bootloader, then reboot)
+hp_wmi.force_multiplex=1
+```
+
+Arch-family users may also try `hp-omen-gaming-wmi-dkms` from AUR. On many OMEN systems it effectively automates the hp-wmi profile setup that otherwise requires manual multiplex/path tuning. It is still not guaranteed to resolve profile control on every board.
+
+If profile control still fails after these steps, collect a report:
+
+```bash
+sudo ./omencore-cli diagnose --report > omencore-report.txt
+```
+
 ---
 
 ## GUI Installation

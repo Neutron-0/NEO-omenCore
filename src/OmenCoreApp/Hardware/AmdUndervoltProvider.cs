@@ -139,13 +139,16 @@ namespace OmenCore.Hardware
                     // Convert CO to approximate mV (CO * ~4mV)
                     CurrentCoreOffsetMv = _lastAllCoreCO * 4,
                     CurrentCacheOffsetMv = _lastIgpuCO * 4, // Use cache field for iGPU
+                    IsRuntimeReady = _smu.IsAvailable && _cpuInfo.SupportsUndervolt,
                     ControlledByOmenCore = true,
                     Timestamp = DateTime.Now
                 };
 
                 if (!_smu.IsAvailable)
                 {
-                    status.Warning = "Ryzen SMU not available. Install PawnIO driver for AMD CPU undervolting.";
+                    status.IsRuntimeReady = false;
+                    status.RuntimeBlockReason = "AMD SMU backend is unavailable. Install PawnIO, run OmenCore as administrator, and reboot if the driver was just installed.";
+                    status.Warning = status.RuntimeBlockReason;
                     status.ControlledByOmenCore = false;
                 }
                 else if (RyzenControl.IsRyzenAi9CurveOptimizerUnsupported())
@@ -154,11 +157,17 @@ namespace OmenCore.Hardware
                 }
                 else if (!_cpuInfo.SupportsUndervolt)
                 {
-                    status.Warning = $"CPU {_cpuInfo.CpuName} may not support Curve Optimizer. Undervolting may not work.";
+                    status.IsRuntimeReady = false;
+                    status.RuntimeBlockReason = $"CPU {_cpuInfo.CpuName} does not expose a supported Curve Optimizer control path on this firmware.";
+                    status.Warning = status.RuntimeBlockReason;
+                    status.ControlledByOmenCore = false;
                 }
                 else if (_cpuInfo.Family == RyzenFamily.Unknown)
                 {
-                    status.Warning = $"Unknown AMD CPU family. SMU addresses may be incorrect.";
+                    status.IsRuntimeReady = false;
+                    status.RuntimeBlockReason = "Unknown AMD CPU family. SMU command addresses cannot be validated safely for Curve Optimizer writes.";
+                    status.Warning = status.RuntimeBlockReason;
+                    status.ControlledByOmenCore = false;
                 }
 
                 return Task.FromResult(status);

@@ -78,16 +78,29 @@ namespace OmenCore.Hardware
         private LibreHardwareMonitorImpl? _tempFallbackMonitor;
         private bool _tempFallbackInitAttempted;
         private bool _lhmFallbackDisabledLogged;
-        private const double ImplausiblyLowCpuTempThresholdC = 33.0;
+        private const double ImplausiblyLowCpuTempThresholdC = 45.0;
         private const double CpuLoadThresholdForLowTempFallbackPercent = 20.0;
         private const double CpuPowerThresholdForLowTempFallbackWatts = 20.0;
+        private const double CpuAuthorityMismatchDeltaThresholdC = 12.0;
+        private const double CpuAuthorityMismatchFallbackMinTempC = 55.0;
+        private const double CpuLoadThresholdForAuthorityMismatchPercent = 12.0;
+        private const double CpuPowerThresholdForAuthorityMismatchWatts = 12.0;
+        private const int CpuAuthorityMismatchConfirmReadings = 2;
         private const int CpuFallbackHoldSeconds = 120;
         private const double MaxAcpiDeltaFromWmiC = 18.0;
         private const int CpuFallbackReadTimeoutMs = 500;
-        private const int CpuFallbackReadCooldownSeconds = 30;
+        private const int CpuFallbackReadBaseCooldownSeconds = 30;
+        private const int CpuFallbackReadCooldownSeconds = CpuFallbackReadBaseCooldownSeconds;
+        private const int CpuFallbackReadMaxCooldownSeconds = 300;
         private DateTime _cpuFallbackHoldUntilUtc = DateTime.MinValue;
         private DateTime _cpuFallbackReadDisabledUntilUtc = DateTime.MinValue;
         private bool _cpuFallbackTimeoutLogged;
+        private int _cpuFallbackTimeoutStreak;
+        private int _cpuAuthorityMismatchConsecutiveReadings;
+        private string _cpuTemperatureAuthoritySource = "WMI BIOS";
+        private string _cpuTemperatureAuthorityReason = "Startup default";
+        private DateTime _cpuTemperatureAuthorityLastSwitchUtc = DateTime.MinValue;
+        private int _cpuTemperatureAuthoritySwitchCount;
         
         // GPU temperature freeze detection (similar to CPU temp)
         private double _lastGpuTempReading;
@@ -137,6 +150,7 @@ namespace OmenCore.Hardware
         
         // Battery
         private double _cachedBatteryDischargeRate;
+        private double _cachedBatteryChargePercent = -1;
         private bool _batteryMonitoringDisabled;
         private bool _batteryDischargeRateSupported = true;
         private int _consecutiveZeroBatteryReads;
@@ -178,9 +192,24 @@ namespace OmenCore.Hardware
         /// </summary>
         public string ModelName => _systemModel;
 
-        public string MonitoringSource => _nvapi?.IsAvailable == true 
-            ? "WMI BIOS + NVAPI (Self-Sustaining)" 
-            : "WMI BIOS (Self-Sustaining)";
+        public string MonitoringSource
+        {
+            get
+            {
+                var baseSource = _nvapi?.IsAvailable == true
+                    ? "WMI BIOS + NVAPI (Self-Sustaining)"
+                    : "WMI BIOS (Self-Sustaining)";
+                return $"{baseSource} | CPU Authority: {_cpuTemperatureAuthoritySource}";
+            }
+        }
+
+        public string CpuTemperatureAuthoritySource => _cpuTemperatureAuthoritySource;
+
+        public string CpuTemperatureAuthorityReason => _cpuTemperatureAuthorityReason;
+
+        public DateTime CpuTemperatureAuthorityLastSwitchUtc => _cpuTemperatureAuthorityLastSwitchUtc;
+
+        public int CpuTemperatureAuthoritySwitchCount => _cpuTemperatureAuthoritySwitchCount;
         
         /// <summary>
         /// Creates a self-sustaining hardware monitor.
@@ -386,6 +415,9 @@ namespace OmenCore.Hardware
                 // Only attempt when WMI BIOS is functional.
                 // ═══════════════════════════════════════════════════════════════
                 
+                string? primaryCpuAuthoritySource = null;
+                string? primaryCpuAuthorityReason = null;
+
                 if (_wmiBios.IsAvailable)
                 {
                     var temps = _wmiBios.GetBothTemperatures();
@@ -432,6 +464,8 @@ namespace OmenCore.Hardware
 
                             _lastCpuTempReading = cpuTemp;
                             _cachedCpuTemp = cpuTemp;
+                            primaryCpuAuthoritySource = "WMI BIOS";
+                            primaryCpuAuthorityReason = "Primary WMI CPU temperature accepted";
                         }
                         if (gpuTemp > 0)
                         {
@@ -716,6 +750,8 @@ namespace OmenCore.Hardware
                             else
                             {
                                 _cachedCpuTemp = acpiTemp;
+                                primaryCpuAuthoritySource = "ACPI Thermal Zone";
+                                primaryCpuAuthorityReason = "ACPI thermal zone accepted for CPU authority";
 
                                 // Freeze detection for ACPI-sourced temps (fires when WMI BIOS is
                                 // unavailable, e.g. non-HP devices with only ACPI thermal zones).
@@ -758,7 +794,11 @@ namespace OmenCore.Hardware
                     }
                 }
 
-                TryApplyCpuTemperatureFallback();
+                var fallbackApplied = TryApplyCpuTemperatureFallback();
+                if (!fallbackApplied && primaryCpuAuthoritySource != null)
+                {
+                    SetCpuTemperatureAuthority(primaryCpuAuthoritySource, primaryCpuAuthorityReason ?? "Primary CPU temperature accepted");
+                }
                 
                 // ═══════════════════════════════════════════════════════════════
                 // SOURCE 3c: WMI Win32_Processor — CPU clock speed
@@ -948,7 +988,7 @@ namespace OmenCore.Hardware
             return (int)(rpm / 55.0);
         }
 
-        private void TryApplyCpuTemperatureFallback()
+        private bool TryApplyCpuTemperatureFallback()
         {
             bool lowAndLoaded = _cachedCpuTemp <= ImplausiblyLowCpuTempThresholdC &&
                                 _cachedCpuLoad >= CpuLoadThresholdForLowTempFallbackPercent;
@@ -957,7 +997,7 @@ namespace OmenCore.Hardware
             bool fallbackHoldActive = DateTime.UtcNow < _cpuFallbackHoldUntilUtc;
             if (DateTime.UtcNow < _cpuFallbackReadDisabledUntilUtc)
             {
-                return;
+                return false;
             }
 
             bool shouldFallback = _workerBackedCpuTempOverrideEnabled ||
@@ -966,15 +1006,69 @@ namespace OmenCore.Hardware
                                   lowAndHighPower ||
                                   fallbackHoldActive;
 
+            bool suspectAuthorityMismatch = _cachedCpuTemp > 0 &&
+                                            _cachedCpuTemp <= ImplausiblyLowCpuTempThresholdC &&
+                                            (_cachedCpuLoad >= CpuLoadThresholdForAuthorityMismatchPercent ||
+                                             _cachedCpuPowerWatts >= CpuPowerThresholdForAuthorityMismatchWatts);
+
+            double preReadFallbackCpuTemp = 0;
+            bool havePreReadFallbackCpuTemp = false;
+
+            if (!shouldFallback && suspectAuthorityMismatch)
+            {
+                var mismatchMonitor = EnsureTempFallbackMonitor();
+                if (mismatchMonitor != null)
+                {
+                    try
+                    {
+                        var mismatchTask = Task.Run(() => mismatchMonitor.GetCpuTemperature());
+                        if (mismatchTask.Wait(TimeSpan.FromMilliseconds(CpuFallbackReadTimeoutMs)))
+                        {
+                            var candidate = mismatchTask.GetAwaiter().GetResult();
+                            if (candidate > 0 && candidate < 110)
+                            {
+                                havePreReadFallbackCpuTemp = true;
+                                preReadFallbackCpuTemp = candidate;
+
+                                bool largeAuthorityGap =
+                                    candidate >= CpuAuthorityMismatchFallbackMinTempC &&
+                                    (candidate - _cachedCpuTemp) >= CpuAuthorityMismatchDeltaThresholdC;
+
+                                if (largeAuthorityGap)
+                                {
+                                    _cpuAuthorityMismatchConsecutiveReadings++;
+                                    if (_cpuAuthorityMismatchConsecutiveReadings >= CpuAuthorityMismatchConfirmReadings)
+                                    {
+                                        shouldFallback = true;
+                                    }
+                                }
+                                else
+                                {
+                                    _cpuAuthorityMismatchConsecutiveReadings = 0;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logging?.Debug($"[WmiBiosMonitor] CPU authority mismatch probe failed: {ex.Message}");
+                    }
+                }
+            }
+            else if (!suspectAuthorityMismatch)
+            {
+                _cpuAuthorityMismatchConsecutiveReadings = 0;
+            }
+
             if (!shouldFallback)
             {
-                return;
+                return false;
             }
 
             var fallbackMonitor = EnsureTempFallbackMonitor();
             if (fallbackMonitor == null)
             {
-                return;
+                return false;
             }
 
             try
@@ -982,19 +1076,27 @@ namespace OmenCore.Hardware
                 var fallbackTask = Task.Run(() => fallbackMonitor.GetCpuTemperature());
                 if (!fallbackTask.Wait(TimeSpan.FromMilliseconds(CpuFallbackReadTimeoutMs)))
                 {
-                    _cpuFallbackReadDisabledUntilUtc = DateTime.UtcNow.AddSeconds(CpuFallbackReadCooldownSeconds);
+                    _cpuFallbackTimeoutStreak++;
+                    var cooldownSeconds = CalculateCpuFallbackReadCooldownSeconds(_cpuFallbackTimeoutStreak);
+                    _cpuFallbackReadDisabledUntilUtc = DateTime.UtcNow.AddSeconds(cooldownSeconds);
                     if (!_cpuFallbackTimeoutLogged)
                     {
-                        _logging?.Warn($"[WmiBiosMonitor] CPU temp fallback timed out after {CpuFallbackReadTimeoutMs}ms — disabling fallback for {CpuFallbackReadCooldownSeconds}s to keep monitoring responsive");
+                        _logging?.Warn($"[WmiBiosMonitor] CPU temp fallback timed out after {CpuFallbackReadTimeoutMs}ms — disabling fallback for {cooldownSeconds}s to keep monitoring responsive");
                         _cpuFallbackTimeoutLogged = true;
                     }
-                    return;
+                    return false;
                 }
 
                 double fallbackCpuTemp = fallbackTask.GetAwaiter().GetResult();
+                if (!havePreReadFallbackCpuTemp)
+                {
+                    preReadFallbackCpuTemp = fallbackCpuTemp;
+                    havePreReadFallbackCpuTemp = fallbackCpuTemp > 0 && fallbackCpuTemp < 110;
+                }
                 if (fallbackCpuTemp > 0 && fallbackCpuTemp < 110)
                 {
                     _cpuFallbackTimeoutLogged = false;
+                    _cpuFallbackTimeoutStreak = 0;
                     _cpuFallbackReadDisabledUntilUtc = DateTime.MinValue;
 
                     bool shouldApplyFallback = _workerBackedCpuTempOverrideEnabled ||
@@ -1016,12 +1118,26 @@ namespace OmenCore.Hardware
                         {
                             _logging?.Info($"[WmiBiosMonitor] CPU temp source override active for model '{_systemModel}': using worker sensor ({fallbackCpuTemp:F1}°C)");
                             _modelCpuTempPreferenceLogged = true;
+                            SetCpuTemperatureAuthority("LHM Worker Override", $"Model override active for '{_systemModel}'");
                         }
                         else if (!_cpuTempFallbackLogged)
                         {
                             _logging?.Warn($"[WmiBiosMonitor] CPU temp fallback active: WMI/ACPI reading looked invalid ({previous:F1}°C), using LibreHardwareMonitor ({fallbackCpuTemp:F1}°C)");
                             _cpuTempFallbackLogged = true;
                         }
+
+                        SetCpuTemperatureAuthority(
+                            "LHM Fallback",
+                            $"WMI/ACPI authority rejected ({previous:F1}C) vs fallback ({fallbackCpuTemp:F1}C), load={_cachedCpuLoad:F0}%, power={_cachedCpuPowerWatts:F1}W");
+
+                        if (_cpuAuthorityMismatchConsecutiveReadings >= CpuAuthorityMismatchConfirmReadings)
+                        {
+                            SetCpuTemperatureAuthority(
+                                "LHM Fallback",
+                                $"Authority mismatch confirmed ({_cpuAuthorityMismatchConsecutiveReadings} reads): WMI {previous:F1}C vs fallback {preReadFallbackCpuTemp:F1}C");
+                        }
+
+                        return true;
                     }
                 }
             }
@@ -1029,6 +1145,42 @@ namespace OmenCore.Hardware
             {
                 _logging?.Debug($"[WmiBiosMonitor] CPU temp fallback read failed: {ex.Message}");
             }
+
+            return false;
+        }
+
+        private void SetCpuTemperatureAuthority(string source, string reason)
+        {
+            var normalizedSource = string.IsNullOrWhiteSpace(source) ? "Unknown" : source.Trim();
+            var normalizedReason = string.IsNullOrWhiteSpace(reason) ? "No reason supplied" : reason.Trim();
+
+            if (string.Equals(_cpuTemperatureAuthoritySource, normalizedSource, StringComparison.Ordinal) &&
+                string.Equals(_cpuTemperatureAuthorityReason, normalizedReason, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (!string.Equals(_cpuTemperatureAuthoritySource, normalizedSource, StringComparison.Ordinal))
+            {
+                _cpuTemperatureAuthoritySwitchCount++;
+                _cpuTemperatureAuthorityLastSwitchUtc = DateTime.UtcNow;
+                _logging?.Warn($"[WmiBiosMonitor] CPU thermal authority switched: {_cpuTemperatureAuthoritySource} -> {normalizedSource}; reason: {normalizedReason}");
+            }
+
+            _cpuTemperatureAuthoritySource = normalizedSource;
+            _cpuTemperatureAuthorityReason = normalizedReason;
+        }
+
+        private static int CalculateCpuFallbackReadCooldownSeconds(int consecutiveTimeouts)
+        {
+            if (consecutiveTimeouts <= 1)
+            {
+                return CpuFallbackReadBaseCooldownSeconds;
+            }
+
+            var shift = Math.Min(consecutiveTimeouts - 1, 4);
+            var cooldown = CpuFallbackReadBaseCooldownSeconds * (1 << shift);
+            return Math.Min(cooldown, CpuFallbackReadMaxCooldownSeconds);
         }
 
         private static string GetSystemModel()
@@ -1706,10 +1858,10 @@ namespace OmenCore.Hardware
         private double GetBatteryCharge()
         {
             // If battery monitoring is disabled (dead/removed battery), skip WMI query entirely
-            if (_batteryMonitoringDisabled) return 100;
+            if (_batteryMonitoringDisabled) return _cachedBatteryChargePercent >= 0 ? _cachedBatteryChargePercent : 100;
             
             // Cooldown: don't query Win32_Battery more than once every 10 seconds
-            if (DateTime.Now - _lastBatteryQuery < _batteryQueryCooldown) return 100;
+            if (DateTime.Now - _lastBatteryQuery < _batteryQueryCooldown) return _cachedBatteryChargePercent >= 0 ? _cachedBatteryChargePercent : 100;
             _lastBatteryQuery = DateTime.Now;
             
             try
@@ -1724,6 +1876,7 @@ namespace OmenCore.Hardware
                     foundBattery = true;
                     if (obj["EstimatedChargeRemaining"] is ushort charge)
                     {
+                        _cachedBatteryChargePercent = charge;
                         if (charge == 0 && IsOnAcPower())
                         {
                             _consecutiveZeroBatteryReads++;
@@ -1731,7 +1884,7 @@ namespace OmenCore.Hardware
                             {
                                 _batteryMonitoringDisabled = true;
                                 _logging?.Warn("[WmiBiosMonitor] Dead battery detected (0% on AC for 3+ reads) — disabling battery WMI queries to prevent EC timeouts");
-                                return 100;
+                                return _cachedBatteryChargePercent;
                             }
                         }
                         else
@@ -1747,7 +1900,7 @@ namespace OmenCore.Hardware
                     // No battery found in WMI — likely removed or not present
                     _batteryMonitoringDisabled = true;
                     _logging?.Info("[WmiBiosMonitor] No battery detected in Win32_Battery — disabling battery queries");
-                    return 100;
+                    return _cachedBatteryChargePercent >= 0 ? _cachedBatteryChargePercent : 100;
                 }
             }
             catch (Exception ex)
@@ -1759,9 +1912,9 @@ namespace OmenCore.Hardware
                     _batteryMonitoringDisabled = true;
                     _logging?.Warn($"[WmiBiosMonitor] Battery WMI queries failing repeatedly ({ex.Message}) — disabling to prevent EC timeouts");
                 }
-                return 100;
+                return _cachedBatteryChargePercent >= 0 ? _cachedBatteryChargePercent : 100;
             }
-            return 100;
+            return _cachedBatteryChargePercent >= 0 ? _cachedBatteryChargePercent : 100;
         }
         
         private bool IsOnAcPower()

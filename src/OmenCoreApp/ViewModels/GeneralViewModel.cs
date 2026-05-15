@@ -1,6 +1,5 @@
 using System;
 using System.Windows.Media;
-using System.Windows.Threading;
 using OmenCore.Models;
 using OmenCore.Services;
 using OmenCore.Utils;
@@ -18,7 +17,6 @@ namespace OmenCore.ViewModels
         private readonly LoggingService _logging;
         private readonly ConfigurationService _configService;
         private readonly SystemInfoService? _systemInfoService;
-        private readonly DispatcherTimer _updateTimer;
         private FanControlViewModel? _fanControlViewModel;
         private SystemControlViewModel? _systemControlViewModel;
 
@@ -39,6 +37,15 @@ namespace OmenCore.ViewModels
         private double _cpuPowerWatts;
         private double _ramUsedGb;
         private double _ramTotalGb;
+        private MonitoringSample? _lastProjectedSample;
+        private DateTime _lastUiProjectionUtc = DateTime.MinValue;
+        private bool _telemetryProjectionEnabled = true;
+
+        private static readonly TimeSpan UiProjectionMinInterval = TimeSpan.FromMilliseconds(750);
+        private const double UiProjectionTempDelta = 0.5;
+        private const double UiProjectionLoadDelta = 2.0;
+        private const double UiProjectionPowerDelta = 1.0;
+        private const int UiProjectionFanRpmDelta = 120;
 
         public GeneralViewModel(
             FanService fanService,
@@ -52,18 +59,6 @@ namespace OmenCore.ViewModels
             _configService = configService;
             _logging = logging;
             _systemInfoService = systemInfoService;
-
-            // Use timer to poll telemetry updates (avoids protected CollectionChanged issue)
-            _updateTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromSeconds(1)
-            };
-            _updateTimer.Tick += (s, e) =>
-            {
-                UpdateTelemetry();
-                UpdateTemperatures();
-            };
-            _updateTimer.Start();
 
             // Initial load
             LoadCurrentState();
@@ -109,6 +104,11 @@ namespace OmenCore.ViewModels
                 }
                 return "pack://application:,,,/Assets/omen.png";
             }
+        }
+
+        public void SetTelemetryProjectionEnabled(bool enabled)
+        {
+            _telemetryProjectionEnabled = enabled;
         }
 
         #region Properties
@@ -482,6 +482,20 @@ namespace OmenCore.ViewModels
         public void UpdateFromMonitoringSample(MonitoringSample? sample)
         {
             if (sample == null) return;
+            RuntimeUiPerformanceCounters.RecordGeneralSampleReceived();
+            if (!_telemetryProjectionEnabled)
+            {
+                RuntimeUiPerformanceCounters.RecordGeneralSampleSkipped();
+                   // v3.6.2: Track hidden-surface suppression
+                   RuntimeUiPerformanceCounters.RecordHiddenSurfaceSampleSkipped();
+                return;
+            }
+
+            if (!ShouldProjectMonitoringSample(sample))
+            {
+                RuntimeUiPerformanceCounters.RecordGeneralSampleSkipped();
+                return;
+            }
             
             try
             {
@@ -504,12 +518,68 @@ namespace OmenCore.ViewModels
                 CpuPowerWatts = sample.CpuPowerWatts;
                 RamUsedGb = sample.RamUsageGb;
                 RamTotalGb = sample.RamTotalGb;
+
+                if (sample.Fan1RpmState == TelemetryDataState.Valid ||
+                    sample.Fan1RpmState == TelemetryDataState.Stale)
+                {
+                    CpuFanRpm = sample.Fan1Rpm;
+                    CpuFanPercent = EstimateFanPercent(sample.Fan1Rpm);
+                }
+
+                if (sample.Fan2RpmState == TelemetryDataState.Valid ||
+                    sample.Fan2RpmState == TelemetryDataState.Stale)
+                {
+                    GpuFanRpm = sample.Fan2Rpm;
+                    GpuFanPercent = sample.GpuFanPercent > 0
+                        ? (int)Math.Clamp(Math.Round(sample.GpuFanPercent), 0, 100)
+                        : EstimateFanPercent(sample.Fan2Rpm);
+                }
+
                 OnPropertyChanged(nameof(RamPercent));
+                _lastProjectedSample = new MonitoringSample(sample);
+                _lastUiProjectionUtc = DateTime.UtcNow;
+                RuntimeUiPerformanceCounters.RecordGeneralSampleProjected();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[GeneralVM] Monitoring sample update error: {ex.Message}");
             }
+        }
+
+        private bool ShouldProjectMonitoringSample(MonitoringSample sample)
+        {
+            if (_lastProjectedSample == null)
+            {
+                return true;
+            }
+
+            var elapsed = DateTime.UtcNow - _lastUiProjectionUtc;
+            if (elapsed >= UiProjectionMinInterval)
+            {
+                return true;
+            }
+
+            var previous = _lastProjectedSample;
+
+            return Math.Abs(sample.CpuTemperatureC - previous.CpuTemperatureC) >= UiProjectionTempDelta
+                || Math.Abs(sample.GpuTemperatureC - previous.GpuTemperatureC) >= UiProjectionTempDelta
+                || Math.Abs(sample.CpuLoadPercent - previous.CpuLoadPercent) >= UiProjectionLoadDelta
+                || Math.Abs(sample.GpuLoadPercent - previous.GpuLoadPercent) >= UiProjectionLoadDelta
+                || Math.Abs(sample.CpuPowerWatts - previous.CpuPowerWatts) >= UiProjectionPowerDelta
+                || Math.Abs(sample.GpuPowerWatts - previous.GpuPowerWatts) >= UiProjectionPowerDelta
+                || Math.Abs(sample.Fan1Rpm - previous.Fan1Rpm) >= UiProjectionFanRpmDelta
+                || Math.Abs(sample.Fan2Rpm - previous.Fan2Rpm) >= UiProjectionFanRpmDelta
+                || sample.CpuTemperatureState != previous.CpuTemperatureState
+                || sample.GpuTemperatureState != previous.GpuTemperatureState
+                || sample.Fan1RpmState != previous.Fan1RpmState
+                || sample.Fan2RpmState != previous.Fan2RpmState;
+        }
+
+        private static int EstimateFanPercent(int rpm)
+        {
+            if (rpm <= 0) return 0;
+            if (rpm >= 5500) return 100;
+            return Math.Clamp((int)Math.Round(rpm / 55.0), 0, 100);
         }
 
         #endregion

@@ -44,8 +44,10 @@ public static class LinuxCapabilityClassifier
         string? model,
         string? boardId)
     {
-        var hasManualFanControl = hasEcAccess || hasFan1Output || hasFan2Output || hasFan1Target || hasFan2Target || hasHwmonFanAccess;
-        var hasProfileControl = hasThermalProfile || hasPlatformProfile || hasAcpiPlatformProfile;
+        var hasManualFanControl = hasEcAccess || hasFan1Output || hasFan2Output || hasFan1Target || hasFan2Target;
+        // hwmon pwm_enable gives coarse policy control (auto/full/manual mode), but not reliable
+        // per-fan/manual target writes by itself.
+        var hasProfileControl = hasThermalProfile || hasPlatformProfile || hasAcpiPlatformProfile || hasHwmonFanAccess;
         var hasTelemetry = hasTelemetryPaths || hasHpWmiPath || hasManualFanControl || hasProfileControl;
 
         if (hasManualFanControl)
@@ -75,7 +77,9 @@ public static class LinuxCapabilityClassifier
 
         if (hasProfileControl)
         {
-            var reason = isUnsafeEcModel
+            var reason = hasHwmonFanAccess
+                ? "Firmware exposes hwmon pwm_enable policy control, but no writable fan target/output interface was detected for manual per-fan speed control."
+                : isUnsafeEcModel
                 ? $"Board '{boardId ?? "unknown"}' on model '{model ?? "unknown"}' is classified profile-only because direct EC writes are blocked for safety and only thermal/platform profile control is exposed."
                 : "Thermal/platform profile control is available, but firmware does not expose manual fan target/output interfaces on this board.";
 

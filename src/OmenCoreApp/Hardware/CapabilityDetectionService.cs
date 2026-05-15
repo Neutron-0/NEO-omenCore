@@ -969,7 +969,60 @@ namespace OmenCore.Hardware
                 }
             }
             
-            // Test 4: Check if model-specific features match reality
+            // Test 4: Undervolt runtime readiness (MSR/SMU access probe)
+            if (Capabilities.CanUndervolt)
+            {
+                try
+                {
+                    _logging?.Info("  Testing undervolt runtime readiness...");
+                    
+                    // Create the provider asynchronously to test MSR/SMU access
+                    var provider = CpuUndervoltProviderFactory.Create(out var backendInfo);
+                    
+                    // Synchronously probe for runtime readiness
+                    // (normally this is async, but we run it synchronously for startup probing)
+                    var ct = System.Threading.CancellationToken.None;
+                    var probeTask = provider.ProbeAsync(ct);
+                    
+                    // Wait for probe with 5 second timeout
+                    if (probeTask.Wait(TimeSpan.FromSeconds(5)))
+                    {
+                        var probeStatus = probeTask.Result;
+                        
+                        if (probeStatus.IsRuntimeReady)
+                        {
+                            _logging?.Info($"  ✓ Undervolt runtime ready via {backendInfo}");
+                            Capabilities.UndervoltRuntimeReady = true;
+                            Capabilities.UndervoltBlockReason = null;
+                            successCount++;
+                        }
+                        else
+                        {
+                            string reason = probeStatus.RuntimeBlockReason ?? probeStatus.Error ?? "Unknown block reason";
+                            _logging?.Warn($"  ✗ Undervolt blocked: {reason}");
+                            Capabilities.UndervoltRuntimeReady = false;
+                            Capabilities.UndervoltBlockReason = reason;
+                            failCount++;
+                        }
+                    }
+                    else
+                    {
+                        _logging?.Warn($"  ✗ Undervolt probe timed out (5s)");
+                        Capabilities.UndervoltRuntimeReady = false;
+                        Capabilities.UndervoltBlockReason = "Undervolt probe timed out";
+                        failCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logging?.Warn($"  ✗ Undervolt probe failed: {ex.Message}");
+                    Capabilities.UndervoltRuntimeReady = false;
+                    Capabilities.UndervoltBlockReason = ex.Message;
+                    failCount++;
+                }
+            }
+            
+            // Test 5: Check if model-specific features match reality
             if (Capabilities.ModelConfig != null)
             {
                 var model = Capabilities.ModelConfig;

@@ -1,9 +1,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OmenCore.Avalonia.Services;
+using OmenCore.Linux.Desktop;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace OmenCore.Avalonia.ViewModels;
 
@@ -37,7 +39,7 @@ public partial class MainWindowViewModel : ObservableObject
     private string _fanMode = "Auto";
 
     [ObservableProperty]
-    private string _appVersion = "3.6.0";
+    private string _appVersion = "3.6.1";
 
     // Navigation state
     [ObservableProperty]
@@ -138,7 +140,7 @@ public partial class MainWindowViewModel : ObservableObject
             await _configService.LoadAsync();
             var capabilities = await _hardwareService.GetCapabilitiesAsync();
             ModelName = capabilities.ModelName;
-            ShowFanControlNavigation = capabilities.SupportsFanControl;
+            ShowFanControlNavigation = capabilities.SupportsFanSurface;
             FanControlCapabilityReason = capabilities.FanControlCapabilityReason;
             StatusText = capabilities.FanControlCapabilityClass switch
             {
@@ -205,9 +207,19 @@ public partial class MainWindowViewModel : ObservableObject
     {
         try
         {
-            StatusText = "Refreshing...";
+            StatusText = "Refreshing sensors...";
             var status = await _hardwareService.GetStatusAsync();
-            StatusText = "Connected";
+            var perfMode = await _hardwareService.GetPerformanceModeAsync();
+
+            PerformanceMode = perfMode.ToString();
+            FanMode = (status.CpuFanRpm > 0 || status.GpuFanRpm > 0) ? "Active" : "Auto";
+
+            if (CurrentPage == "Dashboard")
+            {
+                await DashboardVm.RefreshCommand.ExecuteAsync(null);
+            }
+
+            StatusText = $"Sensors refreshed {DateTime.Now:HH:mm:ss}";
         }
         catch (Exception ex)
         {
@@ -223,6 +235,18 @@ public partial class MainWindowViewModel : ObservableObject
     
     private void OpenUrl(string url)
     {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            if (!LinuxDesktopLauncher.TryOpenUrl(url, out var reason))
+            {
+                StatusText = string.IsNullOrWhiteSpace(reason)
+                    ? "Unable to open browser automatically."
+                    : reason;
+            }
+
+            return;
+        }
+
         try
         {
             Process.Start(new ProcessStartInfo
@@ -233,28 +257,8 @@ public partial class MainWindowViewModel : ObservableObject
         }
         catch
         {
-            // Fallback for Linux when xdg-open fails
-            try
-            {
-                // Try common Linux browsers directly
-                var browsers = new[] { "firefox", "chromium", "google-chrome", "brave-browser", "xdg-open" };
-                foreach (var browser in browsers)
-                {
-                    try
-                    {
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = browser,
-                            Arguments = url,
-                            UseShellExecute = false,
-                            RedirectStandardError = true
-                        });
-                        return;
-                    }
-                    catch { }
-                }
-            }
-            catch { }
+            StatusText = "Unable to open browser automatically.";
         }
     }
+
 }

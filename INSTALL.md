@@ -1,6 +1,6 @@
 ﻿# OmenCore Installation Guide
 
-Complete installation instructions for OmenCore v3.6.0 on Windows and Linux.
+Complete installation instructions for OmenCore v3.6.1 on Windows and Linux.
 
 ---
 
@@ -26,7 +26,7 @@ Complete installation instructions for OmenCore v3.6.0 on Windows and Linux.
 
 ### Option 1: Installer (Recommended)
 
-1. **Download** `OmenCoreSetup-3.6.0.exe` from [Releases](https://github.com/theantipopau/omencore/releases/tag/v3.6.0)
+1. **Download** `OmenCoreSetup-3.6.1.exe` from [Releases](https://github.com/theantipopau/omencore/releases/tag/v3.6.1)
 
 2. **Verify** the SHA256 hash published in the release notes before running (optional but recommended)
 
@@ -44,7 +44,7 @@ Complete installation instructions for OmenCore v3.6.0 on Windows and Linux.
 
 ### Option 2: Portable ZIP
 
-1. **Download** `OmenCore-3.6.0-win-x64.zip` from [Releases](https://github.com/theantipopau/omencore/releases/tag/v3.6.0)
+1. **Download** `OmenCore-3.6.1-win-x64.zip` from [Releases](https://github.com/theantipopau/omencore/releases/tag/v3.6.1)
 
 2. **Verify SHA256** of the ZIP (hash published in GitHub Release notes)
 
@@ -71,7 +71,7 @@ Complete installation instructions for OmenCore v3.6.0 on Windows and Linux.
 
 ```bash
 # 1. Download the Linux release
-VERSION=3.6.0
+VERSION=3.6.1
 wget "https://github.com/theantipopau/omencore/releases/download/v${VERSION}/OmenCore-${VERSION}-linux-x64.zip"
 
 # 2. Extract
@@ -101,7 +101,7 @@ chmod +x omencore-cli omencore-gui
 
 ```bash
 # 1. Download
-VERSION=3.6.0
+VERSION=3.6.1
 wget "https://github.com/theantipopau/omencore/releases/download/v${VERSION}/OmenCore-${VERSION}-linux-x64.zip"
 
 # 2. Extract
@@ -230,6 +230,26 @@ dmesg | grep -i omen
 sudo omencore-cli --report > omencore-report.txt
 ```
 
+If hp-wmi exists but no usable profile files are exposed:
+
+```bash
+# Check for both underscore and hyphen variants
+ls /sys/devices/platform/hp-wmi/*profile* 2>/dev/null
+
+# Optional workaround on some OMEN boards (not universal):
+# add kernel cmdline parameter and reboot
+# hp_wmi.force_multiplex=1
+```
+
+Arch/CachyOS users can test AUR package `hp-omen-gaming-wmi-dkms`. On many OMEN systems this automates the hp-wmi profile-path setup (including multiplex-related behavior) with less manual tuning. Results are still board- and firmware-dependent, and some systems still do not expose usable profile control after installing it.
+
+If these steps do not help, capture diagnostics and include board + kernel details:
+
+```bash
+uname -r
+sudo omencore-cli diagnose --report > omencore-report.txt
+```
+
 #### GUI won't start (Avalonia)
 
 ```bash
@@ -253,7 +273,7 @@ Notes:
 # Re-download fixed Linux package into a clean folder
 rm -rf OmenCore-linux-x64
 mkdir -p OmenCore-linux-x64
-VERSION=3.6.0
+VERSION=3.6.1
 wget "https://github.com/theantipopau/omencore/releases/download/v${VERSION}/OmenCore-${VERSION}-linux-x64.zip"
 unzip "OmenCore-${VERSION}-linux-x64.zip" -d OmenCore-linux-x64
 cd OmenCore-linux-x64

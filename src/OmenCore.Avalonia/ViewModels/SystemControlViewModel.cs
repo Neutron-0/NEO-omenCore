@@ -11,6 +11,9 @@ public partial class SystemControlViewModel : ObservableObject
 {
     private readonly IHardwareService _hardwareService;
     private bool _suppressPerformanceModeSelectionChange;
+    private string _performanceProfileReason = "Performance mode control is unavailable on this Linux board/kernel path.";
+    private bool _canSetKeyboardBrightness = true;
+    private string _keyboardBrightnessReason = "Keyboard brightness control is unavailable on this Linux board/kernel path.";
 
     // Performance Mode
     [ObservableProperty]
@@ -21,6 +24,9 @@ public partial class SystemControlViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isPerformanceModeChanging;
+
+    [ObservableProperty]
+    private bool _canSetPerformanceMode = true;
 
     // GPU Mode
     [ObservableProperty]
@@ -72,6 +78,20 @@ public partial class SystemControlViewModel : ObservableObject
             HasKeyboardBacklight = capabilities.HasKeyboardBacklight;
             HasFourZoneRgb = capabilities.HasFourZoneRgb;
             HasGpuMuxSwitch = capabilities.HasGpuMuxSwitch;
+            CanSetPerformanceMode = capabilities.SupportsPerformanceProfiles;
+            _performanceProfileReason = string.IsNullOrWhiteSpace(capabilities.PerformanceProfileReason)
+                ? "Performance mode control is unavailable on this Linux board/kernel path."
+                : capabilities.PerformanceProfileReason;
+
+            _canSetKeyboardBrightness = capabilities.SupportsKeyboardBrightness;
+            _keyboardBrightnessReason = string.IsNullOrWhiteSpace(capabilities.KeyboardBrightnessReason)
+                ? "Keyboard brightness control is unavailable on this Linux board/kernel path."
+                : capabilities.KeyboardBrightnessReason;
+
+            if (!CanSetPerformanceMode)
+            {
+                StatusMessage = _performanceProfileReason;
+            }
 
             var mode = await _hardwareService.GetPerformanceModeAsync();
             SetSelectedPerformanceModeIndex(mode);
@@ -120,6 +140,12 @@ public partial class SystemControlViewModel : ObservableObject
     {
         if (IsPerformanceModeChanging)
             return;
+
+        if (!CanSetPerformanceMode)
+        {
+            StatusMessage = _performanceProfileReason;
+            return;
+        }
 
         try
         {
@@ -171,6 +197,12 @@ public partial class SystemControlViewModel : ObservableObject
 
     private async Task ApplyKeyboardBrightnessAsync()
     {
+        if (!_canSetKeyboardBrightness)
+        {
+            StatusMessage = _keyboardBrightnessReason;
+            return;
+        }
+
         try
         {
             await _hardwareService.SetKeyboardBrightnessAsync(KeyboardBrightness);

@@ -70,6 +70,14 @@ namespace OmenCore.Services
         {
             try
             {
+                var preflight = await _provider.ProbeAsync(token);
+                if (!preflight.IsRuntimeReady)
+                {
+                    var reason = preflight.RuntimeBlockReason ?? preflight.Warning ?? preflight.Error ?? "Undervolt backend is not ready.";
+                    UpdateStatus(preflight);
+                    throw new InvalidOperationException(reason);
+                }
+
                 await _provider.ApplyOffsetAsync(offset, token);
                 _logging.Info($"Undervolt -> core {offset.CoreMv} mV cache {offset.CacheMv} mV");
                 await RefreshAsync(token);
@@ -86,6 +94,14 @@ namespace OmenCore.Services
         {
             try
             {
+                var preflight = await _provider.ProbeAsync(token);
+                if (!preflight.IsRuntimeReady)
+                {
+                    var reason = preflight.RuntimeBlockReason ?? preflight.Warning ?? preflight.Error ?? "Undervolt backend is not ready.";
+                    UpdateStatus(preflight);
+                    throw new InvalidOperationException(reason);
+                }
+
                 await _provider.ResetAsync(token);
                 _logging.Info("Undervolt offsets reset to default");
                 await RefreshAsync(token);

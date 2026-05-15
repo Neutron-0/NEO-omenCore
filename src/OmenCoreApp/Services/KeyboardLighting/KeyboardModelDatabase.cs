@@ -540,6 +540,21 @@ namespace OmenCore.Services.KeyboardLighting
                 Notes = "GitHub #89 — Victus 16-r0xxx (Ryzen 2024+) with 4-zone RGB keyboard support"
             });
 
+            // Victus 16-e0xxx (Issue #128): unresolved product ID led to Unknown keyboard fallback.
+            // Default to backlight-only until an RGB-capable variant is verified.
+            AddModel(new KeyboardModelConfig
+            {
+                ProductId = "88EC",
+                ModelName = "HP Victus 16-e0xxx",
+                ModelNamePattern = "16-e0",
+                KeyboardType = KeyboardType.BacklightOnly,
+                PreferredMethod = KeyboardMethod.BacklightOnly,
+                FallbackMethods = Array.Empty<KeyboardMethod>(),
+                ModelYear = 2022,
+                UserVerified = false,
+                Notes = "Issue #128 — explicit Victus 16-e0xxx keyboard mapping to avoid unknown fallback; conservative backlight-only defaults pending field verification"
+            });
+
             // ═══════════════════════════════════════════════════════════════════════════════════
             // Older OMEN Models (2018-2019) - Backlight only
             // ═══════════════════════════════════════════════════════════════════════════════════

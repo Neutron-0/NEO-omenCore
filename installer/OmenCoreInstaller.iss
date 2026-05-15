@@ -1,6 +1,6 @@
 #define MyAppName "OmenCore"
 #ifndef MyAppVersion
-  #define MyAppVersion "3.6.0"
+  #define MyAppVersion "3.6.1"
 #endif
 #ifndef MyPublishDir
   #define MyPublishDir "..\\publish\\win-x64"

@@ -52,8 +52,15 @@ namespace OmenCore.Services.BloatwareManager
         {
             get
             {
-                using var identity = WindowsIdentity.GetCurrent();
-                return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
+                try
+                {
+                    using var identity = WindowsIdentity.GetCurrent();
+                    return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
+                }
+                catch
+                {
+                    return false;
+                }
             }
         }
 
@@ -2475,11 +2482,9 @@ namespace OmenCore.Services.BloatwareManager
                 var candidates = apps.Where(a => !a.IsRemoved).ToList();
                 if (!candidates.Any()) return null;
 
-                var logDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "OmenCore", "Logs");
+                var logDir = Path.Combine(GetLocalAppDataRoot(), "OmenCore", "Logs");
                 Directory.CreateDirectory(logDir);
-                var reportPath = Path.Combine(logDir, $"bloatware-dry-run-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+                var reportPath = Path.Combine(logDir, $"bloatware-dry-run-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.txt");
 
                 var lines = new System.Text.StringBuilder();
                 lines.AppendLine("OmenCore Bloatware Dry Run Report");
@@ -2564,6 +2569,23 @@ namespace OmenCore.Services.BloatwareManager
                 "BIOS/driver/update path understood before removing HP support utilities.",
                 "Windows restore point planned before removal."
             };
+        }
+
+        private static string GetLocalAppDataRoot()
+        {
+            var overrideRoot = Environment.GetEnvironmentVariable("LOCALAPPDATA");
+            if (!string.IsNullOrWhiteSpace(overrideRoot))
+            {
+                return overrideRoot;
+            }
+
+            var knownFolder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrWhiteSpace(knownFolder))
+            {
+                return knownFolder;
+            }
+
+            return Path.Combine(Path.GetTempPath(), "OmenCore");
         }
 
         private static string BuildRiskReason(BloatwareApp app)

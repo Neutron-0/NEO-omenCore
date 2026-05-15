@@ -1,4 +1,5 @@
 using System;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using FluentAssertions;
@@ -6,6 +7,7 @@ using OmenCore.Models;
 using OmenCore.Services;
 using OmenCore.Services.Diagnostics;
 using System.Threading.Tasks;
+using System.Reflection;
 using Xunit;
 
 namespace OmenCoreApp.Tests.ViewModels
@@ -51,9 +53,20 @@ namespace OmenCoreApp.Tests.ViewModels
         private sealed class TestFanVerificationService : IFanVerificationService
         {
             public bool IsAvailable { get; set; }
+            public int ApplyAndVerifyCallCount { get; private set; }
 
             public Task<FanApplyResult> ApplyAndVerifyFanSpeedAsync(int fanIndex, int targetPercent, System.Threading.CancellationToken ct = default)
-                => Task.FromResult(new FanApplyResult());
+            {
+                ApplyAndVerifyCallCount++;
+                return Task.FromResult(new FanApplyResult
+                {
+                    FanIndex = fanIndex,
+                    RequestedPercent = targetPercent,
+                    WmiCallSucceeded = true,
+                    VerificationPassed = true,
+                    ActualRpmAfter = 2200
+                });
+            }
 
             public Task<FanApplyResult> ApplyWithEnhancedVerificationAsync(int fanIndex, int targetPercent, bool autoRevertOnFailure = true, System.Threading.CancellationToken ct = default)
                 => Task.FromResult(new FanApplyResult());
@@ -92,6 +105,29 @@ namespace OmenCoreApp.Tests.ViewModels
                 .GetField("_fanService", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             field.Should().NotBeNull();
             return field!.GetValue(vm).Should().BeOfType<FanService>().Subject;
+        }
+
+        private static void AddFanTelemetry(FanService fanService)
+        {
+            var field = typeof(FanService)
+                .GetField("_fanTelemetry", BindingFlags.NonPublic | BindingFlags.Instance);
+            field.Should().NotBeNull();
+            var telemetry = field!.GetValue(fanService).Should().BeAssignableTo<ObservableCollection<FanTelemetry>>().Subject;
+            telemetry.Add(new FanTelemetry { Name = "CPU Fan", SpeedRpm = 1800, DutyCyclePercent = 32, Temperature = 55 });
+            telemetry.Add(new FanTelemetry { Name = "GPU Fan", SpeedRpm = 1700, DutyCyclePercent = 30, Temperature = 53 });
+        }
+
+        private static Task RunCurveVerificationKickAsync(
+            OmenCore.ViewModels.FanControlViewModel vm,
+            string sourceLabel,
+            System.Collections.Generic.IEnumerable<FanCurvePoint> curvePoints,
+            Action reapplyCurveAction)
+        {
+            var method = typeof(OmenCore.ViewModels.FanControlViewModel)
+                .GetMethod("RunCurveVerificationKickAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+            method.Should().NotBeNull();
+            return method!.Invoke(vm, new object[] { sourceLabel, curvePoints, reapplyCurveAction })
+                .Should().BeAssignableTo<Task>().Subject;
         }
 
         [Fact]
@@ -186,6 +222,15 @@ namespace OmenCoreApp.Tests.ViewModels
             extreme.Where(p => p.TemperatureC <= 70).Should().OnlyContain(p => p.FanPercent < 90,
                 "Extreme is the highest non-Max curve, but Max remains the explicit 100% mode");
             extreme.Single(p => p.FanPercent == 100).TemperatureC.Should().BeGreaterThan(80);
+        }
+
+        [Fact]
+        public void BuiltInPresets_DoNotExposeGhostManualPreset()
+        {
+            var vm = CreateViewModel();
+
+            vm.FanPresets.Should().NotContain(p => p.Name == "Manual",
+                "the advanced fan page should not manufacture a fake Manual preset that can leak into runtime state or hotkey cycling");
         }
 
         [Fact]
@@ -301,6 +346,62 @@ namespace OmenCoreApp.Tests.ViewModels
 
             vm.CurveValidationMessage.Should().StartWith("Thermal guard active:");
             vm.CurvePreviewText.Should().Contain("requested 20%, effective 40%");
+        }
+
+        [Fact]
+        public async Task CurveVerificationKick_SkipsRepeatedSameTargetWithinCooldown()
+        {
+            var verification = new TestFanVerificationService { IsAvailable = true };
+            var vm = CreateViewModel(verification);
+            AddFanTelemetry(GetFanService(vm));
+            vm.CurrentTemperature = 55;
+            var curve = new[]
+            {
+                new FanCurvePoint { TemperatureC = 40, FanPercent = 30 },
+                new FanCurvePoint { TemperatureC = 80, FanPercent = 70 }
+            };
+
+            await RunCurveVerificationKickAsync(vm, "Preset 'Field curve'", curve, () => { });
+            await RunCurveVerificationKickAsync(vm, "Preset 'Field curve'", curve, () => { });
+
+            verification.ApplyAndVerifyCallCount.Should().Be(1,
+                "automatic post-apply verification should not repeat the same expensive WMI diagnostic kick inside the cooldown window");
+            vm.CurveApplyStatus.Should().Contain("verification recently checked");
+        }
+
+        [Fact]
+        public void BuiltInGamingAndQuietPresets_PublishCanonicalRuntimeModes()
+        {
+            var vm = CreateViewModel();
+            var fanService = GetFanService(vm);
+
+            vm.FanPresets.Should().ContainSingle(p => p.Name == "Gaming" && p.IsBuiltIn);
+            vm.FanPresets.Should().ContainSingle(p => p.Name == "Quiet" && p.IsBuiltIn);
+
+            fanService.ApplyPreset(vm.FanPresets.Single(p => p.Name == "Gaming")).Should().BeTrue();
+            fanService.GetCurrentFanMode().Should().Be("Gaming");
+
+            fanService.ApplyPreset(vm.FanPresets.Single(p => p.Name == "Quiet")).Should().BeTrue();
+            fanService.GetCurrentFanMode().Should().Be("Quiet");
+        }
+
+        [Fact]
+        public void ExtremeCurve_StaysAtOrAboveGamingCurveOnSharedTemperaturePoints()
+        {
+            var vm = CreateViewModel();
+            var gamingCurve = vm.FanPresets.Single(p => p.Name == "Gaming").Curve.OrderBy(p => p.TemperatureC).ToList();
+            var extremeCurve = vm.FanPresets.Single(p => p.Name == "Extreme").Curve.OrderBy(p => p.TemperatureC).ToList();
+
+            foreach (var temperature in gamingCurve.Select(p => p.TemperatureC).Where(t => t <= 80))
+            {
+                var gamingPoint = gamingCurve.Single(p => p.TemperatureC == temperature);
+                var extremePoint = extremeCurve.Single(p => p.TemperatureC == temperature);
+
+                extremePoint.FanPercent.Should().BeGreaterThanOrEqualTo(gamingPoint.FanPercent,
+                    $"Extreme should never trail Gaming at {temperature}C");
+            }
+
+            extremeCurve.Single(p => p.FanPercent == 100).TemperatureC.Should().BeGreaterThan(80);
         }
     }
 }

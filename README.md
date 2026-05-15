@@ -10,7 +10,7 @@
 
 ---
 
-**OmenCore** is a **complete, independent replacement** for HP OMEN Gaming Hub. No dependencies. No OGH services. No bloatware, outbound telemetry, or ads. Built on .NET 8, it delivers professional-grade hardware control using native WMI BIOS commands that work directly with your laptop's firmware.
+**OmenCore** is an **independent control center** for HP OMEN and Victus laptops. It runs without OMEN Gaming Hub installed, avoids bloatware/outbound telemetry/ads, and uses local WMI BIOS, EC, and platform backends where the hardware exposes them.
 
 ### Why OmenCore?
 
@@ -27,7 +27,7 @@
 
 ### ⚡ Quick Links
 
-[![Version](https://img.shields.io/badge/version-3.6.0-red.svg?style=for-the-badge)](docs/CHANGELOG_v3.6.0.md)
+[![Version](https://img.shields.io/badge/version-3.6.1-red.svg?style=for-the-badge)](docs/CHANGELOG-3.6.1.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg?style=for-the-badge)](https://dotnet.microsoft.com/download/dotnet/8.0)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/9WhJdabGk8)
@@ -83,24 +83,25 @@ This generates a timestamped folder with:
 
 Attach those files to your GitHub issue for faster triage.
 
-## 🔥 **What's New in v3.6.0**
+## 🔥 **What's New in v3.6.1**
 
-v3.6.0 is the current release, focused on lightweight runtime behavior plus reliability hardening for fan, hotkey, and RGB control paths.
+v3.6.1 is the current stabilization release, focused on fan/performance correctness, tray/OSD consistency, lower WMI fan-control CPU pressure, EC coordination, and safer capability fallback behavior.
 
-### v3.6.0 Highlights
+### v3.6.1 Highlights
 
-- **RGB/backlight reliability hardening** with model-aware backend fallback retries and safer recovery flows.
-- **Hotkey reliability improvements** to avoid duplicate/conflicting startup registrations under delayed window-handle timing.
-- **Memory Optimizer quality pass** with richer cleanup metrics, game-aware behavior, and dynamic exclusion guidance.
-- **Lightweight runtime work** to reduce startup/idle overhead while preserving monitoring and diagnostics visibility.
+- **Fan/performance state stabilization** across tray, hotkeys, OSD, dashboard, and linked-mode flows.
+- **Reduced high-CPU fan-curve pressure** by bounding WMI keepalive writes and automatic curve verification.
+- **EC coordination hardening** for fan, performance, keyboard, power verification, diagnostics, and GPU boost fallback paths.
+- **Capability truth improvements** for undervolt readiness, unknown model fallback messaging, and Linux profile/fan capability reporting.
+- **UI responsiveness and layout fixes** for tray/OSD state freshness, low-overhead dashboard updates, and high-DPI/narrow-window clipping.
 
 ### Release Notes
 
-Current stable release is **v3.6.0**.
+Current stable release is **v3.6.1**.
 
-→ **[v3.6.0 Changelog](docs/CHANGELOG_v3.6.0.md)**
+→ **[v3.6.1 Changelog](docs/CHANGELOG-3.6.1.md)**
 
-→ **[v3.6.0 Roadmap](docs/ROADMAP_v3.6.0.md)**
+→ **[v3.6.1 RC Checklist](docs/3.6.1-RC-CHECKLIST.md)**
 
 → **[Previous Stable Changelog (v3.4.1)](docs/CHANGELOG_v3.4.1.md)**
 
@@ -108,15 +109,15 @@ Current stable release is **v3.6.0**.
 
 ## 📦 **Downloads & Artifacts**
 
-**Version:** v3.6.0 | **Status:** Released
+**Version:** v3.6.1 | **Status:** Release candidate
 
 Release artifacts:
 
 | Download | Platform | Details |
 |----------|----------|----------|
-| **OmenCoreSetup-3.6.0.exe** | Windows | Installer (Recommended) — Includes .NET 8 runtime |
-| **OmenCore-3.6.0-win-x64.zip** | Windows | Portable — Extract and run, no installation |
-| **OmenCore-3.6.0-linux-x64.zip** | Linux | CLI + Avalonia GUI, self-contained runtime |
+| **OmenCoreSetup-3.6.1.exe** | Windows | Installer (Recommended) — Includes .NET 8 runtime |
+| **OmenCore-3.6.1-win-x64.zip** | Windows | Portable — Extract and run, no installation |
+| **OmenCore-3.6.1-linux-x64.zip** | Linux | CLI + Avalonia GUI, self-contained runtime |
 
 ### SHA256
 
@@ -183,19 +184,19 @@ Release hashes are published alongside each asset on the [GitHub Releases page](
 
 ## 🎮 HP Gaming Hub Feature Parity
 
-OmenCore is designed to **completely replace** OMEN Gaming Hub.
+OmenCore is designed to replace the core local-control workflows of OMEN Gaming Hub on supported hardware.
 
 | HP Gaming Hub Feature | OmenCore | Notes |
 |----------------------|---------|-------|
-| Fan Control | ✅ Full | Custom curves + WMI BIOS presets |
-| Performance Modes | ✅ Full | CPU/GPU power envelope via WMI |
-| CPU Undervolting | ✅ Full | Intel MSR with safety clamping |
-| GPU Power Boost | ✅ Full | +15W Dynamic Boost (PPAB) |
-| Keyboard RGB | ✅ Full | Per-zone + per-key on supported models |
+| Fan Control | Supported models | Custom curves + WMI BIOS/EC presets where firmware exposes control |
+| Performance Modes | Supported models | CPU/GPU power envelope via WMI/profile backends where available |
+| CPU Undervolting | Intel-supported systems | Intel MSR with safety clamping; hidden when runtime access is blocked |
+| GPU Power Boost | Supported OMEN models | +15W Dynamic Boost (PPAB) where BIOS exposes it |
+| Keyboard RGB | Supported keyboards | Per-zone + per-key on supported models |
 | Hardware Monitoring | ✅ Full | LibreHardwareMonitor integration |
 | Gaming Mode | ✅ Full | Service/animation optimization |
-| Battery Care | ✅ Full | Adjustable 60–100% charge limit |
-| Peripheral Control | 🟡 Beta | Corsair/Logitech/Razer hardware detection ready |
+| Battery Care | Supported models | Adjustable charge limit where firmware exposes it |
+| Peripheral Control | Beta | Corsair/Logitech/Razer hardware detection ready |
 | Hub Cleanup | ✅ Exclusive | Safe OGH removal tool |
 | Per-Game Profiles | ✅ Full | Auto-switch on process detection |
 | In-Game Overlay | ✅ Full | Click-through OSD |
@@ -203,7 +204,7 @@ OmenCore is designed to **completely replace** OMEN Gaming Hub.
 | Game Library | ✅ Out of scope | Use Steam/Epic/Xbox app |
 | Omen Oasis | ✅ Out of scope | Cloud gaming out of scope |
 
-**OmenCore covers 100% of essential Gaming Hub features** — with better performance, no outbound telemetry, no ads, and full offline operation.
+**OmenCore covers the essential local-control Gaming Hub workflows on supported OMEN/Victus hardware** with better performance, no outbound telemetry, no ads, and full offline operation. Unsupported or unverified features are gated clearly rather than presented as guaranteed.
 
 ---
 
@@ -297,7 +298,7 @@ cd src\OmenCoreApp\bin\Release\net8.0-windows10.0.19041.0
 ```powershell
 pwsh ./build-installer.ps1
 # Optional: -Configuration Release -Runtime win-x64 (these are the defaults)
-# Outputs: artifacts/OmenCoreSetup-3.6.0.exe and artifacts/OmenCore-3.6.0-win-x64.zip
+# Outputs: artifacts/OmenCoreSetup-3.6.1.exe and artifacts/OmenCore-3.6.1-win-x64.zip
 ```
 
 ### Tests
@@ -347,6 +348,8 @@ Detailed logs are in `%LOCALAPPDATA%\OmenCore\`. On Linux, use `sudo omencore-cl
 
 | Version | Key Changes |
 |---------|------------|
+| **v3.6.1** | Stabilization release: fan/performance sync, tray/OSD consistency, WMI fan CPU reduction, EC coordination, capability fallback hardening |
+| **v3.6.0** | Lightweight runtime behavior, hardware-worker reliability, fan/RGB/hotkey hardening, and release packaging improvements |
 | **v3.5.0** | Reliability release: fan/tuning diagnostics clarity, requested-vs-confirmed UI hardening, conflict/recovery safety guardrails, and roadmap split for deferred scope |
 | **v3.4.1** | Hotfix for fan/profile regressions, brightness hotkeys, RGB reliability, Linux startup diagnostics, and 15-en0038ur support |
 | **v3.4.0** | Correctness and reliability sweep: fan/power fixes, update safety hardening, CI/package alignment, model/support matrix expansion |
@@ -372,8 +375,8 @@ Older release notes: [docs/](docs/)
 - [docs/ANTIVIRUS_FAQ.md](docs/ANTIVIRUS_FAQ.md) — Antivirus false positive handling
 - [docs/DEFENDER_FALSE_POSITIVE.md](docs/DEFENDER_FALSE_POSITIVE.md) — Windows Defender exclusion steps
 - [docs/WINRING0_SETUP.md](docs/WINRING0_SETUP.md) — WinRing0 driver setup
-- [docs/CHANGELOG_v3.5.0.md](docs/CHANGELOG_v3.5.0.md) — Active release-track changelog and validation gate
-- [docs/ROADMAP_v3.6.0.md](docs/ROADMAP_v3.6.0.md) — Deferred scope for the next release cycle
+- [docs/CHANGELOG-3.6.1.md](docs/CHANGELOG-3.6.1.md) — Current stabilization release changelog
+- [docs/3.6.1-RC-CHECKLIST.md](docs/3.6.1-RC-CHECKLIST.md) — Release-candidate and tester validation checklist
 - [docs/CHANGELOG_v3.4.1.md](docs/CHANGELOG_v3.4.1.md) — Latest stable release notes
 
 ---

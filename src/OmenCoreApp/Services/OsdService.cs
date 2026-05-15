@@ -33,6 +33,9 @@ namespace OmenCore.Services
         private int _retryAttempts = 0;
         private const int MaxRetryAttempts = 5;
         private const int RetryIntervalMs = 2000;
+        private string _lastCurrentMode = "";
+        private string _lastPerformanceMode = "";
+        private string _lastFanMode = "";
         
         // Win32 hotkey registration
         private const int WM_HOTKEY = 0x0312;
@@ -138,6 +141,18 @@ namespace OmenCore.Services
             Application.Current?.Dispatcher?.Invoke(() =>
             {
                 _overlayWindow.Show();
+                if (!string.IsNullOrWhiteSpace(_lastCurrentMode))
+                {
+                    _overlayWindow.SetCurrentMode(_lastCurrentMode);
+                }
+                if (!string.IsNullOrWhiteSpace(_lastPerformanceMode))
+                {
+                    _overlayWindow.SetPerformanceMode(_lastPerformanceMode);
+                }
+                if (!string.IsNullOrWhiteSpace(_lastFanMode))
+                {
+                    _overlayWindow.SetFanMode(_lastFanMode);
+                }
                 _overlayWindow.StartUpdates();
                 NotifyVisibilityChanged(true);
             });
@@ -178,9 +193,10 @@ namespace OmenCore.Services
         /// </summary>
         public void SetCurrentMode(string mode)
         {
+            _lastCurrentMode = mode ?? string.Empty;
             Application.Current?.Dispatcher?.Invoke(() =>
             {
-                _overlayWindow?.SetCurrentMode(mode);
+                _overlayWindow?.SetCurrentMode(mode ?? string.Empty);
             });
         }
         
@@ -189,9 +205,10 @@ namespace OmenCore.Services
         /// </summary>
         public void SetPerformanceMode(string mode)
         {
+            _lastPerformanceMode = mode ?? string.Empty;
             Application.Current?.Dispatcher?.Invoke(() =>
             {
-                _overlayWindow?.SetPerformanceMode(mode);
+                _overlayWindow?.SetPerformanceMode(mode ?? string.Empty);
             });
         }
         
@@ -200,9 +217,10 @@ namespace OmenCore.Services
         /// </summary>
         public void SetFanMode(string mode)
         {
+            _lastFanMode = mode ?? string.Empty;
             Application.Current?.Dispatcher?.Invoke(() =>
             {
-                _overlayWindow?.SetFanMode(mode);
+                _overlayWindow?.SetFanMode(mode ?? string.Empty);
             });
         }
         
@@ -346,6 +364,8 @@ namespace OmenCore.Services
         
         private void StartHotkeyRetryTimer(uint modifiers, uint vk, string hotkeyStr)
         {
+            _retryTimer?.Dispose();
+            _retryTimer = null;
             _retryAttempts = 0;
             _retryTimer = new System.Threading.Timer(_ =>
             {
@@ -370,7 +390,10 @@ namespace OmenCore.Services
                                 }
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            _logging.Warn($"OSD: Hotkey retry attempt failed while resolving main window handle: {ex.Message}");
+                        }
                         
                         _retryAttempts++;
                         if (_retryAttempts >= MaxRetryAttempts)
@@ -415,9 +438,9 @@ namespace OmenCore.Services
                     _hotkeySource = null;
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore errors during cleanup
+                _logging.Warn($"OSD: Hotkey cleanup encountered an error: {ex.Message}");
             }
         }
         

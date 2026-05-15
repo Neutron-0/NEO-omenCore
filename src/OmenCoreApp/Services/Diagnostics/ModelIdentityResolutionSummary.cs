@@ -9,6 +9,7 @@ namespace OmenCore.Services.Diagnostics
 {
     public sealed class ModelIdentityResolutionSummary
     {
+        public string RawManufacturer { get; set; } = "Unknown";
         public string RawWmiModel { get; set; } = "Unknown";
         public string RawBaseboardProduct { get; set; } = "Unknown";
         public string RawSystemSku { get; set; } = "Unknown";
@@ -26,6 +27,8 @@ namespace OmenCore.Services.Diagnostics
         public string ProductIdCandidate { get; set; } = "none";
         public bool IsKnownModel { get; set; }
         public bool IsUserVerified { get; set; }
+        public bool IsHpSystem { get; set; }
+        public bool HasOmenVictusHint { get; set; }
         public string KeyboardProductIdCandidate { get; set; } = "Unknown";
         public bool KeyboardProductIdAmbiguous { get; set; }
         public string KeyboardModel { get; set; } = "Unknown";
@@ -54,6 +57,7 @@ namespace OmenCore.Services.Diagnostics
 
             var summary = new ModelIdentityResolutionSummary
             {
+                RawManufacturer = Clean(systemInfo.Manufacturer),
                 RawWmiModel = Clean(systemInfo.Model),
                 RawBaseboardProduct = Clean(systemInfo.ProductName),
                 RawSystemSku = Clean(systemInfo.SystemSku),
@@ -62,6 +66,13 @@ namespace OmenCore.Services.Diagnostics
                 CapabilityModelFamily = effectiveCapabilities.ModelFamily.ToString(),
                 IsKnownModel = effectiveCapabilities.IsKnownModel
             };
+
+            summary.IsHpSystem = IsHpManufacturer(summary.RawManufacturer);
+            summary.HasOmenVictusHint = ContainsOmenVictusHint(summary.RawWmiModel)
+                || ContainsOmenVictusHint(summary.RawSystemSku)
+                || ContainsOmenVictusHint(summary.HpSupportProductNumber)
+                || ContainsOmenVictusHint(summary.RawBaseboardProduct)
+                || ContainsOmenVictusHint(effectiveCapabilities.ModelName);
 
             PopulateCapabilityResolution(summary, effectiveCapabilities);
             PopulateKeyboardResolution(summary, systemInfo);
@@ -133,7 +144,11 @@ namespace OmenCore.Services.Diagnostics
                 summary.Confidence = "Low";
                 summary.BadgeText = "Family fallback";
                 summary.BadgeTone = "error";
-                summary.WarningText = "No exact model entry matched; capability defaults were inferred from the broader model family.";
+                summary.WarningText = BuildFallbackWarning(
+                    summary,
+                    "No exact model entry matched; capability defaults were inferred from the broader model family.",
+                    "HP system detected, but no validated OMEN/Victus model mapping was found; capability defaults were inferred from a broad family match.",
+                    "OMEN/Victus hints were detected, but the specific model could not be verified; capability defaults were inferred from a broad family match.");
                 return;
             }
 
@@ -143,7 +158,11 @@ namespace OmenCore.Services.Diagnostics
                 summary.Confidence = "Low";
                 summary.BadgeText = "Default fallback";
                 summary.BadgeTone = "error";
-                summary.WarningText = "No exact model or family entry matched; default capabilities are in use.";
+                summary.WarningText = BuildFallbackWarning(
+                    summary,
+                    "No exact model or family entry matched; default capabilities are in use.",
+                    "HP system detected, but no validated OMEN/Victus mapping was found; generic default capabilities are in use.",
+                    "OMEN/Victus hints were detected, but model identity confidence is low; generic default capabilities are in use.");
                 return;
             }
 
@@ -151,7 +170,11 @@ namespace OmenCore.Services.Diagnostics
             summary.Confidence = "Low";
             summary.BadgeText = "Fallback";
             summary.BadgeTone = "error";
-            summary.WarningText = "Capability profile came from a runtime fallback path and should be treated as provisional.";
+            summary.WarningText = BuildFallbackWarning(
+                summary,
+                "Capability profile came from a runtime fallback path and should be treated as provisional.",
+                "HP system detected, but capability profile came from a runtime fallback path; treat this mapping as provisional.",
+                "OMEN/Victus hints were detected, but capability profile came from a runtime fallback path; treat this mapping as provisional.");
         }
 
         private static void PopulateKeyboardResolution(ModelIdentityResolutionSummary summary, SystemInfo systemInfo)
@@ -226,7 +249,11 @@ namespace OmenCore.Services.Diagnostics
 
         private static string BuildShortSummary(ModelIdentityResolutionSummary summary)
         {
-            return $"{summary.ResolvedModel} via {summary.ResolutionSource} ({summary.Confidence} confidence). Keyboard: {summary.KeyboardModel} via {summary.KeyboardResolutionSource} ({summary.KeyboardConfidence} confidence).";
+            var platformQualifier = summary.IsHpSystem
+                    ? (summary.HasOmenVictusHint ? "HP system (OMEN/Victus detected)" : "HP system")
+                : "Non-HP or unknown manufacturer";
+
+            return $"{summary.ResolvedModel} via {summary.ResolutionSource} ({summary.Confidence} confidence) on {platformQualifier}. Keyboard: {summary.KeyboardModel} via {summary.KeyboardResolutionSource} ({summary.KeyboardConfidence} confidence).";
         }
 
         private static string BuildClipboardSummary(ModelIdentityResolutionSummary summary)
@@ -346,6 +373,39 @@ namespace OmenCore.Services.Diagnostics
             var trimmed = systemSku.Trim();
             var hashIndex = trimmed.IndexOf('#');
             return hashIndex > 0 ? trimmed[..hashIndex] : trimmed;
+        }
+
+        private static string BuildFallbackWarning(ModelIdentityResolutionSummary summary, string generic, string hpSpecific, string omenHint)
+        {
+            if (summary.IsHpSystem)
+            {
+                    if (summary.HasOmenVictusHint)
+                    {
+                        return $"{omenHint} Model name contains OMEN/Victus branding, but exact model is not in database.";
+                    }
+                    return hpSpecific;
+            }
+
+            return generic;
+        }
+
+        private static bool IsHpManufacturer(string manufacturer)
+        {
+            return manufacturer.Contains("HP", StringComparison.OrdinalIgnoreCase)
+                || manufacturer.Contains("HEWLETT", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ContainsOmenVictusHint(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            return value.Contains("OMEN", StringComparison.OrdinalIgnoreCase)
+                || value.Contains("VICTUS", StringComparison.OrdinalIgnoreCase)
+                || value.Contains("THE TIGER", StringComparison.OrdinalIgnoreCase)
+                || value.Contains("THETIGER", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

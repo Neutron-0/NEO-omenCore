@@ -193,6 +193,7 @@ namespace OmenCore.Hardware
             {
                 CurrentCoreOffsetMv = canReadMsr ? actualCore : copy.CoreMv,
                 CurrentCacheOffsetMv = canReadMsr ? actualCache : copy.CacheMv,
+                IsRuntimeReady = HasMsrAccess,
                 ControlledByOmenCore = true,
                 Timestamp = DateTime.Now
             };
@@ -222,7 +223,10 @@ namespace OmenCore.Hardware
             }
             else if (!HasMsrAccess && copy.CoreMv == 0 && copy.CacheMv == 0)
             {
-                status.Warning = "No MSR access backend available. Install PawnIO (Secure Boot compatible) to enable CPU undervolting.";
+                status.ControlledByOmenCore = false;
+                status.IsRuntimeReady = false;
+                status.RuntimeBlockReason = "MSR access backend is unavailable. Install PawnIO (Secure Boot compatible) and reboot to enable CPU undervolting.";
+                status.Warning = status.RuntimeBlockReason;
             }
             else if (!canReadMsr)
             {

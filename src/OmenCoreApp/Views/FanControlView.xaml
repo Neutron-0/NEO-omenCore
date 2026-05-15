@@ -168,12 +168,12 @@
                             <TextBlock Text="🌀" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="FAN PROFILES" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <TextBlock Grid.Column="2" Text="Select a preset or create custom curve" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="Select a preset or create custom curve" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Right" MaxWidth="220" Margin="12,0,0,0"/>
                     </Grid>
                 </Border>
                 
-                <!-- Preset Cards Grid - 6 columns -->
-                <UniformGrid Grid.Row="1" Rows="1" Columns="6" Margin="0,0,0,16">
+                <!-- Preset Cards Grid - 2 rows to avoid clipping at smaller widths/DPI scaling -->
+                <UniformGrid Grid.Row="1" Rows="2" Columns="3" Margin="0,0,0,16">
                     <!-- Max Cooling -->
                     <RadioButton GroupName="FanPreset"
                                  IsChecked="{Binding IsMaxSelected}"
@@ -404,15 +404,9 @@
                 </UniformGrid>
                 
                 <!-- Settings Row - Compact horizontal layout -->
-                <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    
+                <StackPanel Grid.Row="2">
                     <!-- Save Custom Preset -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <WrapPanel>
                         <TextBox Text="{Binding CustomPresetName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                                  Style="{StaticResource ModernTextBox}" 
                                  Width="130" Height="28" FontSize="10" Padding="6,4"
@@ -427,10 +421,10 @@
                                 <TextBlock Text="Save" FontSize="10"/>
                             </StackPanel>
                         </Button>
-                    </StackPanel>
+                    </WrapPanel>
                     
                     <!-- Saved Presets: Load / Delete / Import / Export -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="12,0">
+                    <WrapPanel Margin="0,10,0,0">
                         <TextBlock Text="Saved:" FontSize="10" VerticalAlignment="Center" Margin="0,0,6,0"
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
                         <ComboBox ItemsSource="{Binding SavedCustomPresets}" 
@@ -456,12 +450,12 @@
                                 ToolTip="Export presets to a JSON file">
                             <TextBlock Text="Export" FontSize="10"/>
                         </Button>
-                    </StackPanel>
+                    </WrapPanel>
                     
                     <!-- Advanced Settings - Compact -->
-                    <Border Grid.Column="2" Background="#0D0D0F" CornerRadius="8" Padding="12,8">
+                    <Border Background="#0D0D0F" CornerRadius="8" Padding="12,8" Margin="0,10,0,0">
                         <StackPanel>
-                            <StackPanel Orientation="Horizontal">
+                            <WrapPanel>
                             <!-- Immediate Apply -->
                             <CheckBox Content="Instant apply" 
                                       IsChecked="{Binding ImmediateApplyOnApply, Mode=TwoWay}" 
@@ -490,7 +484,7 @@
                                       IsEnabled="{Binding IndependentCurvesFeatureAvailable}"
                                       FontSize="11"
                                       ToolTip="GPU fan writes are model-dependent; unified curve mode remains the safe default"/>
-                            </StackPanel>
+                            </WrapPanel>
 
                             <Border Background="#1A2A3A"
                                     BorderBrush="{StaticResource AccentBlueBrush}"
@@ -517,15 +511,15 @@
                             </Border>
                         </StackPanel>
                     </Border>
-                </Grid>
+                </StackPanel>
             </Grid>
         </Border>
 
         <!-- Fan Curve Editor and Telemetry -->
         <Grid Grid.Row="4">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="450"/>
-                <ColumnDefinition Width="350" MinWidth="300"/>
+                <ColumnDefinition Width="*" MinWidth="320"/>
+                <ColumnDefinition Width="300" MinWidth="220"/>
             </Grid.ColumnDefinitions>
 
             <!-- Curve Editor Container - Shows single or dual curves based on mode -->

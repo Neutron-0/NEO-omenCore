@@ -1,7 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OmenCore.Avalonia.Services;
+using OmenCore.Linux.Desktop;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace OmenCore.Avalonia.ViewModels;
 
@@ -131,6 +133,18 @@ public partial class SettingsViewModel : ObservableObject
 
         try
         {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                if (!LinuxDesktopLauncher.TryOpenPath(omenConfigDir, out var reason))
+                {
+                    StatusMessage = string.IsNullOrWhiteSpace(reason)
+                        ? $"Config folder: {omenConfigDir}"
+                        : $"Config folder: {omenConfigDir} ({reason})";
+                }
+
+                return;
+            }
+
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = omenConfigDir,
@@ -159,6 +173,18 @@ public partial class SettingsViewModel : ObservableObject
     
     private void OpenUrl(string url)
     {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            if (!LinuxDesktopLauncher.TryOpenUrl(url, out var reason))
+            {
+                StatusMessage = string.IsNullOrWhiteSpace(reason)
+                    ? "Unable to open browser automatically."
+                    : reason;
+            }
+
+            return;
+        }
+
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -169,27 +195,8 @@ public partial class SettingsViewModel : ObservableObject
         }
         catch
         {
-            // Fallback for Linux when xdg-open fails
-            try
-            {
-                var browsers = new[] { "firefox", "chromium", "google-chrome", "brave-browser", "xdg-open" };
-                foreach (var browser in browsers)
-                {
-                    try
-                    {
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                        {
-                            FileName = browser,
-                            Arguments = url,
-                            UseShellExecute = false,
-                            RedirectStandardError = true
-                        });
-                        return;
-                    }
-                    catch { }
-                }
-            }
-            catch { }
+            StatusMessage = "Unable to open browser automatically.";
         }
     }
+
 }

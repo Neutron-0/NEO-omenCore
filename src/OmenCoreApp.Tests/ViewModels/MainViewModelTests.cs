@@ -1,5 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using FluentAssertions;
 using OmenCore.Models;
@@ -200,6 +204,162 @@ namespace OmenCoreApp.Tests.ViewModels
             _ = performanceResolver!.Invoke(vm, new object[] { "Balanced" });
             vm.IsSystemControlLoaded.Should().BeFalse(
                 because: "game profiles must resolve performance modes without constructing the OMEN/Tuning view-model");
+        }
+
+        [Fact]
+        public async Task RuntimeIntentOverlap_TrayHotkeyAutomation_ConvergesToFinalTrayMode()
+        {
+            using var vm = new MainViewModel();
+
+            vm.PowerAutomation.AcPerformanceMode = "Performance";
+            vm.PowerAutomation.AcFanPreset = "Performance";
+
+            var hotkeyHandler = typeof(MainViewModel).GetMethod("OnHotkeyToggleQuietMode", BindingFlags.Instance | BindingFlags.NonPublic);
+            hotkeyHandler.Should().NotBeNull();
+
+            var perfField = typeof(MainViewModel).GetField("_performanceModeService", BindingFlags.Instance | BindingFlags.NonPublic);
+            perfField.Should().NotBeNull();
+            var perfService = perfField!.GetValue(vm).Should().BeOfType<PerformanceModeService>().Subject;
+
+            var overlap = new[]
+            {
+                Task.Run(() => vm.SetPerformanceModeFromTray("Performance")),
+                Task.Run(() => hotkeyHandler!.Invoke(vm, new object?[] { null, EventArgs.Empty })),
+                Task.Run(() => vm.PowerAutomation.ApplyPowerProfile(true, "mainviewmodel-test"))
+            };
+
+            await Task.WhenAll(overlap);
+
+            // Allow in-flight queued work from the overlap wave to settle before sending
+            // the explicit final tray intent we want to assert as authoritative.
+            var settleUntil = DateTime.UtcNow.AddSeconds(2);
+            var lastObservedMode = perfService.GetCurrentMode();
+            while (DateTime.UtcNow < settleUntil)
+            {
+                await Task.Delay(100);
+                var currentMode = perfService.GetCurrentMode();
+                if (!string.Equals(currentMode, lastObservedMode, StringComparison.OrdinalIgnoreCase))
+                {
+                    lastObservedMode = currentMode;
+                    settleUntil = DateTime.UtcNow.AddMilliseconds(400);
+                }
+            }
+
+            vm.SetPerformanceModeFromTray("Balanced");
+
+            var sw = Stopwatch.StartNew();
+            while (sw.Elapsed < TimeSpan.FromSeconds(5))
+            {
+                if (string.Equals(perfService.GetCurrentMode(), "Balanced", StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
+
+                await Task.Delay(50);
+            }
+
+            perfService.GetCurrentMode().Should().Be("Balanced", "explicit final tray intent should converge as authoritative final mode");
+        }
+
+        [Fact]
+        public void LatestMonitoringSample_MinorTelemetryNoise_DoesNotRaiseUnchangedSummaryProperties()
+        {
+            using var vm = new MainViewModel();
+
+            var latestMonitoringProperty = typeof(MainViewModel).GetProperty(
+                "LatestMonitoringSample",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            latestMonitoringProperty.Should().NotBeNull();
+
+            var setter = latestMonitoringProperty!.GetSetMethod(true);
+            setter.Should().NotBeNull();
+
+            var changedProperties = new List<string>();
+            vm.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName != null)
+                {
+                    changedProperties.Add(args.PropertyName);
+                }
+            };
+
+            var baseline = new MonitoringSample
+            {
+                CpuTemperatureC = 61.2,
+                CpuTemperatureState = TelemetryDataState.Valid,
+                GpuTemperatureC = 54.2,
+                GpuTemperatureState = TelemetryDataState.Valid,
+                CpuLoadPercent = 17.2,
+                GpuLoadPercent = 23.2,
+                RamUsageGb = 7.12,
+                RamTotalGb = 16,
+                SsdTemperatureC = 40.1,
+                DiskUsagePercent = 11.2,
+                CpuCoreClocksMhz = new List<double> { 4200.4, 4100.2 },
+                Timestamp = DateTime.UtcNow
+            };
+
+            setter!.Invoke(vm, new object?[] { baseline });
+            changedProperties.Clear();
+
+            var noisy = new MonitoringSample(baseline)
+            {
+                CpuTemperatureC = 61.4,
+                GpuTemperatureC = 54.4,
+                CpuLoadPercent = 17.4,
+                GpuLoadPercent = 23.4,
+                RamUsageGb = 7.14,
+                SsdTemperatureC = 40.3,
+                DiskUsagePercent = 11.4,
+                CpuCoreClocksMhz = new List<double> { 4200.1, 4100.4 },
+                Timestamp = baseline.Timestamp.AddSeconds(1)
+            };
+
+            setter.Invoke(vm, new object?[] { noisy });
+
+            changedProperties.Should().Contain(nameof(MainViewModel.LatestMonitoringSample));
+            changedProperties.Should().NotContain(nameof(MainViewModel.CpuSummary));
+            changedProperties.Should().NotContain(nameof(MainViewModel.GpuSummary));
+            changedProperties.Should().NotContain(nameof(MainViewModel.MemorySummary));
+            changedProperties.Should().NotContain(nameof(MainViewModel.StorageSummary));
+            changedProperties.Should().NotContain(nameof(MainViewModel.CpuClockSummary));
+        }
+
+        [Fact]
+        public void ResolveHotkeyFanCycleMode_RecognizesCanonicalFanSlots()
+        {
+            using var vm = new MainViewModel();
+            var fanControl = vm.FanControl;
+            fanControl.Should().NotBeNull();
+
+            var fanServiceField = typeof(FanControlViewModel).GetField("_fanService", BindingFlags.Instance | BindingFlags.NonPublic);
+            fanServiceField.Should().NotBeNull();
+            var fanService = fanServiceField!.GetValue(fanControl!).Should().BeOfType<FanService>().Subject;
+            var currentFanModeField = typeof(FanService).GetField("_currentFanMode", BindingFlags.Instance | BindingFlags.NonPublic);
+            currentFanModeField.Should().NotBeNull();
+
+            var resolver = typeof(MainViewModel).GetMethod("ResolveHotkeyFanCycleMode", BindingFlags.Instance | BindingFlags.NonPublic);
+            resolver.Should().NotBeNull();
+
+            void SetMode(string modeName)
+            {
+                currentFanModeField!.SetValue(fanService, modeName);
+            }
+
+            SetMode("Auto");
+            resolver!.Invoke(vm, null).Should().Be("Auto");
+
+            SetMode("Gaming");
+            resolver!.Invoke(vm, null).Should().Be("Gaming");
+
+            SetMode("Extreme");
+            resolver!.Invoke(vm, null).Should().Be("Extreme");
+
+            SetMode("Custom");
+            resolver!.Invoke(vm, null).Should().Be("Custom");
+
+            SetMode("Quiet");
+            resolver!.Invoke(vm, null).Should().Be("Quiet");
         }
     }
 }

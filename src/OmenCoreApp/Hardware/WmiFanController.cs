@@ -46,8 +46,8 @@ namespace OmenCore.Hardware
         private Timer? _countdownExtensionTimer;
         private readonly object _countdownTimerLock = new();
         private int _countdownCallbackActive;
-        private const int CountdownExtensionIntervalMs = 800; // 0.8 seconds - more aggressive to combat BIOS reversion on AMD (was 3000)
-        private const int CountdownExtensionInitialDelayMs = 250; // 0.25s initial delay (was 1000) - first tick fires early before BIOS reverts
+        private const int CountdownExtensionIntervalMs = 5000;
+        private const int CountdownExtensionInitialDelayMs = 3000;
         private bool _countdownExtensionEnabled = false;
 
         // Max-mode maintenance state.
@@ -60,6 +60,7 @@ namespace OmenCore.Hardware
         private int _maxModeTelemetryUnavailableStreak = 0;
         private DateTime _lastManualModeReapplyUtc = DateTime.MinValue;
         private DateTime _lastPresetModeReapplyUtc = DateTime.MinValue;
+        private DateTime _lastCountdownExtendUtc = DateTime.MinValue;
         private int _keepaliveWriteCount = 0;
         private const int KeepaliveLogSummaryInterval = 50; // log Info summary every 50 successful keepalive writes
         private DateTime? _lastMaxModeExternalResetUtc;
@@ -67,8 +68,11 @@ namespace OmenCore.Hardware
         private const int MaxModeMaintenanceIntervalMs = 8000;
         private const int MaxModeMinDropChecksBeforeReapply = 2;
         private const int MaxModeTelemetryUnavailableReassertCycles = 3;
-        private const int ManualModeReapplyIntervalMs = 2500;
-        private const int PresetModeReapplyIntervalMs = 4000;
+        private const int ManualModeReapplyIntervalMs = 15000;
+        private const int HighDutyManualModeReapplyIntervalMs = 5000;
+        private const int HighDutyManualModeThresholdPercent = 70;
+        private const int PresetModeReapplyIntervalMs = 30000;
+        private const int CountdownExtendMinIntervalMs = 15000;
         private const int MaxModeHealthyRpmFloor = 2000;
         private const double MaxModeHealthyLevelRatio = 0.40;
         
@@ -530,7 +534,8 @@ namespace OmenCore.Hardware
                 try
                 {
                     bool success;
-                    double? rpmBefore = GetCurrentFanRpm();
+                    var captureRpmBefore = percent >= 100 || _isMaxModeActive || attempt > 1;
+                    double? rpmBefore = captureRpmBefore ? GetCurrentFanRpm() : null;
                     
                     // For 100%, use SetFanMax which bypasses BIOS power limits.
                     // If it fails, send the protocol ceiling (100) and let BIOS clamp to
@@ -1497,8 +1502,9 @@ namespace OmenCore.Hardware
 
         /// <summary>
         /// Start the countdown extension timer to prevent BIOS from reverting fan settings.
-        /// HP BIOS aggressively reverts fan settings on many models (some within 3-5 seconds).
-        /// This timer re-applies the current settings every 3 seconds to keep them active.
+        /// HP BIOS can revert fan settings on some models. Keepalive writes are bounded
+        /// because WMI fan-level commands are expensive and can dominate CPU while curves
+        /// hold the same target.
         /// </summary>
         public void StartCountdownExtension()
         {
@@ -1531,9 +1537,8 @@ namespace OmenCore.Hardware
         
         /// <summary>
         /// Countdown extension callback - periodically re-applies fan settings.
-        /// OmenMon-style: Re-applies settings every 3 seconds to prevent BIOS reversion.
-        /// HP BIOS aggressively reverts fan settings, especially under load.
-        /// Some models (e.g., OMEN 16-xd0xxx) revert within 3-5 seconds.
+        /// Re-applies settings on a bounded cadence to prevent BIOS reversion without
+        /// hammering WMI while a curve holds a stable fan percentage.
         /// </summary>
         private void CountdownExtensionCallback(object? state)
         {
@@ -1571,7 +1576,7 @@ namespace OmenCore.Hardware
                             if (_maxModeTelemetryUnavailableStreak < MaxModeTelemetryUnavailableReassertCycles)
                             {
                                 _maxModeLowTelemetryStreak = 0;
-                                _wmiBios.ExtendFanCountdown();
+                                TryExtendFanCountdown(nowUtc);
                                 _logging?.Debug($"Max mode telemetry unavailable - keepalive only ({_maxModeTelemetryUnavailableStreak}/{MaxModeTelemetryUnavailableReassertCycles})");
                                 return;
                             }
@@ -1598,7 +1603,7 @@ namespace OmenCore.Hardware
                         if (telemetryHealthy)
                         {
                             _maxModeLowTelemetryStreak = 0;
-                            _wmiBios.ExtendFanCountdown();
+                            TryExtendFanCountdown(nowUtc);
                             _logging?.Debug($"Max mode maintained via countdown keepalive ({healthDetails})");
                             return;
                         }
@@ -1637,9 +1642,11 @@ namespace OmenCore.Hardware
                     else if (IsManualControlActive && _lastManualFanPercent >= 0)
                     {
                         var nowUtc = DateTime.UtcNow;
-                        if ((nowUtc - _lastManualModeReapplyUtc).TotalMilliseconds < ManualModeReapplyIntervalMs)
+                        var reapplyIntervalMs = _lastManualFanPercent >= HighDutyManualModeThresholdPercent
+                            ? HighDutyManualModeReapplyIntervalMs
+                            : ManualModeReapplyIntervalMs;
+                        if ((nowUtc - _lastManualModeReapplyUtc).TotalMilliseconds < reapplyIntervalMs)
                         {
-                            _wmiBios.ExtendFanCountdown();
                             return;
                         }
 
@@ -1658,13 +1665,12 @@ namespace OmenCore.Hardware
                         var nowUtc = DateTime.UtcNow;
                         if (FanService.IsAnyDiagnosticModeActive)
                         {
-                            _wmiBios.ExtendFanCountdown();
+                            TryExtendFanCountdown(nowUtc);
                             return;
                         }
 
                         if ((nowUtc - _lastPresetModeReapplyUtc).TotalMilliseconds < PresetModeReapplyIntervalMs)
                         {
-                            _wmiBios.ExtendFanCountdown();
                             return;
                         }
 
@@ -1687,6 +1693,17 @@ namespace OmenCore.Hardware
             {
                 Interlocked.Exchange(ref _countdownCallbackActive, 0);
             }
+        }
+
+        private void TryExtendFanCountdown(DateTime nowUtc)
+        {
+            if ((nowUtc - _lastCountdownExtendUtc).TotalMilliseconds < CountdownExtendMinIntervalMs)
+            {
+                return;
+            }
+
+            _lastCountdownExtendUtc = nowUtc;
+            _wmiBios.ExtendFanCountdown();
         }
 
         private bool IsMaxModeTelemetryHealthy(out string details)

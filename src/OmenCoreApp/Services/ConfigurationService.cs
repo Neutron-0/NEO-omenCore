@@ -118,6 +118,7 @@ namespace OmenCore.Services
             {
                 try
                 {
+                    Directory.CreateDirectory(_configDirectory);
                     File.WriteAllText(tmpPath, json);
                     // If config exists, replace it, otherwise move temp to path
                     if (File.Exists(_configPath))
@@ -137,6 +138,7 @@ namespace OmenCore.Services
                     if (attempt >= maxAttempts)
                     {
                         // Last resort: open with shared write
+                        Directory.CreateDirectory(_configDirectory);
                         using var fs = new FileStream(_configPath, FileMode.Create, FileAccess.Write, FileShare.Read);
                         using var sw = new StreamWriter(fs);
                         sw.Write(json);

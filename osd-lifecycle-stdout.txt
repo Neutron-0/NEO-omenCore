@@ -1,0 +1,9 @@
+  Determining projects to restore...
+  Restored f:\OmenCore\omencore\src\OmenCoreApp\OmenCoreApp.csproj (in 2.52 sec).
+  Restored f:\OmenCore\omencore\src\OmenCoreApp.Tests\OmenCoreApp.Tests.csproj (in 2.5 sec).
+  OmenCoreApp -> f:\OmenCore\omencore\src\OmenCoreApp\bin\Debug\net8.0-windows10.0.19041.0\win-x64\OmenCore.dll
+  OmenCoreApp.Tests -> f:\OmenCore\omencore\src\OmenCoreApp.Tests\bin\Debug\net8.0-windows10.0.19041.0\OmenCoreApp.Tests.dll
+Test run for f:\OmenCore\omencore\src\OmenCoreApp.Tests\bin\Debug\net8.0-windows10.0.19041.0\OmenCoreApp.Tests.dll (.NETCoreApp,Version=v8.0)
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:     5, Skipped:     0, Total:     5, Duration: 236 ms - OmenCoreApp.Tests.dll (net8.0)

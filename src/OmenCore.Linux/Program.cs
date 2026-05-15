@@ -1,7 +1,7 @@
 using System.CommandLine;
 using System.Reflection;
-using System.Text.Json;
 using OmenCore.Linux.Commands;
+using OmenCore.Linux.Config;
 
 namespace OmenCore.Linux;
 
@@ -38,10 +38,6 @@ class Program
 
     public const string BuildDate = "2026-03";
     
-    public static string ConfigPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), 
-        ".config", "omencore", "config.json");
-
     static async Task<int> Main(string[] args)
     {
         // Handle --version and -V before System.CommandLine parsing
@@ -252,8 +248,9 @@ class Program
             return;
         }
         
-        // Save to config
-        ConfigManager.Set("battery.profile", profile);
+            var config = OmenCoreConfig.Load();
+            config.Battery.Profile = profile;
+            config.Save();
         
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"✓ Battery profile set to: {profile}");
@@ -307,50 +304,5 @@ class Program
         var filled = (int)((double)value / max * width);
         var empty = width - filled;
         return new string('█', filled) + new string('░', empty);
-    }
-}
-
-/// <summary>
-/// Configuration file management.
-/// </summary>
-public static class ConfigManager
-{
-    private static readonly string ConfigDir = Path.GetDirectoryName(Program.ConfigPath)!;
-    
-    public static Dictionary<string, string> Load()
-    {
-        try
-        {
-            if (File.Exists(Program.ConfigPath))
-            {
-                var json = File.ReadAllText(Program.ConfigPath);
-                return JsonSerializer.Deserialize(json, LinuxJsonContext.Default.DictionaryStringString) ?? new();
-            }
-        }
-        catch { }
-        return new();
-    }
-    
-    public static void Save(Dictionary<string, string> config)
-    {
-        try
-        {
-            Directory.CreateDirectory(ConfigDir);
-            var json = JsonSerializer.Serialize(config, LinuxJsonContext.Default.DictionaryStringString);
-            File.WriteAllText(Program.ConfigPath, json);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Failed to save config: {ex.Message}");
-        }
-    }
-    
-    public static string? Get(string key) => Load().TryGetValue(key, out var val) ? val : null;
-    
-    public static void Set(string key, string value)
-    {
-        var config = Load();
-        config[key] = value;
-        Save(config);
     }
 }

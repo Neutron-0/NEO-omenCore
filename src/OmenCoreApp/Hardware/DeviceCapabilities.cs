@@ -65,7 +65,7 @@ namespace OmenCore.Hardware
                                                           (ModelConfig?.HasPerKeyRgb ?? false)));
         
         /// <summary>Whether to show undervolt controls in UI.</summary>
-        public bool ShowUndervolt => CanUndervolt && (ModelConfig?.SupportsUndervolt ?? true);
+        public bool ShowUndervolt => CanUndervolt && UndervoltRuntimeReady && (ModelConfig?.SupportsUndervolt ?? true);
         
         /// <summary>Whether to show performance mode selector in UI.</summary>
         public bool ShowPerformanceModes => HasOemPerformanceModes || (ModelConfig?.SupportsPerformanceModes ?? true);
@@ -129,6 +129,17 @@ namespace OmenCore.Hardware
         public bool CanUndervolt { get; set; }
         public bool SecureBootEnabled { get; set; }
         public UndervoltMethod UndervoltMethod { get; set; } = UndervoltMethod.None;
+        
+        /// <summary>
+        /// Runtime readiness status for undervolt operations.
+        /// May be false even if CanUndervolt is true if driver/MSR access fails at probe time.
+        /// </summary>
+        public bool UndervoltRuntimeReady { get; set; } = true;
+        
+        /// <summary>
+        /// Block reason if UndervoltRuntimeReady is false. Explains why undervolt is disabled.
+        /// </summary>
+        public string? UndervoltBlockReason { get; set; }
         
         // OGH status (for fallback/compatibility, NOT required)
         public bool OghInstalled { get; set; }

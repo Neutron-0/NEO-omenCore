@@ -25,6 +25,7 @@ namespace OmenCore
         private IServiceProvider? _serviceProvider;
         private TaskbarIcon? _trayIcon;
         private TrayIconService? _trayIconService;
+        private RuntimeStateEngine? _runtimeStateEngine;
         
         // Track remote session state to prevent window activation during RDP
         private static bool _isInRemoteSession;
@@ -375,20 +376,63 @@ namespace OmenCore
 
             // Wire up to MainViewModel for monitoring updates and tray actions
             var mainViewModel = _serviceProvider?.GetRequiredService<MainViewModel>();
+            _runtimeStateEngine = _serviceProvider?.GetService<RuntimeStateEngine>();
             if (mainViewModel != null)
             {
-                // Subscribe to shared monitoring sample updates directly from MainViewModel.
-                mainViewModel.PropertyChanged += (s, e) =>
+                if (_runtimeStateEngine != null)
                 {
-                    if (e.PropertyName == nameof(MainViewModel.LatestMonitoringSample))
+                    string? lastFanMode = null;
+                    string? lastCurvePreset = null;
+                    string? lastPerformanceMode = null;
+                    bool? lastLinkedMode = null;
+
+                    _runtimeStateEngine.StateChanged += (s, snapshot) =>
                     {
-                        var sample = mainViewModel.LatestMonitoringSample;
-                        if (sample != null)
+                        var fanModeChanged = !string.Equals(lastFanMode, snapshot.FanMode, StringComparison.OrdinalIgnoreCase);
+                        var curveChanged = !string.Equals(lastCurvePreset, snapshot.CurvePresetName, StringComparison.OrdinalIgnoreCase);
+                        var performanceChanged = !string.Equals(lastPerformanceMode, snapshot.PerformanceMode, StringComparison.OrdinalIgnoreCase);
+                        var linkedChanged = lastLinkedMode != snapshot.IsFanPerformanceLinked;
+
+                        if (fanModeChanged)
                         {
-                            _trayIconService?.UpdateMonitoringSample(sample);
+                            _trayIconService?.UpdateFanMode(snapshot.FanMode);
+                            lastFanMode = snapshot.FanMode;
                         }
-                    }
-                };
+
+                        if (curveChanged)
+                        {
+                            _trayIconService?.UpdateCurvePresetName(snapshot.CurvePresetName);
+                            lastCurvePreset = snapshot.CurvePresetName;
+                        }
+
+                        if (performanceChanged)
+                        {
+                            _trayIconService?.UpdatePerformanceMode(snapshot.PerformanceMode);
+                            lastPerformanceMode = snapshot.PerformanceMode;
+                        }
+
+                        if (linkedChanged)
+                        {
+                            _trayIconService?.UpdateLinkedMode(snapshot.IsFanPerformanceLinked);
+                            lastLinkedMode = snapshot.IsFanPerformanceLinked;
+                        }
+
+                        var osd = mainViewModel.Osd;
+                        if (osd != null)
+                        {
+                            if (fanModeChanged)
+                            {
+                                osd.SetFanMode(snapshot.FanMode);
+                            }
+
+                            if (performanceChanged)
+                            {
+                                osd.SetPerformanceMode(snapshot.PerformanceMode);
+                                osd.SetCurrentMode(snapshot.PerformanceMode);
+                            }
+                        }
+                    };
+                }
 
                 // Wire up tray quick actions to MainViewModel
                 _trayIconService.FanModeChangeRequested += mode =>
@@ -440,22 +484,20 @@ namespace OmenCore
                 // Subscribe to MainViewModel mode changes to update tray display
                 mainViewModel.PropertyChanged += (s, e) =>
                 {
-                    if (e.PropertyName == nameof(MainViewModel.CurrentFanMode))
+                    if (e.PropertyName == nameof(MainViewModel.CurrentFanMode) ||
+                        e.PropertyName == nameof(MainViewModel.CurrentPerformanceMode) ||
+                        e.PropertyName == nameof(MainViewModel.ActiveCurvePresetName) ||
+                        e.PropertyName == nameof(MainViewModel.IsFanPerformanceLinked))
                     {
-                        _trayIconService?.UpdateFanMode(mainViewModel.CurrentFanMode);
-                        _trayIconService?.UpdateCurvePresetName(mainViewModel.ActiveCurvePresetName);
+                        _runtimeStateEngine?.PublishProjection(
+                            mainViewModel.CurrentFanMode,
+                            mainViewModel.CurrentPerformanceMode,
+                            mainViewModel.ActiveCurvePresetName,
+                            mainViewModel.IsFanPerformanceLinked);
                     }
-                    else if (e.PropertyName == nameof(MainViewModel.CurrentPerformanceMode))
+                    else if (e.PropertyName == nameof(MainViewModel.LatestMonitoringSample))
                     {
-                        _trayIconService?.UpdatePerformanceMode(mainViewModel.CurrentPerformanceMode);
-                    }
-                    else if (e.PropertyName == nameof(MainViewModel.ActiveCurvePresetName))
-                    {
-                        _trayIconService?.UpdateCurvePresetName(mainViewModel.ActiveCurvePresetName);
-                    }
-                    else if (e.PropertyName == nameof(MainViewModel.IsFanPerformanceLinked))
-                    {
-                        _trayIconService?.UpdateLinkedMode(mainViewModel.IsFanPerformanceLinked);
+                        _trayIconService?.UpdateMonitoringSample(mainViewModel.LatestMonitoringSample);
                     }
                     else if (e.PropertyName == nameof(MainViewModel.CurrentGpuPowerLevel))
                     {
@@ -474,10 +516,12 @@ namespace OmenCore
                 // Initial tray sync uses MainViewModel's lightweight state. Avoid forcing
                 // Dashboard/SystemControl construction here; those view-models perform
                 // heavier provider probes and should load on first UI/user action.
-                _trayIconService?.UpdateFanMode(mainViewModel.CurrentFanMode);
-                _trayIconService?.UpdateCurvePresetName(mainViewModel.ActiveCurvePresetName);
-                _trayIconService?.UpdatePerformanceMode(mainViewModel.CurrentPerformanceMode);
-                _trayIconService?.UpdateLinkedMode(mainViewModel.IsFanPerformanceLinked);
+                _runtimeStateEngine?.PublishProjection(
+                    mainViewModel.CurrentFanMode,
+                    mainViewModel.CurrentPerformanceMode,
+                    mainViewModel.ActiveCurvePresetName,
+                    mainViewModel.IsFanPerformanceLinked);
+                _trayIconService?.UpdateMonitoringSample(mainViewModel.LatestMonitoringSample);
                 _trayIconService?.UpdateMonitoringHealth(mainViewModel.HardwareMonitoringService.HealthStatus);
                 
                 // Hide GPU Power tray submenu when model capability data already says it is unsupported.
@@ -491,15 +535,12 @@ namespace OmenCore
                     _trayIconService?.UpdateMonitoringHealth(health);
                 };
 
-                // Wire main-window visibility/state changes to the monitoring service so it can
-                // adapt its polling cadence without touching WPF objects off the UI thread.
-                // This is the companion to the thread-safety fix in GetEffectiveCadenceInterval().
-                var monSvc = mainViewModel.HardwareMonitoringService;
+                // Wire main-window visibility/state changes through MainViewModel so polling
+                // cadence ownership stays centralized in RuntimePollingCoordinator.
                 void UpdateMonitorCadence()
                 {
                     var win = MainWindow;
                     var active = win != null && win.IsVisible && win.WindowState != WindowState.Minimized;
-                    monSvc.SetUiWindowActive(active);
 
                     // Ultra-low tray-only cadence: no visible window and no active fan curve/hold.
                     var trayOnly = !active;
@@ -508,7 +549,8 @@ namespace OmenCore
                         try { trayOnly = !mainViewModel.FanService.IsCurveOrHoldActive; }
                         catch { /* best-effort */ }
                     }
-                    monSvc.SetTrayOnlyMode(trayOnly);
+
+                    mainViewModel.UpdateMonitoringVisibilityCadence(active, trayOnly);
                 }
 
                 if (mainViewModel.FanService != null)
@@ -624,8 +666,9 @@ namespace OmenCore
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Logging.Warn($"Hardware worker path resolution failed: {ex.Message}");
             }
 
             return null;
@@ -890,6 +933,7 @@ namespace OmenCore
         private void ConfigureServices(IServiceCollection services)
         {
             // Register ViewModels (MainViewModel creates all services internally for now)
+            services.AddSingleton<RuntimeStateEngine>();
             services.AddSingleton<MainViewModel>();
 
             // Register Views

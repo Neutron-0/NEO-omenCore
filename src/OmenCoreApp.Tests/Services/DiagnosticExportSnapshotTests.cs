@@ -273,5 +273,96 @@ namespace OmenCoreApp.Tests.Services
                 return File.ReadAllText(Path.Combine(exportPath, fileName));
             }
         }
+
+        /// <summary>
+        /// Issue #129/#128/#130 + RC Diagnostics: Bounded performance snapshot must include
+        /// amplification classification (Dispatcher and Projection) for triage
+        /// so field analysts can quickly assess CPU dispatch overhead.
+        /// </summary>
+        [Fact]
+        public async Task BoundedPerformanceFile_IncludesAmplificationClassification()
+        {
+            var svc = new DiagnosticExportService(_logging, _tempDir);
+            var zipPath = await svc.CollectAndExportAsync();
+
+            string content = ReadFileFromExport(zipPath, "runtime-performance-bounded.txt");
+
+            content.Should().Contain("DispatcherAmplificationClass:", "dispatcher amplification classification required");
+            content.Should().Contain("ProjectionAmplificationClass:", "projection amplification classification required");
+            // Classes should be something like "Nominal", "Elevated", or "High"
+            (content.Contains("Nominal") || content.Contains("Elevated") || content.Contains("High"))
+                .Should().BeTrue("amplification should have a classification value");
+        }
+
+        /// <summary>
+        /// Issue #129/#128/#130 + RC Diagnostics: Bounded snapshot must include
+        /// acceptance ratio classifications (Dashboard, General, Main) for acceptance quality assessment.
+        /// </summary>
+        [Fact]
+        public async Task BoundedPerformanceFile_IncludesAcceptanceClassification()
+        {
+            var svc = new DiagnosticExportService(_logging, _tempDir);
+            var zipPath = await svc.CollectAndExportAsync();
+
+            string content = ReadFileFromExport(zipPath, "runtime-performance-bounded.txt");
+
+            content.Should().Contain("MainProjectionAcceptanceClass:", "main acceptance classification required");
+            content.Should().Contain("DashboardAcceptanceClass:", "dashboard acceptance classification required");
+            content.Should().Contain("GeneralAcceptanceClass:", "general acceptance classification required");
+        }
+
+        /// <summary>
+        /// Issue #129/#128/#130 + RC Diagnostics: Bounded snapshot must include
+        /// cache-hit ratio classifications (Tray and Popup) for rendering optimization assessment.
+        /// </summary>
+        [Fact]
+        public async Task BoundedPerformanceFile_IncludesCacheHitClassification()
+        {
+            var svc = new DiagnosticExportService(_logging, _tempDir);
+            var zipPath = await svc.CollectAndExportAsync();
+
+            string content = ReadFileFromExport(zipPath, "runtime-performance-bounded.txt");
+
+            content.Should().Contain("TrayRenderCacheClass:", "tray cache hit classification required");
+            content.Should().Contain("PopupRenderCacheClass:", "popup cache hit classification required");
+            content.Should().Contain("TrayRenderCacheHitRatio:", "tray cache hit ratio required");
+            content.Should().Contain("PopupRenderCacheHitRatio:", "popup cache hit ratio required");
+        }
+
+        /// <summary>
+        /// Issue #129/#128/#130 + RC Diagnostics: Bounded snapshot must include
+        /// scenario assessment to contextualize performance readings (e.g., "Minimized", "Focused", "Tray").
+        /// </summary>
+        [Fact]
+        public async Task BoundedPerformanceFile_IncludesScenarioAssessment()
+        {
+            var svc = new DiagnosticExportService(_logging, _tempDir);
+            var zipPath = await svc.CollectAndExportAsync();
+
+            string content = ReadFileFromExport(zipPath, "runtime-performance-bounded.txt");
+
+            content.Should().Contain("ScenarioAssessment:", "scenario assessment required for context");
+            // The assessment should have some description (even if it's empty or "unknown")
+            var assessmentLine = content.Split('\n').FirstOrDefault(l => l.Contains("ScenarioAssessment:"));
+            assessmentLine.Should().NotBeNull();
+        }
+
+        /// <summary>
+        /// Issue #129: MonitoringSource in the bounded snapshot must include CPU thermal authority
+        /// when collected, so field diagnostics can correlate performance with authority state.
+        /// </summary>
+        [Fact]
+        public async Task BoundedPerformanceFile_MonitoringSource_IncludesCpuAuthority()
+        {
+            var svc = new DiagnosticExportService(_logging, _tempDir);
+            var zipPath = await svc.CollectAndExportAsync();
+
+            string content = ReadFileFromExport(zipPath, "runtime-performance-bounded.txt");
+
+            // MonitoringSource line should be present and contain CPU Authority info
+            var monitoringLine = content.Split('\n').FirstOrDefault(l => l.Contains("MonitoringSource:"));
+            monitoringLine.Should().NotBeNull("MonitoringSource must be in runtime state summary");
+            monitoringLine.Should().Contain("CPU Authority", "CPU thermal authority source must be included in MonitoringSource");
+        }
     }
 }

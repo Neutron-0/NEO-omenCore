@@ -30,6 +30,7 @@ namespace OmenCore.ViewModels
         private readonly HardwareMonitoringService? _hardwareMonitoringService;
         private IMsrAccess? _msrAccess;  // Changed from WinRing0MsrAccess to IMsrAccess
         private readonly IEcAccess? _ecAccess;
+        private readonly RuntimeEcOperationCoordinator _ecOperationCoordinator;
         private EdpThrottlingMitigationService? _edpMitigationService;
 
         private PerformanceMode? _selectedPerformanceMode;
@@ -226,6 +227,11 @@ namespace OmenCore.ViewModels
                     return false;
                 }
 
+                if (!UndervoltStatus.IsRuntimeReady)
+                {
+                    return false;
+                }
+
                 var reason = (UndervoltStatus.Warning ?? UndervoltStatus.Error ?? string.Empty).ToLowerInvariant();
                 if (string.IsNullOrWhiteSpace(reason))
                 {
@@ -314,6 +320,9 @@ namespace OmenCore.ViewModels
             {
                 if (_undervoltService == null)
                     return "Undervolt service failed to initialize. This may be due to missing driver files or insufficient permissions.";
+
+                if (!UndervoltStatus.IsRuntimeReady && !string.IsNullOrWhiteSpace(UndervoltStatus.RuntimeBlockReason))
+                    return UndervoltStatus.RuntimeBlockReason;
                 
                 var warning = UndervoltStatus?.Warning;
                 if (!string.IsNullOrEmpty(warning))
@@ -2369,7 +2378,8 @@ namespace OmenCore.ViewModels
             FanService? fanService = null,
             HardwareMonitoringService? hardwareMonitoringService = null,
             IEcAccess? ecAccess = null,
-            AmdGpuService? amdGpuService = null)
+            AmdGpuService? amdGpuService = null,
+            RuntimeEcOperationCoordinator? ecOperationCoordinator = null)
         {
             _undervoltService = undervoltService;
             _performanceModeService = performanceModeService;
@@ -2386,6 +2396,7 @@ namespace OmenCore.ViewModels
             _hardwareMonitoringService = hardwareMonitoringService;
             _ecAccess = ecAccess;
             _amdGpuService = amdGpuService;
+            _ecOperationCoordinator = ecOperationCoordinator ?? new RuntimeEcOperationCoordinator(logging);
 
             // Safety-first: detect interrupted/unconfirmed tuning tests from previous session
             // and force a safe reset before any startup reapply operations run.
@@ -2405,6 +2416,7 @@ namespace OmenCore.ViewModels
                 OnPropertyChanged(nameof(UndervoltStatusText));
                 OnPropertyChanged(nameof(UndervoltStatusColor));
                 OnPropertyChanged(nameof(IsUndervoltSupported));
+                OnPropertyChanged(nameof(UndervoltNotSupportedReason));
                 OnPropertyChanged(nameof(UndervoltSectionTitle));
                 OnPropertyChanged(nameof(UndervoltActionLabel));
                 OnPropertyChanged(nameof(UndervoltGuidanceText));
@@ -2414,6 +2426,8 @@ namespace OmenCore.ViewModels
                 OnPropertyChanged(nameof(ExternalControllerWarning));
                 OnPropertyChanged(nameof(ExternalControllerHowToFix));
                 (ApplyUndervoltCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (ResetUndervoltCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (TestUndervoltCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
             };
 
             ApplyPerformanceModeCommand = new RelayCommand(_ => ApplyPerformanceMode(), _ => SelectedPerformanceMode != null);
@@ -3232,7 +3246,10 @@ namespace OmenCore.ViewModels
                 {
                     try
                     {
-                        var perfMode = _ecAccess.ReadByte(0xCE);
+                        var perfMode = _ecOperationCoordinator.Execute(
+                            "SystemControlViewModel",
+                            "DetectGpuBoost.ReadPerformanceMode",
+                            () => _ecAccess.ReadByte(0xCE));
                         _logging.Info($"EC performance mode register 0xCE = 0x{perfMode:X2}");
                         
                         GpuPowerBoostAvailable = true;
@@ -3486,6 +3503,11 @@ namespace OmenCore.ViewModels
                 
                 try
                 {
+                    return _ecOperationCoordinator.Execute(
+                        "SystemControlViewModel",
+                        "ApplyEcGpuBoost",
+                        () =>
+                        {
                     // Register 0xCE: Performance mode (controls PPAB/GPU power)
                     // Values: 0=Quiet, 1=Default, 2=Performance, 3=Extreme (enables PPAB +15W boost)
                     var currentMode = _ecAccess.ReadByte(0xCE);
@@ -3532,6 +3554,7 @@ namespace OmenCore.ViewModels
                     }
 
                     return false;
+                        });
                 }
                 catch (Exception ex)
                 {
@@ -3641,8 +3664,14 @@ namespace OmenCore.ViewModels
                             _ => 2
                         };
                         
-                        _ecAccess.WriteByte(0xCE, ecValue);
-                        var readBack = _ecAccess.ReadByte(0xCE);
+                        var readBack = _ecOperationCoordinator.Execute(
+                            "SystemControlViewModel",
+                            "ReapplyEcGpuBoost",
+                            () =>
+                            {
+                                _ecAccess.WriteByte(0xCE, ecValue);
+                                return _ecAccess.ReadByte(0xCE);
+                            });
                         
                         if (readBack == ecValue)
                         {

@@ -17,6 +17,7 @@ namespace OmenCore.Services
         private readonly PowerLimitController _powerController;
         private readonly IEcAccess _ecAccess;
         private readonly LoggingService _logging;
+        private readonly RuntimeEcOperationCoordinator? _ecOperationCoordinator;
 
         // EC registers to read back
         private const ushort EC_PERFORMANCE_MODE = 0xCE;
@@ -27,11 +28,16 @@ namespace OmenCore.Services
         private const ushort EC_GPU_TGP_LOW = 0xC4;
         private const ushort EC_GPU_TGP_HIGH = 0xC5;
 
-        public PowerVerificationService(PowerLimitController powerController, IEcAccess ecAccess, LoggingService logging)
+        public PowerVerificationService(
+            PowerLimitController powerController,
+            IEcAccess ecAccess,
+            LoggingService logging,
+            RuntimeEcOperationCoordinator? ecOperationCoordinator = null)
         {
             _powerController = powerController;
             _ecAccess = ecAccess;
             _logging = logging;
+            _ecOperationCoordinator = ecOperationCoordinator;
         }
 
         public bool IsAvailable => _powerController.IsAvailable && _ecAccess.IsAvailable;
@@ -47,7 +53,7 @@ namespace OmenCore.Services
             try
             {
                 // Apply the power limits
-                _powerController.ApplyPerformanceLimits(mode);
+                ExecuteEc("ApplyPerformanceLimits", () => _powerController.ApplyPerformanceLimits(mode));
                 result.EcWriteSucceeded = true;
 
                 // Determine expected performance mode value
@@ -96,14 +102,17 @@ namespace OmenCore.Services
 
             try
             {
-                int performanceMode = _ecAccess.ReadByte(EC_PERFORMANCE_MODE);
+                return ExecuteEc("GetCurrentPowerLimits", () =>
+                {
+                    int performanceMode = _ecAccess.ReadByte(EC_PERFORMANCE_MODE);
 
-                // Read power limit registers (if available)
-                int cpuPl1 = ReadWord(EC_CPU_PL1_LOW, EC_CPU_PL1_HIGH);
-                int cpuPl2 = ReadWord(EC_CPU_PL2_LOW, EC_CPU_PL2_HIGH);
-                int gpuTgp = ReadWord(EC_GPU_TGP_LOW, EC_GPU_TGP_HIGH);
+                    // Read power limit registers (if available)
+                    int cpuPl1 = ReadWord(EC_CPU_PL1_LOW, EC_CPU_PL1_HIGH);
+                    int cpuPl2 = ReadWord(EC_CPU_PL2_LOW, EC_CPU_PL2_HIGH);
+                    int gpuTgp = ReadWord(EC_GPU_TGP_LOW, EC_GPU_TGP_HIGH);
 
-                return (cpuPl1, cpuPl2, gpuTgp, performanceMode);
+                    return (cpuPl1, cpuPl2, gpuTgp, performanceMode);
+                });
             }
             catch (Exception ex)
             {
@@ -171,6 +180,27 @@ namespace OmenCore.Services
             {
                 return 0;
             }
+        }
+
+        private T ExecuteEc<T>(string operationName, Func<T> action)
+        {
+            if (_ecOperationCoordinator != null)
+            {
+                return _ecOperationCoordinator.Execute("PowerVerificationService", operationName, action);
+            }
+
+            return action();
+        }
+
+        private void ExecuteEc(string operationName, Action action)
+        {
+            if (_ecOperationCoordinator != null)
+            {
+                _ecOperationCoordinator.Execute("PowerVerificationService", operationName, action);
+                return;
+            }
+
+            action();
         }
     }
 }

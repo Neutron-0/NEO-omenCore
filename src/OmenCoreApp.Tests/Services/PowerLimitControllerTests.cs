@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using OmenCore.Hardware;
@@ -82,6 +84,45 @@ namespace OmenCoreApp.Tests.Services
             verified.Should().BeTrue();
             ec.WriteCount.Should().Be(0,
                 "verify-only calls should not re-apply EC power limits after PerformanceModeService has already written them");
+        }
+
+        [Fact]
+        public void GetCurrentPowerLimits_WaitsForSharedEcCoordinator()
+        {
+            var ec = new FakeEcAccess();
+            var controller = new PowerLimitController(ec);
+            var logging = new LoggingService();
+            var coordinator = new RuntimeEcOperationCoordinator(logging);
+            var verifier = new PowerVerificationService(controller, ec, logging, coordinator);
+
+            using var acquired = new ManualResetEventSlim(false);
+            Exception? holderError = null;
+            var holder = new Thread(() =>
+            {
+                try
+                {
+                    coordinator.Execute("Test", "HoldEcGate", () =>
+                    {
+                        acquired.Set();
+                        Thread.Sleep(175);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    holderError = ex;
+                }
+            });
+            holder.Start();
+
+            acquired.Wait(TimeSpan.FromSeconds(2)).Should().BeTrue();
+
+            var sw = Stopwatch.StartNew();
+            verifier.GetCurrentPowerLimits();
+            sw.Stop();
+
+            sw.ElapsedMilliseconds.Should().BeGreaterThanOrEqualTo(125);
+            holder.Join(TimeSpan.FromSeconds(2)).Should().BeTrue();
+            holderError.Should().BeNull();
         }
     }
 }

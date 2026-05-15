@@ -127,5 +127,24 @@ namespace OmenCoreApp.Tests.Services
             cfg.KeyboardType.Should().Be(KeyboardType.BacklightOnly);
             cfg.FallbackMethods.Should().BeEmpty();
         }
+
+        /// <summary>
+        /// Issue #128: ProductId 88EC must have explicit keyboard mapping to prevent
+        /// unknown fallback on Victus 16-e0xxx systems.
+        /// </summary>
+        [Fact]
+        public void GetConfig_ReturnsConfig_For_ProductId_88EC()
+        {
+            var cfg = KeyboardModelDatabase.GetConfig("88EC");
+            cfg.Should().NotBeNull("88EC must have explicit keyboard entry");
+            cfg!.ProductId.Should().Be("88EC");
+            cfg.ModelName.Should().Contain("Victus 16");
+            cfg.ModelNamePattern.Should().Be("16-e0");
+            cfg.KeyboardType.Should().Be(KeyboardType.BacklightOnly, "conservative default pending RGB verification");
+            cfg.PreferredMethod.Should().Be(KeyboardMethod.BacklightOnly);
+            cfg.FallbackMethods.Should().BeEmpty("no fallbacks for explicit mapping");
+            cfg.UserVerified.Should().BeFalse();
+            cfg.Notes.Should().Contain("Issue #128");
+        }
     }
 }

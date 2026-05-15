@@ -13,6 +13,41 @@ namespace OmenCore.Views
         public GeneralView()
         {
             InitializeComponent();
+            Loaded += GeneralView_Loaded;
+            Unloaded += GeneralView_Unloaded;
+            IsVisibleChanged += GeneralView_IsVisibleChanged;
+            DataContextChanged += GeneralView_DataContextChanged;
+        }
+
+        private void GeneralView_Loaded(object sender, RoutedEventArgs e)
+        {
+            SyncTelemetryProjectionState();
+        }
+
+        private void GeneralView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is ViewModels.GeneralViewModel vm)
+            {
+                vm.SetTelemetryProjectionEnabled(false);
+            }
+        }
+
+        private void GeneralView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            SyncTelemetryProjectionState();
+        }
+
+        private void GeneralView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            SyncTelemetryProjectionState();
+        }
+
+        private void SyncTelemetryProjectionState()
+        {
+            if (DataContext is ViewModels.GeneralViewModel vm)
+            {
+                vm.SetTelemetryProjectionEnabled(IsVisible);
+            }
         }
 
         private void Profile_Performance_Click(object sender, MouseButtonEventArgs e)

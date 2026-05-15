@@ -33,6 +33,7 @@ namespace OmenCore.ViewModels
         private readonly OmenKeyService? _omenKeyService;
         private readonly OsdService? _osdService;
         private readonly HardwareMonitoringService? _hardwareMonitoringService;
+        private readonly RuntimePollingCoordinator? _pollingCoordinator;
         private readonly Hardware.HpWmiBios? _wmiBios;
         private readonly PowerAutomationService? _powerAutomationService;
         private readonly ProfileExportService _profileExportService;
@@ -134,6 +135,7 @@ namespace OmenCore.ViewModels
             OmenKeyService? omenKeyService = null,
             OsdService? osdService = null,
             HardwareMonitoringService? hardwareMonitoringService = null,
+            RuntimePollingCoordinator? pollingCoordinator = null,
             PowerAutomationService? powerAutomationService = null,
             FanService? fanService = null,
             ResumeRecoveryDiagnosticsService? resumeRecoveryDiagnostics = null,
@@ -150,6 +152,7 @@ namespace OmenCore.ViewModels
             _omenKeyService = omenKeyService;
             _osdService = osdService;
             _hardwareMonitoringService = hardwareMonitoringService;
+            _pollingCoordinator = pollingCoordinator;
             _powerAutomationService = powerAutomationService;
             _profileExportService = profileExportService;
             _diagnosticsExportService = diagnosticsExportService;
@@ -432,8 +435,15 @@ namespace OmenCore.ViewModels
                     _lowOverheadMode = value;
                     OnPropertyChanged();
                     
-                    // Apply immediately to monitoring service
-                    _hardwareMonitoringService?.SetLowOverheadMode(value);
+                    // Apply immediately through the central cadence owner when available.
+                    if (_pollingCoordinator != null)
+                    {
+                        _pollingCoordinator.SetLowOverheadMode(value);
+                    }
+                    else
+                    {
+                        _hardwareMonitoringService?.SetLowOverheadMode(value);
+                    }
                     _logging.Info($"Low overhead mode {(value ? "enabled" : "disabled")}");
                     
                     // Raise event for MainViewModel to update MonitoringGraphsVisible

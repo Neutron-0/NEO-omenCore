@@ -49,6 +49,9 @@ namespace OmenCore.Utils
         private bool _disposed;
         private readonly ConfigurationService? _configService;
         private bool? _lastRegisteredTrayTempDisplayEnabled;
+        private string? _lastTooltipText;
+        private int? _lastRenderedBadgeTemperature;
+        private bool? _lastRenderedTrayTempDisplayEnabled;
         
         // v2.6.1: Track fan menu items for checkmarks
         private MenuItem? _fanAutoMenuItem;
@@ -476,8 +479,13 @@ namespace OmenCore.Utils
             _trayIcon.ContextMenu = contextMenu;
         }
 
-        public void UpdateMonitoringSample(MonitoringSample sample)
+        public void UpdateMonitoringSample(MonitoringSample? sample)
         {
+            if (sample == null)
+            {
+                return;
+            }
+
             _latestSample = sample;
             
             // Also update QuickPopup if visible
@@ -491,8 +499,20 @@ namespace OmenCore.Utils
         {
             if (_disposed || _latestSample == null)
             {
-                _trayIcon.ToolTipText = "OmenCore - No Data";
-                _trayIcon.IconSource = _baseIconSource;
+                const string noDataTooltip = "OmenCore - No Data";
+                if (!string.Equals(_lastTooltipText, noDataTooltip, StringComparison.Ordinal))
+                {
+                    _trayIcon.ToolTipText = noDataTooltip;
+                    _lastTooltipText = noDataTooltip;
+                }
+
+                if (!ReferenceEquals(_trayIcon.IconSource, _baseIconSource))
+                {
+                    _trayIcon.IconSource = _baseIconSource;
+                }
+
+                _lastRenderedBadgeTemperature = null;
+                _lastRenderedTrayTempDisplayEnabled = false;
                 return;
             }
 
@@ -512,105 +532,105 @@ namespace OmenCore.Utils
                 var cpuLoad = _latestSample.CpuLoadPercent;
                 var gpuLoad = _latestSample.GpuLoadPercent;
 
-                // Update tooltip with enhanced system info including fan RPM and GPU power (v2.6.1)
                 var memUsedGb = _latestSample.RamUsageGb;
                 var memTotalGb = _latestSample.RamTotalGb;
                 var memPercent = memTotalGb > 0 ? (memUsedGb * 100.0 / memTotalGb) : 0;
                 
-                // v2.9.0: Show "—" for zero temps (sensor unavailable)
                 var cpuTempStr = cpuTemp > 0 ? $"{cpuTemp:F0}°C" : "—°C";
                 var gpuTempStr = gpuTemp > 0 ? $"{gpuTemp:F0}°C" : "—°C";
                 
-                // v2.9.0: Label fans separately as CPU Fan / GPU Fan
                 var fan1Rpm = _latestSample.Fan1Rpm;
                 var fan2Rpm = _latestSample.Fan2Rpm;
                 var fanLine = fan2Rpm > 0 
                     ? $"🌀 CPU Fan: {fan1Rpm} · GPU Fan: {fan2Rpm} RPM" 
                     : (fan1Rpm > 0 ? $"🌀 Fan: {fan1Rpm} RPM" : "🌀 Fan: —");
                     
-                // v2.6.1: Add GPU power display
                 var gpuPower = _latestSample.GpuPowerWatts;
                 var gpuPowerDisplay = gpuPower > 0 ? $" · {gpuPower:F0}W" : "";
                 
-                // v2.9.0: Battery/AC status line
                 var batteryPercent = _latestSample.BatteryChargePercent;
                 var isAc = _latestSample.IsOnAcPower;
                 var powerLine = batteryPercent > 0 || isAc
                     ? $"🔋 {batteryPercent:F0}% · {(isAc ? "AC Power" : "Battery")}"
                     : "";
                 
-                _trayIcon.ToolTipText = $"🎮 OmenCore v{_appVersion}\n" +
-                                       $"━━━━━━━━━━━━━━━━━━\n" +
-                                       $"🔥 CPU: {cpuTempStr} @ {cpuLoad:F0}%\n" +
-                                       $"🎯 GPU: {gpuTempStr} @ {gpuLoad:F0}%{gpuPowerDisplay}\n" +
-                                       $"💾 RAM: {memUsedGb:F1}/{memTotalGb:F1} GB ({memPercent:F0}%)\n" +
-                                       $"{fanLine} | ⚡ {_currentPerformanceMode}\n" +
-                                       $"🔗 Fan/Perf: {(_linkFanToPerformanceMode ? "Linked" : "Decoupled")}\n" +
-                                       (powerLine.Length > 0 ? $"{powerLine}\n" : "") +
-                                       $"📈 Monitor: {_monitoringHealth}\n" +
-                                       $"━━━━━━━━━━━━━━━━━━\n" +
-                                       $"Left-click to open dashboard";
-
-                // Update context menu items using simple header updates
-                if (_cpuTempMenuItem != null)
+                var toolTipText = $"🎮 OmenCore v{_appVersion}\n" +
+                                  $"━━━━━━━━━━━━━━━━━━\n" +
+                                  $"🔥 CPU: {cpuTempStr} @ {cpuLoad:F0}%\n" +
+                                  $"🎯 GPU: {gpuTempStr} @ {gpuLoad:F0}%{gpuPowerDisplay}\n" +
+                                  $"💾 RAM: {memUsedGb:F1}/{memTotalGb:F1} GB ({memPercent:F0}%)\n" +
+                                  $"{fanLine} | ⚡ {_currentPerformanceMode}\n" +
+                                  $"🔗 Fan/Perf: {(_linkFanToPerformanceMode ? "Linked" : "Decoupled")}\n" +
+                                  (powerLine.Length > 0 ? $"{powerLine}\n" : "") +
+                                  $"📈 Monitor: {_monitoringHealth}\n" +
+                                  $"━━━━━━━━━━━━━━━━━━\n" +
+                                  $"Left-click to open dashboard";
+                if (!string.Equals(_lastTooltipText, toolTipText, StringComparison.Ordinal))
                 {
-                    _cpuTempMenuItem.Header = $"🔥 CPU: {cpuTempStr} · {cpuLoad:F0}%";
+                    _trayIcon.ToolTipText = toolTipText;
+                    _lastTooltipText = toolTipText;
                 }
 
-                if (_gpuTempMenuItem != null)
-                {
-                    _gpuTempMenuItem.Header = $"🎯 GPU: {gpuTempStr} · {gpuLoad:F0}%";
-                }
-
-                if (_monitoringHealthMenuItem != null)
-                {
-                    _monitoringHealthMenuItem.Header = $"📈 Monitor: {_monitoringHealth}";
-                }
-
-                if (_ramMenuItem != null)
-                {
-                    _ramMenuItem.Header = $"💾 RAM: {memUsedGb:F1}/{memTotalGb:F1} GB ({memPercent:F0}%)";
-                }
+                SetMenuHeaderIfChanged(_cpuTempMenuItem, $"🔥 CPU: {cpuTempStr} · {cpuLoad:F0}%");
+                SetMenuHeaderIfChanged(_gpuTempMenuItem, $"🎯 GPU: {gpuTempStr} · {gpuLoad:F0}%");
+                SetMenuHeaderIfChanged(_monitoringHealthMenuItem, BuildMonitoringHealthHeaderText(_monitoringHealth));
+                SetMenuHeaderIfChanged(_ramMenuItem, $"💾 RAM: {memUsedGb:F1}/{memTotalGb:F1} GB ({memPercent:F0}%)");
 
                 var fanRpmStr = fan2Rpm > 0
                     ? $"CPU {fan1Rpm} · GPU {fan2Rpm} RPM"
                     : (fan1Rpm > 0 ? $"{fan1Rpm} RPM" : "—");
-                if (_fanStatusMenuItem != null)
-                {
-                    _fanStatusMenuItem.Header = $"🌀 Fan: {_currentFanMode} · {fanRpmStr}";
-                }
+                SetMenuHeaderIfChanged(_fanStatusMenuItem, $"🌀 Fan: {_currentFanMode} · {fanRpmStr}");
 
                 if (_batteryMenuItem != null)
                 {
                     if (batteryPercent > 0 || isAc)
                     {
-                        _batteryMenuItem.Header = $"🔋 {batteryPercent:F0}% · {(isAc ? "⚡ Charging" : "On Battery")}";
-                        _batteryMenuItem.Visibility = Visibility.Visible;
+                        SetMenuHeaderIfChanged(_batteryMenuItem, $"🔋 {batteryPercent:F0}% · {(isAc ? "⚡ Charging" : "On Battery")}");
+                        SetMenuVisibilityIfChanged(_batteryMenuItem, Visibility.Visible);
                     }
                     else
                     {
-                        _batteryMenuItem.Visibility = Visibility.Collapsed;
+                        SetMenuVisibilityIfChanged(_batteryMenuItem, Visibility.Collapsed);
                     }
                 }
 
-                // Update tray icon with max temperature badge (shows highest of CPU/GPU)
-                // But only if tray temp display is enabled in settings
                 var showTempOnTray = _configService?.Config?.Features?.TrayTempDisplayEnabled ?? true;
                 UpdateTrayRefreshTimerDescription(showTempOnTray);
                 if (showTempOnTray)
                 {
                     var maxTemp = Math.Max(cpuTemp, gpuTemp);
-                    var badge = CreateTempIcon(maxTemp);
-                    if (badge != null)
+                    var badgeTemperature = (int)Math.Round(maxTemp);
+                    if (_lastRenderedTrayTempDisplayEnabled != true || _lastRenderedBadgeTemperature != badgeTemperature)
                     {
-                        _trayIcon.IconSource = badge;
+                           // v3.6.2: Cache miss - render state changed, requires re-render
+                           RuntimeUiPerformanceCounters.RecordTrayRenderCacheMiss();
+                        var badge = CreateTempIcon(maxTemp);
+                        if (badge != null)
+                        {
+                            _trayIcon.IconSource = badge;
+                            _lastRenderedBadgeTemperature = badgeTemperature;
+                            _lastRenderedTrayTempDisplayEnabled = true;
+                        }
                     }
+                       else
+                       {
+                           // v3.6.2: Cache hit - render state unchanged, no re-render needed
+                           RuntimeUiPerformanceCounters.RecordTrayRenderCacheHit();
+                       }
                 }
-                else
+                else if (_lastRenderedTrayTempDisplayEnabled != false || !ReferenceEquals(_trayIcon.IconSource, _baseIconSource))
                 {
-                    // Show base icon without temperature
+                       // v3.6.2: Cache miss - render state changed (disabling or switching icon)
+                       RuntimeUiPerformanceCounters.RecordTrayRenderCacheMiss();
                     _trayIcon.IconSource = _baseIconSource;
+                    _lastRenderedBadgeTemperature = null;
+                    _lastRenderedTrayTempDisplayEnabled = false;
                 }
+                   else
+                   {
+                       // v3.6.2: Cache hit - render state unchanged (both disabled)
+                       RuntimeUiPerformanceCounters.RecordTrayRenderCacheHit();
+                   }
             }
             catch (Exception ex)
             {
@@ -654,17 +674,17 @@ namespace OmenCore.Utils
 
         private void SetPerformanceMode(string mode)
         {
-            _currentPerformanceMode = mode;
+            _currentPerformanceMode = PerformanceModeNameResolver.Normalize(mode);
             if (_performanceModeMenuItem != null)
             {
-                _performanceModeMenuItem.Header = $"⚡ Power Profile ▶ [{mode}]";
+                _performanceModeMenuItem.Header = BuildPerformanceModeHeaderText(_currentPerformanceMode);
             }
             
             // v2.6.1: Update checkmarks on performance menu items
-            UpdatePerformanceModeCheckmarks(mode);
+            UpdatePerformanceModeCheckmarks(_currentPerformanceMode);
             
-            PerformanceModeChangeRequested?.Invoke(mode);
-            App.Logging.Info($"Performance mode changed from tray: {mode}");
+            PerformanceModeChangeRequested?.Invoke(_currentPerformanceMode);
+            App.Logging.Info($"Performance mode changed from tray: {_currentPerformanceMode}");
         }
         
         /// <summary>
@@ -672,12 +692,13 @@ namespace OmenCore.Utils
         /// </summary>
         private void UpdatePerformanceModeCheckmarks(string activeMode)
         {
+            var canonicalMode = PerformanceModeNameResolver.Normalize(activeMode);
             if (_perfBalancedMenuItem != null)
-                _perfBalancedMenuItem.Header = (activeMode == "Balanced" ? "✓" : "  ") + " ⚖️ Balanced — Default";
+                _perfBalancedMenuItem.Header = (canonicalMode == "Balanced" ? "✓" : "  ") + " ⚖️ Balanced — Default";
             if (_perfPerformanceMenuItem != null)
-                _perfPerformanceMenuItem.Header = (activeMode == "Performance" ? "✓" : "  ") + " 🚀 Performance — Max power";
+                _perfPerformanceMenuItem.Header = (canonicalMode == "Performance" ? "✓" : "  ") + " 🚀 Performance — Max power";
             if (_perfQuietMenuItem != null)
-                _perfQuietMenuItem.Header = (activeMode == "Quiet" ? "✓" : "  ") + " 🔋 Power Saver — Battery life";
+                _perfQuietMenuItem.Header = (canonicalMode == "Quiet" ? "✓" : "  ") + " 🔋 Power Saver — Battery life";
         }
         
         /// <summary>
@@ -856,23 +877,34 @@ namespace OmenCore.Utils
 
         public void UpdateFanMode(string mode)
         {
-            _currentFanMode = mode;
+            var normalizedMode = NormalizeFanModeForDisplay(mode);
+            if (string.Equals(_currentFanMode, normalizedMode, StringComparison.Ordinal) && _pendingFanModeRequest == null)
+            {
+                return;
+            }
+
+            _currentFanMode = normalizedMode;
             _pendingFanModeRequest = null;
             Application.Current?.Dispatcher?.BeginInvoke(() =>
             {
-                UpdateFanModeCheckmarks(mode);
+                UpdateFanModeCheckmarks(normalizedMode);
 
                 if (_fanModeMenuItem != null)
                 {
                     _fanModeMenuItem.Header = BuildFanModeHeader();
                 }
 
-                _quickPopup?.UpdateFanMode(mode);
+                _quickPopup?.UpdateFanMode(normalizedMode);
             });
         }
 
         public void UpdateCurvePresetName(string? presetName)
         {
+            if (string.Equals(_curvePresetName, presetName, StringComparison.Ordinal))
+            {
+                return;
+            }
+
             _curvePresetName = presetName;
             Application.Current?.Dispatcher?.BeginInvoke(() =>
             {
@@ -882,18 +914,33 @@ namespace OmenCore.Utils
 
         public void UpdatePerformanceMode(string mode)
         {
-            _currentPerformanceMode = mode;
+            var normalizedMode = PerformanceModeNameResolver.Normalize(mode);
+            if (string.Equals(_currentPerformanceMode, normalizedMode, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _currentPerformanceMode = normalizedMode;
             Application.Current?.Dispatcher?.BeginInvoke(() =>
             {
                 if (_performanceModeMenuItem != null)
                 {
-                    _performanceModeMenuItem.Header = $"⚡ Performance ▶ {mode}";
+                    _performanceModeMenuItem.Header = BuildPerformanceModeHeaderText(_currentPerformanceMode);
                 }
+
+                UpdatePerformanceModeCheckmarks(_currentPerformanceMode);
+
+                _quickPopup?.UpdatePerformanceMode(_currentPerformanceMode);
             });
         }
 
         public void UpdateLinkedMode(bool linked)
         {
+            if (_linkFanToPerformanceMode == linked)
+            {
+                return;
+            }
+
             _linkFanToPerformanceMode = linked;
             Application.Current?.Dispatcher?.BeginInvoke(() =>
             {
@@ -911,7 +958,7 @@ namespace OmenCore.Utils
 
         public void UpdateMonitoringHealth(MonitoringHealthStatus healthStatus)
         {
-            _monitoringHealth = healthStatus switch
+            var normalizedHealth = healthStatus switch
             {
                 MonitoringHealthStatus.Healthy => "Healthy",
                 MonitoringHealthStatus.Degraded => "Degraded",
@@ -919,11 +966,18 @@ namespace OmenCore.Utils
                 _ => "Unknown"
             };
 
+            if (string.Equals(_monitoringHealth, normalizedHealth, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _monitoringHealth = normalizedHealth;
+
             Application.Current?.Dispatcher?.BeginInvoke(() =>
             {
                 if (_monitoringHealthMenuItem != null)
                 {
-                    _monitoringHealthMenuItem.Header = $"📈 Monitor: {_monitoringHealth}";
+                    _monitoringHealthMenuItem.Header = BuildMonitoringHealthHeaderText(_monitoringHealth);
                 }
 
                 if (_quickPopup != null)
@@ -936,19 +990,86 @@ namespace OmenCore.Utils
         private string BuildFanModeHeader() =>
             BuildFanModeHeaderText(_currentFanMode, _pendingFanModeRequest, _linkFanToPerformanceMode);
 
+        private static string NormalizeFanModeForDisplay(string? mode)
+        {
+            if (FanModeNameResolver.IsMaxAlias(mode))
+            {
+                return "Max";
+            }
+
+            if (FanModeNameResolver.IsQuietAlias(mode))
+            {
+                return "Quiet";
+            }
+
+            if (FanModeNameResolver.IsAutoAlias(mode))
+            {
+                return "Auto";
+            }
+
+            if (FanModeNameResolver.IsCustomAlias(mode))
+            {
+                return "Custom";
+            }
+
+            return string.IsNullOrWhiteSpace(mode) ? "Auto" : mode.Trim();
+        }
+
         /// <summary>
         /// Pure helper — separated so it can be tested without WPF dependencies.
         /// </summary>
         public static string BuildFanModeHeaderText(string currentMode, string? pendingRequest, bool linked)
         {
+            var normalizedCurrentMode = string.IsNullOrWhiteSpace(currentMode) ? "Unknown" : currentMode.Trim();
+            var normalizedPendingRequest = string.IsNullOrWhiteSpace(pendingRequest) ? null : pendingRequest.Trim();
             var suffix = linked ? " [linked]" : string.Empty;
-            if (!string.IsNullOrWhiteSpace(pendingRequest) &&
-                !string.Equals(pendingRequest, currentMode, StringComparison.OrdinalIgnoreCase))
+            if (normalizedPendingRequest != null &&
+                !string.Equals(normalizedPendingRequest, normalizedCurrentMode, StringComparison.OrdinalIgnoreCase))
             {
-                return $"🌀 Fan Mode ▶ {currentMode}{suffix} (requested: {pendingRequest})";
+                return $"🌀 Fan Mode ▶ {normalizedCurrentMode}{suffix} (requested: {normalizedPendingRequest})";
             }
 
-            return $"🌀 Fan Mode ▶ {currentMode}{suffix}";
+            return $"🌀 Fan Mode ▶ {normalizedCurrentMode}{suffix}";
+        }
+
+        /// <summary>
+        /// Pure helper for tray performance mode header formatting.
+        /// </summary>
+        public static string BuildPerformanceModeHeaderText(string currentMode)
+        {
+            var normalizedCurrentMode = string.IsNullOrWhiteSpace(currentMode) ? "Unknown" : currentMode.Trim();
+            return $"⚡ Performance ▶ {normalizedCurrentMode}";
+        }
+
+        /// <summary>
+        /// Pure helper for tray monitoring-health header formatting.
+        /// </summary>
+        public static string BuildMonitoringHealthHeaderText(string monitoringHealth)
+        {
+            var normalizedHealth = string.IsNullOrWhiteSpace(monitoringHealth) ? "Unknown" : monitoringHealth.Trim();
+            return $"📈 Monitor: {normalizedHealth}";
+        }
+
+        private static void SetMenuHeaderIfChanged(MenuItem? menuItem, string header)
+        {
+            if (menuItem == null)
+            {
+                return;
+            }
+
+            var currentHeader = menuItem.Header?.ToString();
+            if (!string.Equals(currentHeader, header, StringComparison.Ordinal))
+            {
+                menuItem.Header = header;
+            }
+        }
+
+        private static void SetMenuVisibilityIfChanged(MenuItem? menuItem, Visibility visibility)
+        {
+            if (menuItem != null && menuItem.Visibility != visibility)
+            {
+                menuItem.Visibility = visibility;
+            }
         }
 
         /// <summary>

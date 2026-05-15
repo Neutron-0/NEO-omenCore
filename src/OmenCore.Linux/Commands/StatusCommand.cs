@@ -39,11 +39,11 @@ public static class StatusCommand
         var keyboard = new LinuxKeyboardController();
         var config = OmenCoreConfig.Load();
         var isRoot = LinuxEcController.CheckRootAccess();
-        var ecIoPathExists = File.Exists("/sys/kernel/debug/ec/ec0/io");
-        var hpWmiPathExists = Directory.Exists("/sys/devices/platform/hp-wmi");
-        var hasThermalProfilePath = File.Exists("/sys/devices/platform/hp-wmi/thermal_profile");
-        var hasPlatformProfilePath = File.Exists("/sys/devices/platform/hp-wmi/platform_profile");
-        var hasAcpiPlatformProfilePath = File.Exists("/sys/firmware/acpi/platform_profile");
+        var ecIoPathExists = File.Exists(LinuxSysfsPathMap.EcIoPath);
+        var hpWmiPathExists = Directory.Exists(LinuxSysfsPathMap.HpWmiRoot);
+        var hasThermalProfilePath = LinuxSysfsPathMap.AnyPathExists(LinuxSysfsPathMap.HpWmiThermalProfilePaths);
+        var hasPlatformProfilePath = LinuxSysfsPathMap.AnyPathExists(LinuxSysfsPathMap.PlatformProfilePaths);
+        var hasAcpiPlatformProfilePath = File.Exists(LinuxSysfsPathMap.AcpiPlatformProfilePath);
 
         var cpuReading = LinuxTelemetryResolver.GetCpuTemperature(ec, hwmon);
         var gpuReading = LinuxTelemetryResolver.GetGpuTemperature(ec, hwmon);
@@ -61,8 +61,8 @@ public static class StatusCommand
             hasAcpiPlatformProfilePath,
             File.Exists("/sys/devices/platform/hp-wmi/fan1_output"),
             File.Exists("/sys/devices/platform/hp-wmi/fan2_output"),
-            Directory.Exists("/sys/devices/platform/hp-wmi/hwmon") && Directory.GetDirectories("/sys/devices/platform/hp-wmi/hwmon", "hwmon*", SearchOption.TopDirectoryOnly).Any(dir => File.Exists(Path.Combine(dir, "fan1_target"))),
-            Directory.Exists("/sys/devices/platform/hp-wmi/hwmon") && Directory.GetDirectories("/sys/devices/platform/hp-wmi/hwmon", "hwmon*", SearchOption.TopDirectoryOnly).Any(dir => File.Exists(Path.Combine(dir, "fan2_target"))),
+            LinuxSysfsPathMap.HasHpWmiFanTarget(1),
+            LinuxSysfsPathMap.HasHpWmiFanTarget(2),
             ec.HasHwmonFanAccess,
             ecIoPathExists || hpWmiPathExists,
             ec.IsUnsafeEcModel,

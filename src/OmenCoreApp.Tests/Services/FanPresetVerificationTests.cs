@@ -201,6 +201,65 @@ namespace OmenCoreApp.Tests.Services
         }
 
         [Fact]
+        public void ApplyPreset_ManualCurve_KeepsPresetNameButPublishesCanonicalCustomMode()
+        {
+            var logging = new LoggingService();
+            logging.Initialize();
+
+            var controller = new NoEffectController();
+            var hwMonitor = new OmenCore.Hardware.LibreHardwareMonitorImpl();
+            var thermalProvider = new OmenCore.Hardware.ThermalSensorProvider(hwMonitor);
+            var notificationService = new NotificationService(logging);
+
+            var fanService = new FanService(controller, thermalProvider, logging, notificationService, 1000, new ResumeRecoveryDiagnosticsService());
+
+            var preset = new FanPreset
+            {
+                Name = "Field curve",
+                Mode = FanMode.Manual,
+                Curve = new List<FanCurvePoint>
+                {
+                    new FanCurvePoint { TemperatureC = 40, FanPercent = 30 },
+                    new FanCurvePoint { TemperatureC = 82, FanPercent = 78 }
+                }
+            };
+
+            fanService.ApplyPreset(preset).Should().BeTrue();
+
+            fanService.ActivePresetName.Should().Be("Field curve");
+            fanService.GetCurrentFanMode().Should().Be("Custom",
+                "manual/saved curves need a stable runtime fan mode even when the preset keeps its own display name");
+
+            logging.Dispose();
+        }
+
+        [Fact]
+        public void ApplyCustomCurve_PublishesCustomRuntimeModeWithoutSyntheticPresetName()
+        {
+            var logging = new LoggingService();
+            logging.Initialize();
+
+            var controller = new NoEffectController();
+            var hwMonitor = new OmenCore.Hardware.LibreHardwareMonitorImpl();
+            var thermalProvider = new OmenCore.Hardware.ThermalSensorProvider(hwMonitor);
+            var notificationService = new NotificationService(logging);
+
+            var fanService = new FanService(controller, thermalProvider, logging, notificationService, 1000, new ResumeRecoveryDiagnosticsService());
+
+            fanService.ApplyCustomCurve(new[]
+            {
+                new FanCurvePoint { TemperatureC = 40, FanPercent = 32 },
+                new FanCurvePoint { TemperatureC = 85, FanPercent = 80 }
+            });
+
+            fanService.ActivePresetName.Should().BeNull();
+            fanService.GetCurrentFanMode().Should().Be("Custom");
+            fanService.IsCurveActive.Should().BeTrue();
+
+            logging.Dispose();
+        }
+
+        [Fact]
         public void ApplyPreset_VerificationSucceeds_LeavesNewPresetActive()
         {
             var logging = new LoggingService();
@@ -399,6 +458,152 @@ namespace OmenCoreApp.Tests.Services
             fanService.ForceSetFanSpeed(42);
 
             states.Should().ContainInOrder(false, true, false);
+            logging.Dispose();
+        }
+
+        [Fact]
+        public void ApplyMaxCooling_IdempotentSkip_WhenAlreadyInMaxMode()
+        {
+            // OmenMon-Reborn parity: duplicate direct Max requests should skip writes
+            var logging = new LoggingService();
+            logging.Initialize();
+
+            var controller = new NoEffectController();
+            var hwMonitor = new OmenCore.Hardware.LibreHardwareMonitorImpl();
+            var thermalProvider = new OmenCore.Hardware.ThermalSensorProvider(hwMonitor);
+            var notificationService = new NotificationService(logging);
+            var fanService = new FanService(controller, thermalProvider, logging, notificationService, 1000, new ResumeRecoveryDiagnosticsService());
+
+            var maxPreset = new FanPreset { Name = "Max", Mode = FanMode.Max };
+
+            // First apply: should write
+            fanService.ApplyPreset(maxPreset);
+            int callCountAfterFirst = controller.ApplyMaxCoolingCount;
+            callCountAfterFirst.Should().Be(1, "first preset apply should invoke ApplyMaxCooling");
+
+            // Second direct call without forceApply: should skip write (idempotent)
+            fanService.ApplyMaxCooling();
+            int callCountAfterSecond = controller.ApplyMaxCoolingCount;
+            callCountAfterSecond.Should().Be(1, "direct ApplyMaxCooling() when already in Max should be skipped");
+
+            // History should record the skip
+            var history = fanService.GetCommandHistorySnapshot();
+            history.Should().Contain(entry => entry.Command == "ApplyMaxCooling" && entry.Target == "Max" && entry.Success && entry.Details.Contains("write skipped"));
+
+            logging.Dispose();
+        }
+
+        [Fact]
+        public void ApplyMaxCooling_ForcedApply_AlwaysWrites()
+        {
+            // OmenMon-Reborn parity: forced Max apply (from preset) should always write
+            var logging = new LoggingService();
+            logging.Initialize();
+
+            var controller = new NoEffectController();
+            var hwMonitor = new OmenCore.Hardware.LibreHardwareMonitorImpl();
+            var thermalProvider = new OmenCore.Hardware.ThermalSensorProvider(hwMonitor);
+            var notificationService = new NotificationService(logging);
+            var fanService = new FanService(controller, thermalProvider, logging, notificationService, 1000, new ResumeRecoveryDiagnosticsService());
+
+            // Manually set Max mode to test forceApply bypass
+            var maxPreset = new FanPreset { Name = "Max", Mode = FanMode.Max };
+            fanService.ApplyPreset(maxPreset);
+            int callCountAfterFirst = controller.ApplyMaxCoolingCount;
+            callCountAfterFirst.Should().Be(1);
+
+            // Directly call internal forceApply path to simulate preset re-application
+            typeof(FanService)
+                .GetMethod("ApplyMaxCooling", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)!
+                .Invoke(fanService, new object[] { true }); // forceApply: true
+
+            int callCountAfterForced = controller.ApplyMaxCoolingCount;
+            callCountAfterForced.Should().Be(2, "forced ApplyMaxCooling should always write even when already in Max");
+
+            logging.Dispose();
+        }
+
+        [Fact]
+        public void ApplyMaxCooling_PresetPath_UsesForceApply()
+        {
+            // OmenMon-Reborn parity: preset-driven Max should use forceApply for authority
+            var logging = new LoggingService();
+            logging.Initialize();
+
+            var controller = new NoEffectController();
+            var hwMonitor = new OmenCore.Hardware.LibreHardwareMonitorImpl();
+            var thermalProvider = new OmenCore.Hardware.ThermalSensorProvider(hwMonitor);
+            var notificationService = new NotificationService(logging);
+            var fanService = new FanService(controller, thermalProvider, logging, notificationService, 1000, new ResumeRecoveryDiagnosticsService());
+
+            // Apply Max preset once
+            var maxPreset = new FanPreset { Name = "Max", Mode = FanMode.Max };
+            fanService.ApplyPreset(maxPreset);
+            int callCountAfterFirst = controller.ApplyMaxCoolingCount;
+            callCountAfterFirst.Should().Be(1);
+
+            // Apply it again: preset path should force-apply, not skip
+            fanService.ApplyPreset(maxPreset);
+            int callCountAfterSecond = controller.ApplyMaxCoolingCount;
+            callCountAfterSecond.Should().Be(2, "preset-driven ApplyMaxCooling should use forceApply and write even when already in Max");
+
+            logging.Dispose();
+        }
+
+        [Fact]
+        public void MaxPersistenceRecovery_ForcesReapply_WhenDeferredVerificationFails()
+        {
+            var logging = new LoggingService();
+            logging.Initialize();
+
+            var controller = new NoEffectController();
+            var hwMonitor = new OmenCore.Hardware.LibreHardwareMonitorImpl();
+            var thermalProvider = new OmenCore.Hardware.ThermalSensorProvider(hwMonitor);
+            var notificationService = new NotificationService(logging);
+            var fanService = new FanService(controller, thermalProvider, logging, notificationService, 1000, new ResumeRecoveryDiagnosticsService());
+
+            var maxPreset = new FanPreset { Name = "Max", Mode = FanMode.Max };
+            fanService.ApplyPreset(maxPreset);
+            controller.ApplyMaxCoolingCount.Should().Be(1);
+
+            // Invoke private recovery hook directly to validate behavior deterministically.
+            typeof(FanService)
+                .GetMethod("AttemptMaxPersistenceRecovery", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                .Invoke(fanService, new object[] { "test verification failed" });
+
+            controller.ApplyMaxCoolingCount.Should().Be(2, "recovery should force one re-apply when Max verification fails");
+
+            var history = fanService.GetCommandHistorySnapshot();
+            history.Should().Contain(entry => entry.Command == "ApplyMaxCooling.Recover" && entry.Success);
+
+            logging.Dispose();
+        }
+
+        [Fact]
+        public void MaxPersistenceRecovery_RespectsCooldown_ToAvoidWriteChurn()
+        {
+            var logging = new LoggingService();
+            logging.Initialize();
+
+            var controller = new NoEffectController();
+            var hwMonitor = new OmenCore.Hardware.LibreHardwareMonitorImpl();
+            var thermalProvider = new OmenCore.Hardware.ThermalSensorProvider(hwMonitor);
+            var notificationService = new NotificationService(logging);
+            var fanService = new FanService(controller, thermalProvider, logging, notificationService, 1000, new ResumeRecoveryDiagnosticsService());
+
+            var maxPreset = new FanPreset { Name = "Max", Mode = FanMode.Max };
+            fanService.ApplyPreset(maxPreset);
+            controller.ApplyMaxCoolingCount.Should().Be(1);
+
+            var recoveryMethod = typeof(FanService)
+                .GetMethod("AttemptMaxPersistenceRecovery", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+
+            recoveryMethod.Invoke(fanService, new object[] { "first failure" });
+            recoveryMethod.Invoke(fanService, new object[] { "second failure" });
+
+            controller.ApplyMaxCoolingCount.Should().Be(2,
+                "second immediate recovery attempt should be suppressed by cooldown to avoid repeated EC writes");
+
             logging.Dispose();
         }
     }

@@ -84,9 +84,9 @@ namespace OmenCoreApp.Tests
             "WmiBiosMonitor.cs:1007",
             "WmiBiosMonitor.cs:1478",
             "WmiBiosMonitor.cs:1521",
-            "WmiFanController.cs:168", // shifted from :157 after 3.6 fan percentage helper
-            "WmiFanController.cs:182", // shifted from :171 after 3.6 fan percentage helper
-            "WmiFanController.cs:196", // shifted from :185 after 3.6 fan percentage helper
+            "WmiFanController.cs:172", // shifted from :170 after v3.6.1 countdown-extension throttle
+            "WmiFanController.cs:186", // shifted from :184 after v3.6.1 countdown-extension throttle
+            "WmiFanController.cs:200", // shifted from :198 after v3.6.1 countdown-extension throttle
             "DiagnosticLoggingService.cs:97",
             "DiagnosticLoggingService.cs:333",
             "DiagnosticLoggingService.cs:336",
@@ -96,7 +96,7 @@ namespace OmenCoreApp.Tests
             "GameLibraryService.cs:392",
             "GameLibraryService.cs:495",
             "GameLibraryService.cs:540",
-            "KeyboardLightingService.cs:238", // shifted from :218
+            "KeyboardLightingService.cs:240", // shifted from :238 after EC coordinator injection into V2 backend
             "NotificationService.cs:522",
             "OmenKeyService.cs:369",
             "OsdService.cs:373", // shifted from :357
@@ -299,6 +299,133 @@ namespace OmenCoreApp.Tests
                 "exception routing via ex.Message.Contains() must not appear; " +
                 "use typed catch clauses or HResult checks instead (STEP-03). " +
                 "Violations: " + string.Join(", ", violations));
+        }
+
+        // ─── v3.6.1 runtime reduction gates ──────────────────────────────────
+
+        [Fact]
+        public void RuntimePresentation_NoLegacyFanCurveBypassInMainViewModel()
+        {
+            var root = GetMainSourceRoot();
+            if (!Directory.Exists(root))
+                return;
+
+            var path = Path.Combine(root, "ViewModels", "MainViewModel.cs");
+            var content = File.ReadAllText(path);
+
+            content.Should().NotContain("ApplyFanCurveCommand",
+                "custom fan-curve application belongs to FanControlViewModel so validation and verification are not bypassed");
+            content.Should().NotContain("_fanService.ApplyCustomCurve",
+                "MainViewModel must remain a presentation mapper and not directly mutate fan curves");
+        }
+
+        [Fact]
+        public void RuntimePresentation_GeneralViewModelHasNoIndependentDispatcherTimer()
+        {
+            var root = GetMainSourceRoot();
+            if (!Directory.Exists(root))
+                return;
+
+            var path = Path.Combine(root, "ViewModels", "GeneralViewModel.cs");
+            var content = File.ReadAllText(path);
+
+            content.Should().NotContain("DispatcherTimer",
+                "GeneralViewModel should subscribe to the centralized monitoring sample stream instead of owning a 1-second presentation timer");
+        }
+
+        [Fact]
+        public void RuntimePresentation_GeneralViewModelUsesTelemetryProjectionRateLimit()
+        {
+            var root = GetMainSourceRoot();
+            if (!Directory.Exists(root))
+                return;
+
+            var path = Path.Combine(root, "ViewModels", "GeneralViewModel.cs");
+            var content = File.ReadAllText(path);
+
+            content.Should().Contain("UiProjectionMinInterval",
+                "GeneralViewModel telemetry projection must be rate-limited to keep the UI quiet under high-frequency monitoring");
+            content.Should().Contain("ShouldProjectMonitoringSample",
+                "GeneralViewModel must coalesce minor updates before notifying bindings");
+        }
+
+        [Fact]
+        public void RuntimePresentation_DashboardProjectionAvoidsUnboundedUiLoop()
+        {
+            var root = GetMainSourceRoot();
+            if (!Directory.Exists(root))
+                return;
+
+            var path = Path.Combine(root, "ViewModels", "DashboardViewModel.cs");
+            var content = File.ReadAllText(path);
+
+            var onSampleStart = content.IndexOf("private void OnSampleUpdated", StringComparison.Ordinal);
+            var onSampleEnd = content.IndexOf("private void UpdateFanCurvePoints", StringComparison.Ordinal);
+            onSampleStart.Should().BeGreaterThan(0);
+            onSampleEnd.Should().BeGreaterThan(onSampleStart);
+
+            var onSampleSection = content.Substring(onSampleStart, onSampleEnd - onSampleStart);
+            onSampleSection.Should().NotContain("while (true)",
+                "dashboard telemetry projection must process coalesced updates incrementally and yield back to the dispatcher");
+
+            content.Should().Contain("UiProjectionMinInterval",
+                "dashboard UI projection should be decoupled from raw telemetry cadence");
+            content.Should().Contain("ShouldProjectSampleToUi",
+                "dashboard must gate minor sample noise to prevent binding and layout storms");
+            content.Should().Contain("SetTelemetryProjectionEnabled",
+                "dashboard projection must become explicitly suppressible when the surface is hidden or minimized");
+            content.Should().Contain("!_telemetryProjectionEnabled",
+                "dashboard must skip projection work while hidden instead of continuously mutating telemetry collections");
+        }
+
+        [Fact]
+        public void RuntimeDiagnostics_DiagnosticExportEcReadsUseCoordinator()
+        {
+            var root = GetMainSourceRoot();
+            if (!Directory.Exists(root))
+                return;
+
+            var path = Path.Combine(root, "Services", "Diagnostics", "DiagnosticExportService.cs");
+            var content = File.ReadAllText(path);
+
+            content.Should().Contain("RuntimeEcOperationCoordinator",
+                "support-bundle EC snapshots should share the runtime EC serialization gate");
+            content.Should().NotContain("byte value = ecAccess.ReadByte",
+                "diagnostic export loops must not perform raw EC reads outside ReadDiagnosticEcByte");
+        }
+
+        [Fact]
+        public void RuntimePresentation_TrayRefreshSkipsRedundantRenderedState()
+        {
+            var root = GetMainSourceRoot();
+            if (!Directory.Exists(root))
+                return;
+
+            var path = Path.Combine(root, "Utils", "TrayIconService.cs");
+            var content = File.ReadAllText(path);
+
+            content.Should().Contain("_lastTooltipText",
+                "tray refresh should cache its last rendered tooltip so fixed timer ticks can skip redundant work");
+            content.Should().Contain("SetMenuHeaderIfChanged",
+                "tray refresh should avoid repeating identical menu header mutations on every timer tick");
+            content.Should().Contain("_lastRenderedBadgeTemperature",
+                "tray icon badge regeneration should be bounded by visible temperature changes instead of every refresh tick");
+        }
+
+        [Fact]
+        public void RuntimePresentation_QuickPopupRefreshSkipsRedundantRenderedState()
+        {
+            var root = GetMainSourceRoot();
+            if (!Directory.Exists(root))
+                return;
+
+            var path = Path.Combine(root, "Views", "QuickPopupWindow.xaml.cs");
+            var content = File.ReadAllText(path);
+
+            content.Should().Contain("PopupTelemetryDisplayState",
+                "quick popup refresh should cache the last rendered telemetry state so visible timer ticks can skip no-op redraws");
+            content.Should().Contain("_lastRenderedTelemetryState",
+                "quick popup should keep a render-state fingerprint instead of rewriting text on every refresh tick");
         }
 
         // ─── Source-root discovery smoke test ─────────────────────────────────

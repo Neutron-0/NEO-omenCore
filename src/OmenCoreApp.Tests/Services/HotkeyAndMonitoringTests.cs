@@ -38,6 +38,26 @@ namespace OmenCoreApp.Tests.Services
             }
         }
 
+        private sealed class CountingRestartBridgeStub : IHardwareMonitorBridge
+        {
+            private int _restartCount;
+
+            public string MonitoringSource => "CountingRestartBridgeStub";
+            public int RestartCount => _restartCount;
+
+            public Task<MonitoringSample> ReadSampleAsync(CancellationToken token)
+            {
+                token.ThrowIfCancellationRequested();
+                return Task.FromResult(new MonitoringSample());
+            }
+
+            public Task<bool> TryRestartAsync()
+            {
+                Interlocked.Increment(ref _restartCount);
+                return Task.FromResult(true);
+            }
+        }
+
         [Fact]
         public void StartWmiEventWatcher_IsSkipped_When_HookActive()
         {
@@ -303,7 +323,7 @@ namespace OmenCoreApp.Tests.Services
         }
 
         [Fact]
-        public void GetEffectiveCadenceInterval_UsesActiveCadence_WhenOverlayRealtimeModeEnabledInTray()
+        public void GetEffectiveCadenceInterval_UsesActiveCadence2s_WhenOverlayRealtimeModeEnabledInTray()
         {
             var logging = new LoggingService();
             logging.Initialize();
@@ -320,7 +340,9 @@ namespace OmenCoreApp.Tests.Services
             method.Should().NotBeNull();
             var cadence = (TimeSpan)method!.Invoke(svc, null)!;
 
-            cadence.Should().Be(TimeSpan.FromSeconds(1));
+            // v3.6.2: Active cadence reduced from 1s to 2s for focused-window overhead reduction.
+            // OSD overlay remains responsive at 2s cadence; monitor loop uses active interval while overlay is visible.
+            cadence.Should().Be(TimeSpan.FromSeconds(2));
         }
 
         [Fact]
@@ -564,6 +586,52 @@ namespace OmenCoreApp.Tests.Services
             var result = (bool)shouldRecoverMethod!.Invoke(null, new object[] { isConnected, ownsWorkerProcess, workerProcessExited })!;
 
             result.Should().Be(expected);
+        }
+
+        [Fact]
+        public async Task CheckAndRecoverFrozenTemps_RateLimitsBridgeRestart_WhenTempsStayFrozen()
+        {
+            var logging = new LoggingService();
+            logging.Initialize();
+
+            var bridge = new CountingRestartBridgeStub();
+            var prefs = new MonitoringPreferences();
+            var svc = new HardwareMonitoringService(bridge, logging, prefs, new ResumeRecoveryDiagnosticsService());
+            var checkMethod = typeof(HardwareMonitoringService).GetMethod("CheckAndRecoverFrozenTemps", BindingFlags.Instance | BindingFlags.NonPublic);
+
+            checkMethod.Should().NotBeNull();
+
+            // Keep temps/load/power static and non-idle so freeze threshold stays at 30 readings.
+            var frozenSample = new MonitoringSample
+            {
+                CpuTemperatureC = 42,
+                GpuTemperatureC = 51,
+                CpuLoadPercent = 20,
+                GpuLoadPercent = 20,
+                CpuPowerWatts = 12
+            };
+
+            for (var i = 0; i < 75; i++)
+            {
+                checkMethod!.Invoke(svc, new object[] { frozenSample });
+            }
+
+            // Allow the async restart task to run once.
+            for (var i = 0; i < 20 && bridge.RestartCount == 0; i++)
+            {
+                await Task.Delay(25);
+            }
+
+            bridge.RestartCount.Should().Be(1);
+
+            // More frozen checks should not trigger another immediate restart due to cooldown.
+            for (var i = 0; i < 75; i++)
+            {
+                checkMethod!.Invoke(svc, new object[] { frozenSample });
+            }
+
+            await Task.Delay(100);
+            bridge.RestartCount.Should().Be(1);
         }
     }
 }

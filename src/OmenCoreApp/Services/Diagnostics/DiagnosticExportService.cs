@@ -29,6 +29,7 @@ namespace OmenCore.Services.Diagnostics
         private readonly FanService? _fanService;
         private readonly KeyboardLightingService? _keyboardLightingService;
         private readonly Func<RgbManager?>? _rgbManagerProvider;
+        private readonly RuntimeEcOperationCoordinator _ecOperationCoordinator;
 
         public DiagnosticExportService(
             LoggingService logging,
@@ -37,7 +38,8 @@ namespace OmenCore.Services.Diagnostics
             HardwareMonitoringService? hardwareMonitoringService = null,
             FanService? fanService = null,
             KeyboardLightingService? keyboardLightingService = null,
-            Func<RgbManager?>? rgbManagerProvider = null)
+            Func<RgbManager?>? rgbManagerProvider = null,
+            RuntimeEcOperationCoordinator? ecOperationCoordinator = null)
         {
             _logging = logging;
             _logsDirectory = logsDirectory;
@@ -46,6 +48,7 @@ namespace OmenCore.Services.Diagnostics
             _fanService = fanService;
             _keyboardLightingService = keyboardLightingService;
             _rgbManagerProvider = rgbManagerProvider;
+            _ecOperationCoordinator = ecOperationCoordinator ?? new RuntimeEcOperationCoordinator(logging);
         }
 
         /// <summary>
@@ -78,6 +81,7 @@ namespace OmenCore.Services.Diagnostics
                     CollectSystemInfoAsync(exportPath),
                     CollectResourceFootprintSnapshotAsync(exportPath, effectiveMonitoringService, effectiveFanService),
                     CollectRuntimePerformanceSnapshotAsync(exportPath),
+                    CollectBoundedPerformanceSnapshotsAsync(exportPath),
                     CollectBackgroundTimerSnapshotAsync(exportPath),
                     CollectRgbControlPathAsync(exportPath),
                     CollectModelIdentityTraceAsync(exportPath),
@@ -586,6 +590,49 @@ namespace OmenCore.Services.Diagnostics
                 sb.AppendLine($"IOThreads: available={ioAvail}, min={ioMin}, max={ioMax}");
                 sb.AppendLine();
 
+                var uiCounters = RuntimeUiPerformanceCounters.GetSnapshot();
+                sb.AppendLine("[UI Dispatcher + Projection Counters]");
+                sb.AppendLine($"CounterUptimeSeconds: {uiCounters.UptimeSeconds:F1}");
+                sb.AppendLine($"DispatcherBeginInvokePosts: {uiCounters.DispatcherBeginInvokePosts}");
+                sb.AppendLine($"DispatcherInvokes: {uiCounters.DispatcherInvokes}");
+                sb.AppendLine($"MainMonitoringSamplesQueued: {uiCounters.MainMonitoringSamplesQueued}");
+                sb.AppendLine($"MainMonitoringSamplesCoalesced: {uiCounters.MainMonitoringSamplesCoalesced}");
+                sb.AppendLine($"MainMonitoringSamplesProjected: {uiCounters.MainMonitoringSamplesProjected}");
+                sb.AppendLine($"DashboardSamplesReceived: {uiCounters.DashboardSamplesReceived}");
+                sb.AppendLine($"DashboardSamplesProjected: {uiCounters.DashboardSamplesProjected}");
+                sb.AppendLine($"DashboardSamplesSkipped: {uiCounters.DashboardSamplesSkipped}");
+                sb.AppendLine($"DashboardDispatcherPosts: {uiCounters.DashboardDispatcherPosts}");
+                sb.AppendLine($"DashboardProjectionRequeues: {uiCounters.DashboardProjectionRequeues}");
+                sb.AppendLine($"GeneralSamplesReceived: {uiCounters.GeneralSamplesReceived}");
+                sb.AppendLine($"GeneralSamplesProjected: {uiCounters.GeneralSamplesProjected}");
+                sb.AppendLine($"GeneralSamplesSkipped: {uiCounters.GeneralSamplesSkipped}");
+                sb.AppendLine($"TotalProjectedSamples: {uiCounters.TotalProjectedSamples}");
+                sb.AppendLine($"DispatcherBeginInvokePostsPerSecond: {uiCounters.DispatcherBeginInvokePostsPerSecond:F2}");
+                sb.AppendLine($"DispatcherInvokesPerSecond: {uiCounters.DispatcherInvokesPerSecond:F2}");
+                sb.AppendLine($"MainProjectedSamplesPerSecond: {uiCounters.MainProjectedSamplesPerSecond:F2}");
+                sb.AppendLine($"DashboardProjectedSamplesPerSecond: {uiCounters.DashboardProjectedSamplesPerSecond:F2}");
+                sb.AppendLine($"GeneralProjectedSamplesPerSecond: {uiCounters.GeneralProjectedSamplesPerSecond:F2}");
+                sb.AppendLine($"ProjectionAmplificationRatio: {uiCounters.ProjectionAmplificationRatio:F2}");
+                sb.AppendLine($"DispatcherAmplificationRatio: {uiCounters.DispatcherAmplificationRatio:F2}");
+                sb.AppendLine($"MainProjectionAcceptanceRatio: {uiCounters.MainProjectionAcceptanceRatio:F2}");
+                sb.AppendLine($"DashboardProjectionAcceptanceRatio: {uiCounters.DashboardProjectionAcceptanceRatio:F2}");
+                sb.AppendLine($"GeneralProjectionAcceptanceRatio: {uiCounters.GeneralProjectionAcceptanceRatio:F2}");
+                sb.AppendLine();
+
+                // v3.6.2 Field Validation Counters
+                sb.AppendLine("[v3.6.2 Field Validation Counters]");
+                sb.AppendLine($"DashboardDormancyActivations: {uiCounters.DashboardDormancyActivations}");
+                sb.AppendLine($"DashboardDormancySamplesProjected: {uiCounters.DashboardDormancySamplesProjected}");
+                sb.AppendLine($"HiddenSurfaceSamplesSkipped: {uiCounters.HiddenSurfaceSamplesSkipped}");
+                sb.AppendLine($"TrayRenderCacheHits: {uiCounters.TrayRenderCacheHits}");
+                sb.AppendLine($"TrayRenderCacheMisses: {uiCounters.TrayRenderCacheMisses}");
+                sb.AppendLine($"TrayRenderCacheHitRatio: {uiCounters.TrayRenderCacheHitRatio:F2}");
+                sb.AppendLine($"PopupRenderCacheHits: {uiCounters.PopupRenderCacheHits}");
+                sb.AppendLine($"PopupRenderCacheMisses: {uiCounters.PopupRenderCacheMisses}");
+                sb.AppendLine($"PopupRenderCacheHitRatio: {uiCounters.PopupRenderCacheHitRatio:F2}");
+                sb.AppendLine($"LatestSampleReplacements: {uiCounters.LatestSampleReplacements}");
+                sb.AppendLine();
+
                 sb.AppendLine("[Omen-Related Processes]");
                 var omenProcesses = Process.GetProcesses()
                     .Where(p => p.ProcessName.Contains("omen", StringComparison.OrdinalIgnoreCase)
@@ -617,6 +664,113 @@ namespace OmenCore.Services.Diagnostics
             catch (Exception ex)
             {
                 _logging.Warn($"Failed to collect runtime performance snapshot: {ex.Message}");
+            }
+        }
+
+        private async Task CollectBoundedPerformanceSnapshotsAsync(string exportPath)
+        {
+            try
+            {
+                var scenario = NormalizeDiagnosticScenarioLabel(Environment.GetEnvironmentVariable("OMENCORE_DIAGNOSTIC_SCENARIO"));
+                var sampleCount = 3;
+                var interval = TimeSpan.FromSeconds(5);
+                var snapshots = new List<(DateTime Utc, TimeSpan Cpu, long WorkingSetBytes, long PrivateBytes, int Threads, int Handles, RuntimeUiPerformanceCounterSnapshot Ui)>();
+
+                for (var i = 0; i < sampleCount; i++)
+                {
+                    using var process = Process.GetCurrentProcess();
+                    snapshots.Add((
+                        DateTime.UtcNow,
+                        process.TotalProcessorTime,
+                        process.WorkingSet64,
+                        process.PrivateMemorySize64,
+                        process.Threads.Count,
+                        process.HandleCount,
+                        RuntimeUiPerformanceCounters.GetSnapshot()));
+
+                    if (i < sampleCount - 1)
+                    {
+                        await Task.Delay(interval);
+                    }
+                }
+
+                var first = snapshots[0];
+                var last = snapshots[^1];
+                var totalWindow = last.Utc - first.Utc;
+                var cpuDelta = last.Cpu - first.Cpu;
+                var estimatedCpuPercent = totalWindow.TotalMilliseconds <= 0
+                    ? 0
+                    : Math.Max(0, cpuDelta.TotalMilliseconds / (totalWindow.TotalMilliseconds * Environment.ProcessorCount) * 100.0);
+
+                var sb = new StringBuilder();
+                sb.AppendLine("=== BOUNDED PERFORMANCE SNAPSHOT ===");
+                sb.AppendLine($"CapturedUtc: {DateTime.UtcNow:O}");
+                sb.AppendLine($"Scenario: {scenario}");
+                sb.AppendLine($"SampleCount: {sampleCount}");
+                sb.AppendLine($"SampleIntervalSeconds: {interval.TotalSeconds:F0}");
+                sb.AppendLine($"WindowSeconds: {totalWindow.TotalSeconds:F1}");
+                sb.AppendLine("Purpose: cheap, bounded evidence for focused/minimized/popup/OSD/tray states without continuous logging.");
+                sb.AppendLine();
+
+                sb.AppendLine("[Runtime State Summary]");
+                sb.AppendLine($"MonitoringHealth: {_hardwareMonitoringService?.HealthStatus.ToString() ?? "Unavailable"}");
+                sb.AppendLine($"MonitoringSource: {_hardwareMonitoringService?.MonitoringSource ?? "Unavailable"}");
+                sb.AppendLine($"CurrentCadenceReason: {_hardwareMonitoringService?.CurrentCadenceReason ?? "Unavailable"}");
+                sb.AppendLine($"LowOverheadMode: {_hardwareMonitoringService?.LowOverheadMode.ToString() ?? "Unavailable"}");
+                sb.AppendLine($"FanControlState: {_fanService?.FanControlStateDescription ?? "Unavailable"}");
+                sb.AppendLine($"CurveActive: {_fanService?.IsCurveActive.ToString() ?? "Unavailable"}");
+                sb.AppendLine($"HoldActive: {_fanService?.IsHoldActive.ToString() ?? "Unavailable"}");
+                sb.AppendLine();
+
+                for (var i = 0; i < snapshots.Count; i++)
+                {
+                    var s = snapshots[i];
+                    sb.AppendLine($"[Sample {i + 1}]");
+                    sb.AppendLine($"Utc: {s.Utc:O}");
+                    sb.AppendLine($"WorkingSetMB: {s.WorkingSetBytes / 1024d / 1024d:F1}");
+                    sb.AppendLine($"PrivateMemoryMB: {s.PrivateBytes / 1024d / 1024d:F1}");
+                    sb.AppendLine($"Threads: {s.Threads}");
+                    sb.AppendLine($"Handles: {s.Handles}");
+                    sb.AppendLine($"DispatcherAmplificationRatio: {s.Ui.DispatcherAmplificationRatio:F2}");
+                    sb.AppendLine($"ProjectionAmplificationRatio: {s.Ui.ProjectionAmplificationRatio:F2}");
+                    sb.AppendLine($"MainProjectionAcceptanceRatio: {s.Ui.MainProjectionAcceptanceRatio:F2}");
+                    sb.AppendLine($"DashboardProjectionAcceptanceRatio: {s.Ui.DashboardProjectionAcceptanceRatio:F2}");
+                    sb.AppendLine($"GeneralProjectionAcceptanceRatio: {s.Ui.GeneralProjectionAcceptanceRatio:F2}");
+                    sb.AppendLine($"DispatcherAmplificationClass: {ClassifyAmplificationRatio(s.Ui.DispatcherAmplificationRatio)}");
+                    sb.AppendLine($"ProjectionAmplificationClass: {ClassifyAmplificationRatio(s.Ui.ProjectionAmplificationRatio)}");
+                    sb.AppendLine($"MainProjectionAcceptanceClass: {ClassifyAcceptanceRatio(s.Ui.MainProjectionAcceptanceRatio)}");
+                    sb.AppendLine($"DashboardAcceptanceClass: {ClassifyAcceptanceRatio(s.Ui.DashboardProjectionAcceptanceRatio)}");
+                    sb.AppendLine($"GeneralAcceptanceClass: {ClassifyAcceptanceRatio(s.Ui.GeneralProjectionAcceptanceRatio)}");
+                    sb.AppendLine($"DashboardDormancyActivations: {s.Ui.DashboardDormancyActivations}");
+                    sb.AppendLine($"HiddenSurfaceSamplesSkipped: {s.Ui.HiddenSurfaceSamplesSkipped}");
+                    sb.AppendLine($"TrayRenderCacheHitRatio: {s.Ui.TrayRenderCacheHitRatio:F2}");
+                    sb.AppendLine($"PopupRenderCacheHitRatio: {s.Ui.PopupRenderCacheHitRatio:F2}");
+                    sb.AppendLine($"TrayRenderCacheClass: {ClassifyCacheHitRatio(s.Ui.TrayRenderCacheHitRatio)}");
+                    sb.AppendLine($"PopupRenderCacheClass: {ClassifyCacheHitRatio(s.Ui.PopupRenderCacheHitRatio)}");
+                    sb.AppendLine();
+                }
+
+                sb.AppendLine("[Window Delta]");
+                sb.AppendLine($"EstimatedCpuPercentOverWindow: {estimatedCpuPercent:F2}");
+                sb.AppendLine($"EstimatedCpuClass: {ClassifyEstimatedCpuPercent(estimatedCpuPercent)}");
+                sb.AppendLine($"WorkingSetDeltaMB: {(last.WorkingSetBytes - first.WorkingSetBytes) / 1024d / 1024d:F1}");
+                sb.AppendLine($"PrivateMemoryDeltaMB: {(last.PrivateBytes - first.PrivateBytes) / 1024d / 1024d:F1}");
+                sb.AppendLine($"DispatcherBeginInvokePostsDelta: {last.Ui.DispatcherBeginInvokePosts - first.Ui.DispatcherBeginInvokePosts}");
+                sb.AppendLine($"DispatcherInvokesDelta: {last.Ui.DispatcherInvokes - first.Ui.DispatcherInvokes}");
+                sb.AppendLine($"MainMonitoringSamplesQueuedDelta: {last.Ui.MainMonitoringSamplesQueued - first.Ui.MainMonitoringSamplesQueued}");
+                sb.AppendLine($"MainMonitoringSamplesProjectedDelta: {last.Ui.MainMonitoringSamplesProjected - first.Ui.MainMonitoringSamplesProjected}");
+                sb.AppendLine($"DashboardSamplesProjectedDelta: {last.Ui.DashboardSamplesProjected - first.Ui.DashboardSamplesProjected}");
+                sb.AppendLine($"GeneralSamplesProjectedDelta: {last.Ui.GeneralSamplesProjected - first.Ui.GeneralSamplesProjected}");
+                sb.AppendLine($"HiddenSurfaceSamplesSkippedDelta: {last.Ui.HiddenSurfaceSamplesSkipped - first.Ui.HiddenSurfaceSamplesSkipped}");
+                sb.AppendLine($"LatestSampleReplacementsDelta: {last.Ui.LatestSampleReplacements - first.Ui.LatestSampleReplacements}");
+                sb.AppendLine($"ScenarioAssessment: {BuildBoundedScenarioAssessment(last, first, estimatedCpuPercent)}");
+
+                File.WriteAllText(Path.Combine(exportPath, "runtime-performance-bounded.txt"), sb.ToString());
+                _logging.Info("Collected bounded performance snapshots");
+            }
+            catch (Exception ex)
+            {
+                _logging.Warn($"Failed to collect bounded performance snapshots: {ex.Message}");
             }
         }
 
@@ -748,6 +902,127 @@ namespace OmenCore.Services.Diagnostics
         private static string FormatMaybeInfiniteSeconds(TimeSpan value)
         {
             return value == TimeSpan.MaxValue ? "No successful sample yet" : value.TotalSeconds.ToString("F1");
+        }
+
+        private static string NormalizeDiagnosticScenarioLabel(string? raw)
+        {
+            var trimmed = raw?.Trim();
+            return string.IsNullOrWhiteSpace(trimmed) ? "unspecified" : trimmed;
+        }
+
+        private static string ClassifyAmplificationRatio(double ratio)
+        {
+            if (ratio <= 1.1)
+            {
+                return "Excellent";
+            }
+
+            if (ratio <= 2.0)
+            {
+                return "Expected";
+            }
+
+            if (ratio <= 3.0)
+            {
+                return "Elevated";
+            }
+
+            return "Critical";
+        }
+
+        private static string ClassifyAcceptanceRatio(double ratio)
+        {
+            if (ratio <= 0.10)
+            {
+                return "Strong suppression";
+            }
+
+            if (ratio <= 0.50)
+            {
+                return "Moderate suppression";
+            }
+
+            if (ratio <= 0.80)
+            {
+                return "Moderate projection";
+            }
+
+            return "High projection";
+        }
+
+        private static string ClassifyCacheHitRatio(double ratio)
+        {
+            if (ratio >= 0.90)
+            {
+                return "Excellent";
+            }
+
+            if (ratio >= 0.70)
+            {
+                return "Good";
+            }
+
+            if (ratio >= 0.50)
+            {
+                return "Watch";
+            }
+
+            return "Low";
+        }
+
+        private static string ClassifyEstimatedCpuPercent(double estimatedCpuPercent)
+        {
+            if (estimatedCpuPercent <= 1.0)
+            {
+                return "Idle-like";
+            }
+
+            if (estimatedCpuPercent <= 2.5)
+            {
+                return "Expected active background";
+            }
+
+            if (estimatedCpuPercent <= 5.0)
+            {
+                return "Elevated";
+            }
+
+            return "Critical";
+        }
+
+        private static string BuildBoundedScenarioAssessment(
+            (DateTime Utc, TimeSpan Cpu, long WorkingSetBytes, long PrivateBytes, int Threads, int Handles, RuntimeUiPerformanceCounterSnapshot Ui) last,
+            (DateTime Utc, TimeSpan Cpu, long WorkingSetBytes, long PrivateBytes, int Threads, int Handles, RuntimeUiPerformanceCounterSnapshot Ui) first,
+            double estimatedCpuPercent)
+        {
+            var findings = new List<string>();
+
+            if (estimatedCpuPercent > 5.0)
+            {
+                findings.Add("High process CPU across bounded window");
+            }
+
+            if (last.Ui.DispatcherAmplificationRatio > 3.0)
+            {
+                findings.Add("Dispatcher amplification above triage threshold");
+            }
+
+            if (last.Ui.ProjectionAmplificationRatio > 3.0)
+            {
+                findings.Add("Projection amplification above triage threshold");
+            }
+
+            if ((last.Ui.HiddenSurfaceSamplesSkipped - first.Ui.HiddenSurfaceSamplesSkipped) <= 0)
+            {
+                findings.Add("No hidden-surface suppression observed in this window");
+            }
+
+            if (findings.Count == 0)
+            {
+                return "No immediate anomalies detected in bounded window";
+            }
+
+            return string.Join("; ", findings);
         }
 
         private static void AppendAssemblyLoadHint(StringBuilder sb, string token)
@@ -905,7 +1180,7 @@ namespace OmenCore.Services.Diagnostics
                 {
                     try
                     {
-                        byte value = ecAccess.ReadByte((ushort)reg);
+                        byte value = ReadDiagnosticEcByte(ecAccess, (ushort)reg, "CollectEcState.SafeRegister");
                         string binary = Convert.ToString(value, 2).PadLeft(8, '0');
                         sb.AppendLine($"0x{reg:X2}\t0x{value:X2}\t{binary}");
                     }
@@ -923,7 +1198,7 @@ namespace OmenCore.Services.Diagnostics
                 {
                     try
                     {
-                        byte value = ecAccess.ReadByte((ushort)reg);
+                        byte value = ReadDiagnosticEcByte(ecAccess, (ushort)reg, "CollectEcState.FanRegister");
                         sb.AppendLine($"EC[0x{reg:X2}] = 0x{value:X2} ({value})");
                     }
                     catch (Exception ex)
@@ -940,7 +1215,7 @@ namespace OmenCore.Services.Diagnostics
                 {
                     try
                     {
-                        byte value = ecAccess.ReadByte((ushort)reg);
+                        byte value = ReadDiagnosticEcByte(ecAccess, (ushort)reg, "CollectEcState.TempRegister");
                         sb.AppendLine($"EC[0x{reg:X2}] = 0x{value:X2} ({value}°C raw)");
                     }
                     catch (Exception ex)
@@ -957,6 +1232,14 @@ namespace OmenCore.Services.Diagnostics
             {
                 _logging.Warn($"Failed to collect EC state: {ex.Message}");
             }
+        }
+
+        private byte ReadDiagnosticEcByte(IEcAccess ecAccess, ushort register, string operationName)
+        {
+            return _ecOperationCoordinator.Execute(
+                "DiagnosticExportService",
+                $"{operationName}.0x{register:X2}",
+                () => ecAccess.ReadByte(register));
         }
 
         private async Task CollectHardwareInfoAsync(string exportPath, LibreHardwareMonitorImpl? hwMonitor)

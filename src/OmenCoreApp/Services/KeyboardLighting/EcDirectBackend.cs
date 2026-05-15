@@ -15,6 +15,7 @@ namespace OmenCore.Services.KeyboardLighting
     {
         private readonly IEcAccess? _ecAccess;
         private readonly LoggingService _logging;
+        private readonly RuntimeEcOperationCoordinator? _ecOperationCoordinator;
         private bool _initialized;
         private bool _disposed;
         
@@ -37,10 +38,15 @@ namespace OmenCore.Services.KeyboardLighting
         public int ZoneCount => 4;
         public bool IsPerKey => false;
         
-        public EcDirectBackend(IEcAccess? ecAccess, LoggingService logging, KeyboardModelConfig? modelConfig = null)
+        public EcDirectBackend(
+            IEcAccess? ecAccess,
+            LoggingService logging,
+            KeyboardModelConfig? modelConfig = null,
+            RuntimeEcOperationCoordinator? ecOperationCoordinator = null)
         {
             _ecAccess = ecAccess;
             _logging = logging;
+            _ecOperationCoordinator = ecOperationCoordinator;
             _ = modelConfig;
             
             // Use model-specific registers if available
@@ -130,26 +136,31 @@ namespace OmenCore.Services.KeyboardLighting
                     $"Z2=#{zoneColors[2].R:X2}{zoneColors[2].G:X2}{zoneColors[2].B:X2}, " +
                     $"Z3=#{zoneColors[3].R:X2}{zoneColors[3].G:X2}{zoneColors[3].B:X2}");
                 
-                // Write each zone's RGB values to EC registers
-                bool allWritesSucceeded = true;
-                for (int zone = 0; zone < 4 && allWritesSucceeded; zone++)
+                // Write each zone's RGB values to EC registers under the shared runtime EC gate.
+                bool allWritesSucceeded = ExecuteEc("SetZoneColors", () =>
                 {
-                    int baseReg = zone * 3;
-                    var color = zoneColors[zone];
-                    
-                    try
+                    bool success = true;
+                    for (int zone = 0; zone < 4 && success; zone++)
                     {
-                        _ecAccess.WriteByte(_colorRegisters[baseReg], color.R);
-                        _ecAccess.WriteByte(_colorRegisters[baseReg + 1], color.G);
-                        _ecAccess.WriteByte(_colorRegisters[baseReg + 2], color.B);
+                        int baseReg = zone * 3;
+                        var color = zoneColors[zone];
+
+                        try
+                        {
+                            _ecAccess.WriteByte(_colorRegisters[baseReg], color.R);
+                            _ecAccess.WriteByte(_colorRegisters[baseReg + 1], color.G);
+                            _ecAccess.WriteByte(_colorRegisters[baseReg + 2], color.B);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logging.Error($"[EcDirectBackend] Failed to write zone {zone}: {ex.Message}", ex);
+                            success = false;
+                            result.FailureReason = $"EC write failed for zone {zone}: {ex.Message}";
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        _logging.Error($"[EcDirectBackend] Failed to write zone {zone}: {ex.Message}", ex);
-                        allWritesSucceeded = false;
-                        result.FailureReason = $"EC write failed for zone {zone}: {ex.Message}";
-                    }
-                }
+
+                    return success;
+                });
                 
                 result.BackendReportedSuccess = allWritesSucceeded;
                 
@@ -225,15 +236,20 @@ namespace OmenCore.Services.KeyboardLighting
                 if (!IsAvailable || _ecAccess == null)
                     return Task.FromResult<Color[]?>(null);
                 
-                var colors = new Color[4];
-                for (int zone = 0; zone < 4; zone++)
+                var colors = ExecuteEc("ReadZoneColors", () =>
                 {
-                    int baseReg = zone * 3;
-                    byte r = _ecAccess.ReadByte(_colorRegisters[baseReg]);
-                    byte g = _ecAccess.ReadByte(_colorRegisters[baseReg + 1]);
-                    byte b = _ecAccess.ReadByte(_colorRegisters[baseReg + 2]);
-                    colors[zone] = Color.FromArgb(r, g, b);
-                }
+                    var readColors = new Color[4];
+                    for (int zone = 0; zone < 4; zone++)
+                    {
+                        int baseReg = zone * 3;
+                        byte r = _ecAccess.ReadByte(_colorRegisters[baseReg]);
+                        byte g = _ecAccess.ReadByte(_colorRegisters[baseReg + 1]);
+                        byte b = _ecAccess.ReadByte(_colorRegisters[baseReg + 2]);
+                        readColors[zone] = Color.FromArgb(r, g, b);
+                    }
+
+                    return readColors;
+                });
                 
                 return Task.FromResult<Color[]?>(colors);
             }
@@ -255,7 +271,7 @@ namespace OmenCore.Services.KeyboardLighting
                 brightness = Math.Clamp(brightness, 0, 100);
                 byte ecValue = (byte)(brightness * 255 / 100);
                 
-                _ecAccess.WriteByte(_brightnessRegister, ecValue);
+                ExecuteEc("SetBrightness", () => _ecAccess.WriteByte(_brightnessRegister, ecValue));
                 _logging.Info($"[EcDirectBackend] Set brightness to {brightness}% (EC value: {ecValue})");
                 return Task.FromResult(true);
             }
@@ -275,7 +291,7 @@ namespace OmenCore.Services.KeyboardLighting
                 
                 // Write to backlight control register
                 byte value = enabled ? (byte)0x01 : (byte)0x00;
-                _ecAccess.WriteByte(_backlightControlRegister, value);
+                ExecuteEc("SetBacklightEnabled", () => _ecAccess.WriteByte(_backlightControlRegister, value));
                 _logging.Info($"[EcDirectBackend] Set backlight enabled: {enabled}");
                 return Task.FromResult(true);
             }
@@ -299,7 +315,7 @@ namespace OmenCore.Services.KeyboardLighting
                 }
                 
                 // Write effect type to effect register
-                _ecAccess.WriteByte(_effectRegister, (byte)effect);
+                ExecuteEc("SetEffect", () => _ecAccess.WriteByte(_effectRegister, (byte)effect));
                 _logging.Info($"[EcDirectBackend] Set effect to {effect} (EC value: {(byte)effect})");
                 
                 // For static, also set the colors
@@ -331,6 +347,27 @@ namespace OmenCore.Services.KeyboardLighting
             _disposed = true;
             _initialized = false;
             // EC access is not owned by this class
+        }
+
+        private T ExecuteEc<T>(string operationName, Func<T> action)
+        {
+            if (_ecOperationCoordinator != null)
+            {
+                return _ecOperationCoordinator.Execute("KeyboardLightingV2.EcDirectBackend", operationName, action);
+            }
+
+            return action();
+        }
+
+        private void ExecuteEc(string operationName, Action action)
+        {
+            if (_ecOperationCoordinator != null)
+            {
+                _ecOperationCoordinator.Execute("KeyboardLightingV2.EcDirectBackend", operationName, action);
+                return;
+            }
+
+            action();
         }
     }
 }

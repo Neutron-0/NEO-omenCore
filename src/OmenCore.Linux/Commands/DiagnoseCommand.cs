@@ -124,42 +124,47 @@ public static class DiagnoseCommand
         info.HpWmiModuleLoaded = Directory.Exists("/sys/module/hp_wmi");
 
         // Paths
-        info.EcIoPathExists = File.Exists("/sys/kernel/debug/ec/ec0/io");
+        info.EcIoPathExists = File.Exists(LinuxSysfsPathMap.EcIoPath);
 
-        info.HpWmiPathExists = Directory.Exists("/sys/devices/platform/hp-wmi");
-        info.HpWmiThermalProfileExists = File.Exists("/sys/devices/platform/hp-wmi/thermal_profile");
-        info.HpWmiPlatformProfileExists = File.Exists("/sys/devices/platform/hp-wmi/platform_profile");
-        info.HpWmiThermalProfileChoicesExists = File.Exists("/sys/devices/platform/hp-wmi/thermal_profile_choices");
-        info.HpWmiPlatformProfileChoicesExists = File.Exists("/sys/devices/platform/hp-wmi/platform_profile_choices");
+        info.HpWmiPathExists = Directory.Exists(LinuxSysfsPathMap.HpWmiRoot);
+        info.HpWmiThermalProfileExists = LinuxSysfsPathMap.AnyPathExists(LinuxSysfsPathMap.HpWmiThermalProfilePaths);
+        info.HpWmiPlatformProfileExists = LinuxSysfsPathMap.AnyPathExists(LinuxSysfsPathMap.PlatformProfilePaths);
+        info.HpWmiThermalProfileChoicesExists = LinuxSysfsPathMap.AnyPathExists(LinuxSysfsPathMap.HpWmiThermalProfileChoicePaths);
+        info.HpWmiPlatformProfileChoicesExists = LinuxSysfsPathMap.AnyPathExists(LinuxSysfsPathMap.HpWmiPlatformProfileChoicePaths);
         info.HpWmiFanAlwaysOnExists = File.Exists("/sys/devices/platform/hp-wmi/fan_always_on");
         info.HpWmiFan1OutputExists = File.Exists("/sys/devices/platform/hp-wmi/fan1_output");
         info.HpWmiFan2OutputExists = File.Exists("/sys/devices/platform/hp-wmi/fan2_output");
-        var hpWmiHwmonRoot = "/sys/devices/platform/hp-wmi/hwmon";
-        if (Directory.Exists(hpWmiHwmonRoot))
-        {
-            var hwmonDirs = Directory.GetDirectories(hpWmiHwmonRoot, "hwmon*", SearchOption.TopDirectoryOnly);
-            info.HpWmiFan1TargetExists = hwmonDirs.Any(dir => File.Exists(Path.Combine(dir, "fan1_target")));
-            info.HpWmiFan2TargetExists = hwmonDirs.Any(dir => File.Exists(Path.Combine(dir, "fan2_target")));
-        }
+        info.HpWmiFan1TargetExists = LinuxSysfsPathMap.HasHpWmiFanTarget(1);
+        info.HpWmiFan2TargetExists = LinuxSysfsPathMap.HasHpWmiFanTarget(2);
 
         // ACPI platform_profile (kernel 5.18+, used by 2025+ models)
-        info.AcpiPlatformProfileExists = File.Exists("/sys/firmware/acpi/platform_profile");
+        info.AcpiPlatformProfileExists = File.Exists(LinuxSysfsPathMap.AcpiPlatformProfilePath);
         if (info.AcpiPlatformProfileExists)
         {
-            info.AcpiPlatformProfile = await ReadTextAsync("/sys/firmware/acpi/platform_profile");
-            info.AcpiPlatformProfileChoices = await ReadTextAsync("/sys/firmware/acpi/platform_profile_choices");
+            info.AcpiPlatformProfile = await ReadTextAsync(LinuxSysfsPathMap.AcpiPlatformProfilePath);
+            info.AcpiPlatformProfileChoices = await ReadTextAsync(LinuxSysfsPathMap.AcpiPlatformProfileChoicesPath);
         }
 
-        info.HpWmiPlatformProfile = await ReadTextAsync("/sys/devices/platform/hp-wmi/platform_profile");
-        info.HpWmiPlatformProfileChoices = await ReadTextAsync("/sys/devices/platform/hp-wmi/platform_profile_choices");
-        info.HpWmiThermalProfile = await ReadTextAsync("/sys/devices/platform/hp-wmi/thermal_profile");
-        info.HpWmiThermalProfileChoices = await ReadTextAsync("/sys/devices/platform/hp-wmi/thermal_profile_choices");
+        info.HpWmiPlatformProfile = await ReadFirstExistingTextAsync(LinuxSysfsPathMap.PlatformProfilePaths);
+        info.HpWmiPlatformProfileChoices = await ReadFirstExistingTextAsync(LinuxSysfsPathMap.HpWmiPlatformProfileChoicePaths);
+        info.HpWmiThermalProfile = await ReadFirstExistingTextAsync(LinuxSysfsPathMap.HpWmiThermalProfilePaths);
+        info.HpWmiThermalProfileChoices = await ReadFirstExistingTextAsync(LinuxSysfsPathMap.HpWmiThermalProfileChoicePaths);
 
         var ec = new LinuxEcController();
         var hwmon = new LinuxHwMonController();
         var gpuReading = LinuxTelemetryResolver.GetGpuTemperature(ec, hwmon);
         info.Service = await CollectServiceDiagnosticsAsync();
         info.KernelIssueHints = await CollectKernelIssueHintsAsync();
+
+        var effectiveConfig = OmenCoreConfig.Load();
+        var configReport = OmenCoreConfig.LastLoadReport;
+        info.ConfigSchemaVersion = effectiveConfig.SchemaVersion;
+        info.ConfigLoadedPaths = configReport.LoadedPaths.ToList();
+        info.ConfigMigrationWarnings = configReport.Warnings.ToList();
+        if (info.ConfigMigrationWarnings.Count > 0)
+        {
+            info.Notes.Add($"Config migration/parser warnings: {info.ConfigMigrationWarnings.Count}");
+        }
 
         // Detection (use current controller logic)
         info.DetectedAccessMethod = ec.AccessMethod;
@@ -228,6 +233,8 @@ public static class DiagnoseCommand
             {
                 info.Notes.Add("hp-wmi directory exists but thermal_profile not found; your kernel/firmware may not expose OMEN controls.");
                 info.Recommendations.Add("Try a newer kernel (6.5+ recommended for 2023+ OMEN) and ensure hp-wmi is loaded: sudo modprobe hp-wmi");
+                info.Recommendations.Add("If your firmware supports it, test kernel parameter hp_wmi.force_multiplex=1 and reboot.");
+                info.Recommendations.Add("Arch-family optional path: test hp-omen-gaming-wmi-dkms (AUR). It often automates hp-wmi profile-path setup, but remains board-dependent and may not fix profile exposure on all models.");
             }
         }
 
@@ -585,6 +592,20 @@ public static class DiagnoseCommand
         }
     }
 
+    private static async Task<string?> ReadFirstExistingTextAsync(IEnumerable<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            var value = await ReadTextAsync(path);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
     private static void PrintHumanReadable(DiagnoseInfo info)
     {
         // Box width: 90 total (╔ + 88 inner + ╗)
@@ -623,6 +644,7 @@ public static class DiagnoseCommand
         Console.WriteLine($"║  hwmon_fan: {(info.HasHwmonFanAccess ? "✓ present" : "✗ missing"),-76}║");
         Console.WriteLine(midBorder);
         Console.WriteLine($"║  Capability:{Truncate(info.CapabilityClass, 76),-76}║");
+        Console.WriteLine($"║  Config Sch:{info.ConfigSchemaVersion,-76}║");
         Console.WriteLine($"║  GPU Telem.: {Truncate($"{info.GpuTelemetrySource} {info.GpuTelemetryPath}".Trim(), 76),-76}║");
         Console.WriteLine($"║  Detected:  {info.DetectedAccessMethod,-76}║");
         Console.WriteLine($"║  Available: {(info.EcControllerAvailable ? "✓" : "✗"),-76}║");
@@ -753,6 +775,11 @@ public static class DiagnoseCommand
         Console.WriteLine($"- **System Config:** {(info.Service.SystemConfigExists ? "Present" : "Missing")} (`{info.Service.SystemConfigPath}`)");
         Console.WriteLine($"- **User Config:** {(info.Service.UserConfigExists ? "Present" : "Missing")} (`{info.Service.UserConfigPath}`)");
         Console.WriteLine($"- **Bundle Extract Dir:** {(info.Service.BundleExtractDirExists ? "Present" : "Missing")} (`{info.Service.BundleExtractDir}`)");
+        Console.WriteLine($"- **Config Schema Version:** {info.ConfigSchemaVersion}");
+        if (info.ConfigLoadedPaths.Count > 0)
+        {
+            Console.WriteLine($"- **Config Load Paths:** {string.Join(", ", info.ConfigLoadedPaths)}");
+        }
         Console.WriteLine();
         Console.WriteLine($"**Capability Classification:** `{info.CapabilityClass}`");
         Console.WriteLine();
@@ -876,7 +903,11 @@ public class DiagnoseInfo
     public string GpuTelemetrySource { get; set; } = "unavailable";
     public string GpuTelemetryPath { get; set; } = string.Empty;
     public LinuxServiceDiagnostics Service { get; set; } = new();
-    
+
+    public int ConfigSchemaVersion { get; set; }
+    public List<string> ConfigLoadedPaths { get; set; } = new();
+    public List<string> ConfigMigrationWarnings { get; set; } = new();
+
     // ACPI platform_profile (2025+ models)
     public bool AcpiPlatformProfileExists { get; set; }
     public string? AcpiPlatformProfile { get; set; }

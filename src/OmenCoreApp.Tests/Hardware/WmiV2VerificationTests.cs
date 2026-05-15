@@ -114,6 +114,50 @@ namespace OmenCoreApp.Tests.Hardware
             fake.LastSetFanLevel!.Value.fan2.Should().Be((byte)100);
         }
 
+        [Fact]
+        public void SetFanSpeed_ManualCurveWrite_DoesNotReadRpmForHistory()
+        {
+            var fake = new ManualWriteSnapshotFakeWmiBios();
+            var controller = new WmiFanController(null, null, 0, injectedWmiBios: fake);
+
+            controller.SetFanSpeed(42).Should().BeTrue();
+            controller.StopCountdownExtension();
+
+            fake.SetFanLevelCalls.Should().Be(1);
+            fake.GetFanRpmDirectCalls.Should().Be(0,
+                "steady manual curve writes should not perform an extra WMI RPM read just to decorate command history");
+        }
+
+        private sealed class ManualWriteSnapshotFakeWmiBios : IHpWmiBios
+        {
+            public int GetFanRpmDirectCalls { get; private set; }
+            public int SetFanLevelCalls { get; private set; }
+
+            public bool IsAvailable => true;
+            public string Status => "ManualWriteSnapshotFake";
+            public HpWmiBios.ThermalPolicyVersion ThermalPolicy => HpWmiBios.ThermalPolicyVersion.V2;
+            public int FanCount => 2;
+            public int MaxFanLevel => 100;
+
+            public (int fan1Rpm, int fan2Rpm)? GetFanRpmDirect()
+            {
+                GetFanRpmDirectCalls++;
+                return (1900, 1800);
+            }
+
+            public (byte fan1, byte fan2)? GetFanLevel() => (42, 42);
+            public bool SetFanMax(bool enabled) => true;
+            public bool SetFanLevel(byte fan1, byte fan2) { SetFanLevelCalls++; return true; }
+            public bool SetFanMode(HpWmiBios.FanMode mode) => true;
+            public double? GetTemperature() => 52.0;
+            public double? GetGpuTemperature() => 51.0;
+            public void ExtendFanCountdown() { }
+            public (bool customTgp, bool ppab, int dState)? GetGpuPower() => null;
+            public bool SetGpuPower(HpWmiBios.GpuPowerLevel level) => true;
+            public HpWmiBios.GpuMode? GetGpuMode() => null;
+            public void Dispose() { }
+        }
+
         private class NoEffectFakeWmiBios : IHpWmiBios
         {
             public List<bool> SetFanMaxCalls { get; } = new List<bool>();
@@ -227,6 +271,23 @@ namespace OmenCoreApp.Tests.Hardware
         }
 
         [Fact]
+        public void CountdownExtensionCallback_MaxMode_ThrottlesCountdownExtensionWrites()
+        {
+            var fake = new MaintenanceFakeWmiBios();
+            var controller = new WmiFanController(null, null, 0, injectedWmiBios: fake);
+
+            controller.ApplyPreset(new FanPreset { Name = "Max" }).Should().BeTrue();
+            controller.StopCountdownExtension();
+
+            InvokeCountdownExtensionCallback(controller);
+            SetPrivateField(controller, "_lastMaxModeMaintenanceUtc", System.DateTime.MinValue);
+            InvokeCountdownExtensionCallback(controller);
+
+            fake.ExtendCountdownCalls.Should().Be(1,
+                "healthy Max maintenance should not issue hidden countdown-extension WMI writes on every maintenance pass");
+        }
+
+        [Fact]
         public void CountdownExtensionCallback_MaxMode_ReappliesAfterSustainedDrop()
         {
             var fake = new MaintenanceFakeWmiBios();
@@ -300,7 +361,8 @@ namespace OmenCoreApp.Tests.Hardware
             InvokeCountdownExtensionCallback(controller);
             fake.SetFanLevelCalls.Should().Be(1,
                 "rapid keepalive ticks should not keep re-writing the same manual level every interval");
-            fake.ExtendCountdownCalls.Should().BeGreaterThan(0);
+            fake.ExtendCountdownCalls.Should().Be(0,
+                "skipped manual keepalive ticks should avoid hidden WMI writes through ExtendFanCountdown");
         }
 
         [Fact]
@@ -322,7 +384,8 @@ namespace OmenCoreApp.Tests.Hardware
             InvokeCountdownExtensionCallback(controller);
             fake.SetFanModeCalls.Should().Be(1,
                 "preset keepalive should not spam SetFanMode on every countdown tick");
-            fake.ExtendCountdownCalls.Should().BeGreaterThan(0);
+            fake.ExtendCountdownCalls.Should().Be(0,
+                "skipped preset keepalive ticks should avoid hidden WMI writes through ExtendFanCountdown");
         }
 
         [Fact]

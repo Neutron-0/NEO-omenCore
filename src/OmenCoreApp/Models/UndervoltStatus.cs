@@ -13,6 +13,8 @@ namespace OmenCore.Models
         public double CurrentCoreOffsetMv { get; set; }
         public double CurrentCacheOffsetMv { get; set; }
         public bool ControlledByOmenCore { get; set; }
+        public bool IsRuntimeReady { get; set; } = true;
+        public string? RuntimeBlockReason { get; set; }
         public string? ExternalController { get; set; }
         public double ExternalCoreOffsetMv { get; set; }
         public double ExternalCacheOffsetMv { get; set; }
@@ -30,12 +32,16 @@ namespace OmenCore.Models
         public static UndervoltStatus CreateUnknown(string? message = null) => new()
         {
             Warning = message ?? "Awaiting undervolt telemetry...",
+            IsRuntimeReady = false,
+            RuntimeBlockReason = message ?? "Undervolt runtime readiness has not been established yet.",
             ControlledByOmenCore = false
         };
 
         public static UndervoltStatus CreateError(string? message = null) => new()
         {
             Error = message ?? "Undervolt operation failed.",
+            IsRuntimeReady = false,
+            RuntimeBlockReason = message ?? "Undervolt operation failed.",
             ControlledByOmenCore = false
         };
     }

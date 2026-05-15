@@ -21,7 +21,7 @@ namespace OmenCore.Services
         private readonly LoggingService _logging;
         private readonly ObservableCollection<MonitoringSample> _samples = new();
         private readonly int _history;
-        private readonly TimeSpan _activeCadenceInterval = TimeSpan.FromSeconds(1);
+        private readonly TimeSpan _activeCadenceInterval = TimeSpan.FromSeconds(2);
         private readonly TimeSpan _idleCadenceInterval = TimeSpan.FromSeconds(5);
         private readonly TimeSpan _trayOnlyCadenceInterval = TimeSpan.FromSeconds(10);
         private CancellationTokenSource? _cts;
@@ -71,6 +71,14 @@ namespace OmenCore.Services
         private int _consecutiveZeroTempReadings = 0;        // Track sustained zero-temp data quality failures
         private const int ZeroTempDegradedThreshold = 10;    // Mark degraded after 10 consecutive 0°C readings (~10s)
         private bool _gpuFreezeWarningLogged = false;        // v2.8.6: Only log GPU freeze warning once per freeze event
+        private const int FreezeRestartBaseCooldownSeconds = 90;
+        private const int FreezeRestartMaxCooldownSeconds = 300;
+        private const int FreezeRestartBudgetWindowMinutes = 15;
+        private const int FreezeRestartMaxAttemptsPerWindow = 4;
+        private readonly object _freezeRestartGate = new();
+        private readonly Queue<DateTime> _freezeRestartAttemptsUtc = new();
+        private DateTime _freezeRestartSuppressedUntilUtc = DateTime.MinValue;
+        private int _freezeRestartCooldownSeconds = FreezeRestartBaseCooldownSeconds;
         private TimeSpan? _lastAppliedCadence;
         private string _lastCadenceReason = "Cadence not initialized";
         private readonly object _cadenceTransitionLock = new();
@@ -1080,6 +1088,7 @@ namespace OmenCore.Services
                 {
                     _logging.Info($"✅ CPU temperature unfroze: {_lastCpuTempForFreezeCheck:F1}°C → {sample.CpuTemperatureC:F1}°C");
                     _usingWmiFallback = false;
+                    ResetFreezeRestartGuards();
                 }
                 _consecutiveSameCpuTemp = 0;
                 _lastCpuTempForFreezeCheck = sample.CpuTemperatureC;
@@ -1107,6 +1116,7 @@ namespace OmenCore.Services
                 if (_gpuFreezeWarningLogged)
                 {
                     _logging.Info($"✅ GPU temperature unfroze: {_lastGpuTempForFreezeCheck:F1}°C → {sample.GpuTemperatureC:F1}°C");
+                    ResetFreezeRestartGuards();
                 }
                 _consecutiveSameGpuTemp = 0;
                 _lastGpuTempForFreezeCheck = sample.GpuTemperatureC;
@@ -1182,6 +1192,12 @@ namespace OmenCore.Services
                 _consecutiveSameCpuTemp >= effectiveCpuFreezeThreshold * 2 && 
                 !_restartInProgress)
             {
+                if (!TryAcquireFreezeRestartPermit(out var skipReason))
+                {
+                    _logging.Info($"[MonitorLoop] Freeze-recovery restart suppressed: {skipReason}");
+                    return sample;
+                }
+
                 _logging.Warn("🔄 Both CPU and GPU temps frozen for extended period - attempting bridge restart...");
                 _restartInProgress = true;
                 
@@ -1195,6 +1211,10 @@ namespace OmenCore.Services
                             _logging.Info("✅ Bridge restart successful after temp freeze detection");
                             _consecutiveSameCpuTemp = 0;
                             _consecutiveSameGpuTemp = 0;
+                        }
+                        else
+                        {
+                            _logging.Warn("[MonitorLoop] Bridge restart reported no recovery during temp-freeze handling");
                         }
                     }
                     catch (Exception ex)
@@ -1219,6 +1239,50 @@ namespace OmenCore.Services
             _lastGpuTempForFreezeCheck = 0;
             _gpuFreezeWarningLogged = false;
             _usingWmiFallback = false;
+            ResetFreezeRestartGuards();
+        }
+
+        private bool TryAcquireFreezeRestartPermit(out string reason)
+        {
+            var nowUtc = DateTime.UtcNow;
+            lock (_freezeRestartGate)
+            {
+                var windowStart = nowUtc.AddMinutes(-FreezeRestartBudgetWindowMinutes);
+                while (_freezeRestartAttemptsUtc.Count > 0 && _freezeRestartAttemptsUtc.Peek() < windowStart)
+                {
+                    _freezeRestartAttemptsUtc.Dequeue();
+                }
+
+                if (nowUtc < _freezeRestartSuppressedUntilUtc)
+                {
+                    var remaining = _freezeRestartSuppressedUntilUtc - nowUtc;
+                    reason = $"cooldown active ({remaining.TotalSeconds:F0}s remaining)";
+                    return false;
+                }
+
+                if (_freezeRestartAttemptsUtc.Count >= FreezeRestartMaxAttemptsPerWindow)
+                {
+                    _freezeRestartSuppressedUntilUtc = nowUtc.AddMinutes(FreezeRestartBudgetWindowMinutes);
+                    reason = $"restart budget exceeded ({FreezeRestartMaxAttemptsPerWindow}/{FreezeRestartBudgetWindowMinutes}m)";
+                    return false;
+                }
+
+                _freezeRestartAttemptsUtc.Enqueue(nowUtc);
+                _freezeRestartSuppressedUntilUtc = nowUtc.AddSeconds(_freezeRestartCooldownSeconds);
+                _freezeRestartCooldownSeconds = Math.Min(_freezeRestartCooldownSeconds * 2, FreezeRestartMaxCooldownSeconds);
+                reason = string.Empty;
+                return true;
+            }
+        }
+
+        private void ResetFreezeRestartGuards()
+        {
+            lock (_freezeRestartGate)
+            {
+                _freezeRestartAttemptsUtc.Clear();
+                _freezeRestartSuppressedUntilUtc = DateTime.MinValue;
+                _freezeRestartCooldownSeconds = FreezeRestartBaseCooldownSeconds;
+            }
         }
 
         private async Task RecoverAfterResumeAsync()

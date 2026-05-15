@@ -51,6 +51,7 @@ namespace OmenCore.Services.KeyboardLighting
         private readonly IEcAccess? _ecAccess;
         private readonly ConfigurationService? _configService;
         private readonly SystemInfoService? _systemInfoService;
+        private readonly RuntimeEcOperationCoordinator? _ecOperationCoordinator;
         
         private IKeyboardBackend? _activeBackend;
         private KeyboardModelConfig? _modelConfig;
@@ -105,13 +106,15 @@ namespace OmenCore.Services.KeyboardLighting
             HpWmiBios? wmiBios = null,
             IEcAccess? ecAccess = null,
             ConfigurationService? configService = null,
-            SystemInfoService? systemInfoService = null)
+            SystemInfoService? systemInfoService = null,
+            RuntimeEcOperationCoordinator? ecOperationCoordinator = null)
         {
             _logging = logging;
             _wmiBios = wmiBios;
             _ecAccess = ecAccess;
             _configService = configService;
             _systemInfoService = systemInfoService;
+            _ecOperationCoordinator = ecOperationCoordinator;
         }
         
         /// <summary>
@@ -291,7 +294,7 @@ namespace OmenCore.Services.KeyboardLighting
                                 _logging.Info($"[KeyboardLightingV2] Auto-enabled EC keyboard writes for verified model: {_modelConfig!.ModelName}");
                             }
                             
-                            backend = new EcDirectBackend(_ecAccess, _logging, _modelConfig);
+                            backend = new EcDirectBackend(_ecAccess, _logging, _modelConfig, _ecOperationCoordinator);
                         }
                         else
                         {

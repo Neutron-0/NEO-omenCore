@@ -141,5 +141,42 @@ namespace OmenCoreApp.Tests.Hardware
             caps.Family.Should().Be(OmenModelFamily.Victus);
             ModelCapabilityDatabase.IsAmbiguousProductId("8BB1").Should().BeTrue();
         }
+
+        /// <summary>
+        /// Issue #128: ProductId 88EC must resolve to explicit Victus e0xxx mapping,
+        /// not a broad family fallback. This ensures consistent identity on field systems.
+        /// </summary>
+        [Fact]
+        public void GetCapabilities_88EC_ResolvesToExplicitVictusE0xxxMapping()
+        {
+            var caps = ModelCapabilityDatabase.GetCapabilities("88EC");
+
+            caps.Should().NotBeNull();
+            caps!.ProductId.Should().Be("88EC", "explicit 88EC entry must exist");
+            caps.Family.Should().Be(OmenModelFamily.Victus);
+            caps.ModelName.Should().Contain("Victus 16");
+            caps.ModelNamePattern.Should().Be("16-e0");
+            caps.UserVerified.Should().BeFalse("pending field verification");
+            caps.Notes.Should().Contain("Issue #128");
+        }
+
+        /// <summary>
+        /// Issue #128: Victus 88EC capability flags are conservative pending field verification.
+        /// No speculation about features without hardware evidence.
+        /// </summary>
+        [Fact]
+        public void GetCapabilities_88EC_UsesConservativeFeatureFlags()
+        {
+            var caps = ModelCapabilityDatabase.GetCapabilities("88EC");
+
+            caps.Should().NotBeNull();
+            caps!.ProductId.Should().Be("88EC");
+            caps.SupportsFanControlWmi.Should().BeTrue("WMI fan control is expected on Victus");
+            caps.SupportsFanCurves.Should().BeTrue("curve support expected");
+            caps.HasFourZoneRgb.Should().BeFalse("no RGB proof yet");
+            caps.SupportsGpuPowerBoost.Should().BeFalse("no power boost proof yet");
+            caps.SupportsUndervolt.Should().BeFalse("no undervolt proof yet");
+            caps.HasKeyboardBacklight.Should().BeTrue("keyboard backlight expected");
+        }
     }
 }

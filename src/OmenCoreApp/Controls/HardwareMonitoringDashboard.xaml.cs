@@ -214,12 +214,15 @@ namespace OmenCore.Controls
             var window = Application.Current?.MainWindow;
             bool minimized = window?.WindowState == WindowState.Minimized;
             _chartsSuppressed = minimized || !this.IsVisible;
+            _dashboardViewModel?.SetTelemetryProjectionEnabled(!_chartsSuppressed);
         }
 
         private void HardwareMonitoringDashboard_Unloaded(object sender, RoutedEventArgs e)
         {
             if (Application.Current?.MainWindow is Window w)
                 w.StateChanged -= MainWindow_StateChanged;
+
+            _dashboardViewModel?.SetTelemetryProjectionEnabled(false);
             
             // Unsubscribe from PropertyChanged to prevent memory leaks
             if (_mainViewModel != null)

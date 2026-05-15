@@ -67,5 +67,26 @@ namespace OmenCoreApp.Tests.Utils
             var header = TrayIconService.BuildFanModeHeaderText("Auto", "   ", linked: false);
             header.Should().Be("🌀 Fan Mode ▶ Auto");
         }
+
+        [Fact]
+        public void PendingRequest_TrimmedBeforeComparison()
+        {
+            var header = TrayIconService.BuildFanModeHeaderText("Quiet", "  quiet  ", linked: false);
+            header.Should().Be("🌀 Fan Mode ▶ Quiet");
+        }
+
+        [Fact]
+        public void PendingRequest_TrimmedBeforeDisplay()
+        {
+            var header = TrayIconService.BuildFanModeHeaderText("Auto", "  Max  ", linked: false);
+            header.Should().Be("🌀 Fan Mode ▶ Auto (requested: Max)");
+        }
+
+        [Fact]
+        public void EmptyCurrentMode_FallsBackToUnknown()
+        {
+            var header = TrayIconService.BuildFanModeHeaderText("   ", null, linked: false);
+            header.Should().Be("🌀 Fan Mode ▶ Unknown");
+        }
     }
 }

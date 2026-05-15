@@ -17,32 +17,17 @@ public class LinuxHardwareService : IHardwareService, IDisposable
     private PerformanceMode? _lastFanFallbackMode;
 
     // HP OMEN specific paths
-    private const string HP_WMI_PATH = "/sys/devices/platform/hp-wmi";
+    private const string HP_WMI_PATH = LinuxSysfsPathMap.HpWmiRoot;
     private const string HWMON_BASE = "/sys/class/hwmon";
     private const string POWER_SUPPLY = "/sys/class/power_supply";
-    private const string BACKLIGHT_PATH = "/sys/class/leds/hp::kbd_backlight";
+    private const string BACKLIGHT_PATH = LinuxSysfsPathMap.KeyboardBacklightPath;
     private const string HP_WMI_FAN1_OUTPUT = "/sys/devices/platform/hp-wmi/fan1_output";
     private const string HP_WMI_FAN2_OUTPUT = "/sys/devices/platform/hp-wmi/fan2_output";
     private const string HP_WMI_FAN_ALWAYS_ON = "/sys/devices/platform/hp-wmi/fan_always_on";
-    private const string HP_WMI_HWMON_ROOT = "/sys/devices/platform/hp-wmi/hwmon";
-    
-    // Thermal profile sysfs paths - checked in order of preference
-    // The standard kernel platform_profile interface (kernel 5.18+) is most reliable.
-    // HP-specific hp-wmi thermal_profile is a fallback for older kernels.
-    private static readonly string[] ThermalProfilePaths = new[]
+    private static readonly string[] PowerProfilesCtlCandidates =
     {
-        "/sys/firmware/acpi/platform_profile",               // Standard kernel interface (most reliable)
-        "/sys/devices/platform/hp-wmi/thermal_profile",      // HP-specific WMI sysfs
-        "/sys/devices/platform/hp-wmi/platform_profile",      // Some kernels expose profile under hp-wmi
-        "/sys/devices/platform/hp-wmi/performance_profile",   // OEM variant naming
-        "/sys/devices/platform/thinkpad_acpi/thermal_profile" // Fallback for WMI alias
-    };
-
-    private static readonly string[] ThermalProfileChoicePaths = new[]
-    {
-        "/sys/firmware/acpi/platform_profile_choices",
-        "/sys/devices/platform/hp-wmi/platform_profile_choices",
-        "/sys/devices/platform/hp-wmi/thermal_profile_choices"
+        "/usr/bin/powerprofilesctl",
+        "/bin/powerprofilesctl"
     };
     
     private string? _resolvedThermalPath; // Cached resolved path
@@ -182,7 +167,9 @@ public class LinuxHardwareService : IHardwareService, IDisposable
                 HasDiscreteGpu = true,
                 HasGpuMuxSwitch = true,
                 SupportsFanControl = true,
+                SupportsFanSurface = true,
                 SupportsPerformanceProfiles = true,
+                SupportsKeyboardBrightness = true,
                 FanControlCapabilityClass = "full-control",
                 FanControlCapabilityReason = "Mock environment reports full control.",
                 ModelName = "HP OMEN 16 (Mock)",
@@ -191,19 +178,22 @@ public class LinuxHardwareService : IHardwareService, IDisposable
             };
         }
 
-        // Check for HP OMEN thermal profile (try multiple sysfs paths)
+        // Check for HP OMEN thermal/profile interfaces using centralized path normalization.
         _resolvedThermalPath = ResolveThermalProfilePath();
         bool hasDirectFanControl = File.Exists(HP_WMI_FAN1_OUTPUT) ||
                        File.Exists(HP_WMI_FAN2_OUTPUT) ||
                        ResolveHwmonFanTargetPath(1) != null ||
                        ResolveHwmonFanTargetPath(2) != null;
+        var hasHpWmiThermalProfilePath = LinuxSysfsPathMap.AnyPathExists(LinuxSysfsPathMap.HpWmiThermalProfilePaths);
+        var hasHpWmiPlatformProfilePath = LinuxSysfsPathMap.AnyPathExists(LinuxSysfsPathMap.PlatformProfilePaths);
+
         var capabilityAssessment = LinuxCapabilityClassifier.Assess(
             CheckRootAccess(),
-            File.Exists("/sys/kernel/debug/ec/ec0/io"),
+            File.Exists(LinuxSysfsPathMap.EcIoPath),
             Directory.Exists(HP_WMI_PATH),
-            File.Exists("/sys/devices/platform/hp-wmi/thermal_profile"),
-            File.Exists("/sys/devices/platform/hp-wmi/platform_profile"),
-            File.Exists("/sys/firmware/acpi/platform_profile"),
+            hasHpWmiThermalProfilePath,
+            hasHpWmiPlatformProfilePath,
+            File.Exists(LinuxSysfsPathMap.AcpiPlatformProfilePath),
             File.Exists(HP_WMI_FAN1_OUTPUT),
             File.Exists(HP_WMI_FAN2_OUTPUT),
             ResolveHwmonFanTargetPath(1) != null,
@@ -214,12 +204,21 @@ public class LinuxHardwareService : IHardwareService, IDisposable
             await ReadDmiStringAsync("product_name"),
             await ReadDmiStringAsync("board_name"));
         _capabilities.SupportsFanControl = capabilityAssessment.SupportsManualFanControl;
-        _capabilities.SupportsPerformanceProfiles = capabilityAssessment.SupportsProfileControl;
+        _capabilities.SupportsFanSurface = capabilityAssessment.SupportsManualFanControl || capabilityAssessment.SupportsProfileControl || capabilityAssessment.SupportsTelemetry;
+        _capabilities.SupportsPerformanceProfiles = capabilityAssessment.SupportsProfileControl || ResolvePowerProfilesCtlPath() != null;
+        _capabilities.PerformanceProfileReason = _capabilities.SupportsPerformanceProfiles
+            ? string.Empty
+            : "No writable platform_profile/thermal_profile interface was detected.";
         _capabilities.FanControlCapabilityClass = capabilityAssessment.CapabilityKey;
         _capabilities.FanControlCapabilityReason = capabilityAssessment.Reason;
         
-        // Check keyboard backlight
+        // Check keyboard backlight and writable brightness endpoint.
         _capabilities.HasKeyboardBacklight = Directory.Exists(BACKLIGHT_PATH);
+        var keyboardBrightnessPath = Path.Combine(BACKLIGHT_PATH, "brightness");
+        _capabilities.SupportsKeyboardBrightness = _capabilities.HasKeyboardBacklight && File.Exists(keyboardBrightnessPath);
+        _capabilities.KeyboardBrightnessReason = _capabilities.SupportsKeyboardBrightness
+            ? string.Empty
+            : "Keyboard brightness sysfs path was not detected on this kernel/board.";
         
         // Detect RGB capabilities from common HP OMEN LED interfaces.
         _capabilities.HasFourZoneRgb = DetectFourZoneRgbSupport();
@@ -307,39 +306,12 @@ public class LinuxHardwareService : IHardwareService, IDisposable
     /// </summary>
     private static string? ResolveThermalProfilePath()
     {
-        foreach (var path in ThermalProfilePaths)
-        {
-            if (File.Exists(path))
-                return path;
-        }
-        return null;
+        return LinuxSysfsPathMap.ResolveThermalProfilePath();
     }
 
     private static string? ResolveHwmonPwmEnablePath(int index)
     {
-        var pwmFile = $"pwm{index}_enable";
-        if (!Directory.Exists(HP_WMI_HWMON_ROOT))
-        {
-            return null;
-        }
-
-        try
-        {
-            foreach (var hwmonDir in Directory.GetDirectories(HP_WMI_HWMON_ROOT, "hwmon*", SearchOption.TopDirectoryOnly))
-            {
-                var candidate = Path.Combine(hwmonDir, pwmFile);
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-            }
-        }
-        catch
-        {
-            return null;
-        }
-
-        return null;
+        return LinuxSysfsPathMap.ResolveHpWmiPwmEnablePath(index);
     }
 
     private static bool CheckRootAccess()
@@ -457,7 +429,7 @@ public class LinuxHardwareService : IHardwareService, IDisposable
         var choices = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            foreach (var choicesPath in ThermalProfileChoicePaths)
+            foreach (var choicesPath in LinuxSysfsPathMap.ThermalProfileChoicePaths)
             {
                 if (!File.Exists(choicesPath))
                 {
@@ -503,6 +475,12 @@ public class LinuxHardwareService : IHardwareService, IDisposable
         }
         catch { }
 
+        var fallbackMode = await TryGetPowerProfilesCtlModeAsync();
+        if (fallbackMode.HasValue)
+        {
+            return fallbackMode.Value;
+        }
+
         return PerformanceMode.Balanced;
     }
 
@@ -519,6 +497,11 @@ public class LinuxHardwareService : IHardwareService, IDisposable
         var thermalPath = _resolvedThermalPath ?? ResolveThermalProfilePath();
         if (thermalPath == null)
         {
+            if (await TrySetPerformanceModeViaPowerProfilesCtlAsync(mode))
+            {
+                return;
+            }
+
             var boardId = await ReadFirstExistingTextAsync(new[]
             {
                 "/sys/class/dmi/id/board_name",
@@ -549,8 +532,104 @@ public class LinuxHardwareService : IHardwareService, IDisposable
             // sysfs write failed.
         }
 
+        if (await TrySetPerformanceModeViaPowerProfilesCtlAsync(mode))
+        {
+            return;
+        }
+
         throw new InvalidOperationException(
             $"Could not write to {thermalPath}. Start OmenCore with the required permissions or configure a distro policy rule for this sysfs path.");
+    }
+
+    private static string? ResolvePowerProfilesCtlPath()
+    {
+        foreach (var candidate in PowerProfilesCtlCandidates)
+        {
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static PerformanceMode ParsePowerProfilesCtlMode(string raw)
+    {
+        return raw.Trim().ToLowerInvariant() switch
+        {
+            "power-saver" => PerformanceMode.Quiet,
+            "performance" => PerformanceMode.Performance,
+            _ => PerformanceMode.Balanced
+        };
+    }
+
+    private static string ToPowerProfilesCtlMode(PerformanceMode mode)
+    {
+        return mode switch
+        {
+            PerformanceMode.Quiet => "power-saver",
+            PerformanceMode.Performance => "performance",
+            _ => "balanced"
+        };
+    }
+
+    private static async Task<(int exitCode, string stdout)> RunPowerProfilesCtlAsync(string arguments)
+    {
+        var binary = ResolvePowerProfilesCtlPath();
+        if (binary == null)
+        {
+            return (-1, string.Empty);
+        }
+
+        try
+        {
+            using var process = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = binary,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                }
+            };
+
+            if (!process.Start())
+            {
+                return (-1, string.Empty);
+            }
+
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var waitTask = process.WaitForExitAsync();
+            await Task.WhenAll(stdoutTask, waitTask);
+
+            return (process.ExitCode, (await stdoutTask).Trim());
+        }
+        catch
+        {
+            return (-1, string.Empty);
+        }
+    }
+
+    private static async Task<PerformanceMode?> TryGetPowerProfilesCtlModeAsync()
+    {
+        var (exitCode, stdout) = await RunPowerProfilesCtlAsync("get");
+        if (exitCode != 0 || string.IsNullOrWhiteSpace(stdout))
+        {
+            return null;
+        }
+
+        return ParsePowerProfilesCtlMode(stdout);
+    }
+
+    private static async Task<bool> TrySetPerformanceModeViaPowerProfilesCtlAsync(PerformanceMode mode)
+    {
+        var profile = ToPowerProfilesCtlMode(mode);
+        var (exitCode, _) = await RunPowerProfilesCtlAsync($"set {profile}");
+        return exitCode == 0;
     }
 
     public async Task SetCpuFanSpeedAsync(int percentage)
@@ -692,9 +771,16 @@ public class LinuxHardwareService : IHardwareService, IDisposable
             var maxPath = Path.Combine(BACKLIGHT_PATH, "max_brightness");
             var brightnessPath = Path.Combine(BACKLIGHT_PATH, "brightness");
 
+            if (!File.Exists(brightnessPath))
+            {
+                throw new NotSupportedException("Keyboard brightness control is not exposed by this Linux kernel/board path.");
+            }
+
             try
             {
-                var maxBrightness = int.Parse(await File.ReadAllTextAsync(maxPath));
+                var maxBrightness = File.Exists(maxPath)
+                    ? int.Parse(await File.ReadAllTextAsync(maxPath))
+                    : 3;
                 var scaledBrightness = (int)(brightness / 100.0 * maxBrightness);
                 await File.WriteAllTextAsync(brightnessPath, scaledBrightness.ToString());
             }
@@ -803,10 +889,7 @@ public class LinuxHardwareService : IHardwareService, IDisposable
     {
         try
         {
-            if (!Directory.Exists(HP_WMI_HWMON_ROOT))
-                return null;
-
-            foreach (var hwmonDir in Directory.GetDirectories(HP_WMI_HWMON_ROOT, "hwmon*"))
+            foreach (var hwmonDir in LinuxSysfsPathMap.EnumerateHpWmiHwmonDirectories())
             {
                 var targetPath = Path.Combine(hwmonDir, $"fan{fanIndex}_target");
                 if (File.Exists(targetPath))
