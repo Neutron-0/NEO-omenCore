@@ -67,5 +67,18 @@ namespace OmenCoreApp.Tests.Hardware
 
             shouldPrefer.Should().Be(expected);
         }
+
+        [Theory]
+        [InlineData(true, "LHM Worker Override")]
+        [InlineData(false, "LHM Fallback")]
+        public void CpuFallbackAuthority_PreservesWorkerOverrideIdentity(bool workerOverride, string expected)
+        {
+            var method = typeof(WmiBiosMonitor).GetMethod(
+                "GetCpuFallbackAuthoritySource",
+                BindingFlags.NonPublic | BindingFlags.Static);
+
+            method.Should().NotBeNull();
+            method!.Invoke(null, new object[] { workerOverride }).Should().Be(expected);
+        }
     }
 }

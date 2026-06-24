@@ -15,6 +15,8 @@ The first fixes target OMEN Max `8D41` Max fan hold stability, Victus `8BD4` WMI
 
 Community feedback also asks that v3.8.0 stay RC/pre-release until the core control surface is validated: fan control, fan curves, performance modes, profile cycling, and basic hotkeys.
 
+Post-3.8.0 reports GitHub #141-#143, saved Custom fan-curve selection, GPU OC startup persistence, and background resource usage are not claimed as fixes in this changelog. They are triaged for the v3.8.1 patch in [3.8.1-BUG-REPORTS.md](3.8.1-BUG-REPORTS.md), with a fresh-PC continuation guide in [3.8.1-MIGRATION-HANDOFF.md](3.8.1-MIGRATION-HANDOFF.md).
+
 ---
 
 ## Fixed So Far

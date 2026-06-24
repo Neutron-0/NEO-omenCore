@@ -1097,6 +1097,7 @@ namespace OmenCore.Utils
                 }
                 else
                 {
+                    _quickPopup.ConfigureQuickAction(_configService?.Config.QuickAccessAction);
                     _quickPopup.PositionNearTray();
                     _quickPopup.UpdateFanMode(_currentFanMode);
                     _quickPopup.UpdateCurvePresetName(_curvePresetName);
@@ -1129,6 +1130,7 @@ namespace OmenCore.Utils
                     _quickPopup.Closed += (s, e) => _quickPopup = null;
                 }
 
+                _quickPopup.ConfigureQuickAction(_configService?.Config.QuickAccessAction);
                 _quickPopup.PositionNearTray();
                 _quickPopup.UpdateFanMode(_currentFanMode);
                 _quickPopup.UpdateCurvePresetName(_curvePresetName);

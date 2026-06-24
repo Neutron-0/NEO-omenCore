@@ -140,6 +140,34 @@ namespace OmenCoreApp.Tests.ViewModels
         }
 
         [Fact]
+        public void QuickAccessAction_DefaultsToDisplayOffAndPersistsSupportedChoices()
+        {
+            var logging = new LoggingService();
+            var cfgService = new ConfigurationService();
+            var sysInfo = new SystemInfoService(logging);
+            var fanCleaning = new FanCleaningService(logging, null, sysInfo);
+            var bios = new BiosUpdateService(logging);
+            var profileExport = new ProfileExportService(logging, cfgService);
+            var diagnosticsExport = new DiagnosticExportService(logging, Path.GetTempPath());
+            var vm = new SettingsViewModel(logging, cfgService, sysInfo, fanCleaning, bios, profileExport, diagnosticsExport);
+
+            vm.QuickAccessAction.Should().Be("Display Off");
+            vm.QuickAccessAction = "Lock Windows";
+
+            var lockReload = new ConfigurationService();
+            lockReload.Config.QuickAccessAction.Should().Be("LockWindows");
+            new SettingsViewModel(logging, lockReload, sysInfo, fanCleaning, bios, profileExport, diagnosticsExport)
+                .QuickAccessAction.Should().Be("Lock Windows");
+
+            vm.QuickAccessAction = "Disabled";
+
+            var reloaded = new ConfigurationService();
+            reloaded.Config.QuickAccessAction.Should().Be("Disabled");
+            new SettingsViewModel(logging, reloaded, sysInfo, fanCleaning, bios, profileExport, diagnosticsExport)
+                .QuickAccessAction.Should().Be("Disabled");
+        }
+
+        [Fact]
         public void LowOverheadMode_PersistsCanonicalLegacyMonitoringValues()
         {
             var logging = new OmenCore.Services.LoggingService();

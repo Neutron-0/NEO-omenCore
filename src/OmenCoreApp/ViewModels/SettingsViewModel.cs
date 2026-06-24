@@ -342,6 +342,34 @@ namespace OmenCore.ViewModels
 
         public bool ShowAdvancedControls => !_liteModeEnabled;
 
+        public string[] QuickAccessActionOptions => new[] { "Display Off", "Lock Windows", "Disabled" };
+
+        public string QuickAccessAction
+        {
+            get => _config.QuickAccessAction switch
+            {
+                "LockWindows" => "Lock Windows",
+                "Disabled" => "Disabled",
+                _ => "Display Off"
+            };
+            set
+            {
+                var normalized = value switch
+                {
+                    "Lock Windows" => "LockWindows",
+                    "Disabled" => "Disabled",
+                    _ => "DisplayOff"
+                };
+
+                if (!string.Equals(_config.QuickAccessAction, normalized, StringComparison.Ordinal))
+                {
+                    _config.QuickAccessAction = normalized;
+                    OnPropertyChanged();
+                    SaveSettings();
+                }
+            }
+        }
+
         public bool LinkFanToPerformanceMode
         {
             get => _linkFanToPerformanceMode;

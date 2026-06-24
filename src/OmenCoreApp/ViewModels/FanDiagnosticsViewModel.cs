@@ -257,7 +257,7 @@ namespace OmenCore.ViewModels
             
             var testLevels = new[] { 30, 60, 100 };
             var fanNames = new[] { "CPU", "GPU" };
-            var results = new System.Collections.Generic.List<(string fan, int target, bool passed, int rpm, double deviation, int score, string rating, string evidence)>();
+            var results = new System.Collections.Generic.List<(string fan, int target, bool passed, string rpm, double deviation, int score, string rating, string evidence)>();
             
             // v2.7.1: Save current preset before diagnostic
             _preTestPreset = _fanService.ActivePreset;
@@ -285,7 +285,7 @@ namespace OmenCore.ViewModels
                             // is judged consistently with the single-fan diagnostic.
                             var passed = result.VerificationPassed;
                             var evidence = string.IsNullOrWhiteSpace(result.VerificationEvidence) ? "None" : result.VerificationEvidence;
-                            results.Add((fanName, targetPercent, passed, result.ActualRpmAfter, result.DeviationPercent, result.VerificationScore, result.ScoreRating, evidence));
+                            results.Add((fanName, targetPercent, passed, result.RpmDisplay, result.DeviationPercent, result.VerificationScore, result.ScoreRating, evidence));
                             
                             // Add to history
                             History.Insert(0, result);
@@ -298,7 +298,7 @@ namespace OmenCore.ViewModels
                         catch (Exception ex)
                         {
                             _logging.Error($"[GuidedDiagnostic] {fanName} at {targetPercent}% FAILED: {ex.Message}");
-                            results.Add((fanName, targetPercent, false, 0, 0, 0, "Failed", "None"));
+                            results.Add((fanName, targetPercent, false, "Physical RPM unavailable", 0, 0, "Failed", "None"));
                         }
                     }
                     
@@ -328,7 +328,7 @@ namespace OmenCore.ViewModels
                 foreach (var r in results)
                 {
                     var statusIcon = r.passed ? "✓" : "✗";
-                    summary.AppendLine($"{statusIcon} {r.fan} @ {r.target}%: {r.rpm} RPM ({r.deviation:+0.0;-0.0}%) - Score: {r.score} [evidence: {r.evidence}]");
+                    summary.AppendLine($"{statusIcon} {r.fan} @ {r.target}%: {r.rpm} - Score: {r.score} [evidence: {r.evidence}]");
                 }
                 
                 GuidedTestResult = summary.ToString();

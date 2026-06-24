@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -31,6 +32,10 @@ namespace OmenCore.Views
         private List<DisplayTarget> _displayTargets = new();
         private int _activeDisplayTargetIndex;
         private PopupTelemetryDisplayState? _lastRenderedTelemetryState;
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool LockWorkStation();
 
         private readonly record struct PopupTelemetryDisplayState(
             string CpuTemp,
@@ -414,9 +419,46 @@ namespace OmenCore.Views
 
         private void DisplayOff_Click(object sender, RoutedEventArgs e)
         {
-            // Close popup first, then turn off display
             Hide();
+
+            if (string.Equals(DisplayOffBtn.Tag as string, "LockWindows", StringComparison.Ordinal))
+            {
+                if (!LockWorkStation())
+                {
+                    App.Logging.Warn("Quick Access could not lock Windows");
+                }
+                return;
+            }
+
             _displayService.TurnOffDisplay();
+        }
+
+        /// <summary>
+        /// Applies the persisted Quick Access shortcut preference. Unknown values retain
+        /// the legacy Display Off behavior for backward compatibility.
+        /// </summary>
+        public void ConfigureQuickAction(string? action)
+        {
+            switch (action)
+            {
+                case "Disabled":
+                    DisplayOffBtn.Visibility = Visibility.Collapsed;
+                    break;
+                case "LockWindows":
+                    DisplayOffBtn.Visibility = Visibility.Visible;
+                    DisplayOffBtn.Tag = "LockWindows";
+                    DisplayOffBtn.ToolTip = "Lock Windows";
+                    QuickActionIcon.Text = "🔒";
+                    QuickActionText.Text = "Lock";
+                    break;
+                default:
+                    DisplayOffBtn.Visibility = Visibility.Visible;
+                    DisplayOffBtn.Tag = "DisplayOff";
+                    DisplayOffBtn.ToolTip = "Turn off display";
+                    QuickActionIcon.Text = "🌙";
+                    QuickActionText.Text = "Display Off";
+                    break;
+            }
         }
 
         private void RefreshRate_Click(object sender, RoutedEventArgs e)

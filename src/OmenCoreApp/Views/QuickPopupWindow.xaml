@@ -241,8 +241,8 @@
                     </Button>
                     <Button x:Name="DisplayOffBtn" Style="{StaticResource QuickButtonStyle}" Click="DisplayOff_Click" ToolTip="Turn off display">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="🌙" FontSize="14" Margin="0,0,6,0"/>
-                            <TextBlock Text="Display Off" FontSize="11"/>
+                            <TextBlock x:Name="QuickActionIcon" Text="🌙" FontSize="14" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="QuickActionText" Text="Display Off" FontSize="11"/>
                         </StackPanel>
                     </Button>
                     <Button x:Name="RefreshRateBtn" Style="{StaticResource QuickButtonStyle}" Click="RefreshRate_Click" ToolTip="Toggle refresh rate">

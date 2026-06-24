@@ -47,7 +47,7 @@ namespace OmenCoreApp.Tests
         {
             "App.xaml.cs:627", // shifted from :605 after 3.6 planning branch UI wiring edits
             "App.xaml.cs:1057",
-            "AmdGpuService.cs:371",
+            "AmdGpuService.cs:409", // shifted from :371 after adding DescribeAdlResult/ADL error constants
             "EcAccessFactory.cs:216",
             "FanController.cs:412",
             "FanController.cs:769",

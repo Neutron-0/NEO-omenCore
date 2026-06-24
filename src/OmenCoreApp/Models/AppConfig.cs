@@ -87,6 +87,12 @@ namespace OmenCore.Models
         /// Keep the main window always on top of other windows.
         /// </summary>
         public bool StayOnTop { get; set; } = false;
+
+        /// <summary>
+        /// Action shown in the middle Quick Access shortcut. Supported values are
+        /// DisplayOff, LockWindows, and Disabled.
+        /// </summary>
+        public string QuickAccessAction { get; set; } = "DisplayOff";
         
         /// <summary>
         /// When true, switching performance modes also writes a fan policy (legacy coupled behavior).

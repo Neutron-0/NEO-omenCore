@@ -39,6 +39,23 @@ namespace OmenCore.Services
         private int _lastNeverInterceptVkCode = 0;
         private int _lastNeverInterceptScanCode = 0;
         private const int NeverInterceptGuardWindowMs = 1200;
+
+        // Last key candidate evaluated by IsOmenKey, regardless of source or outcome.
+        // Field reports for #141-class issues need to see exactly which candidate was
+        // last accepted/rejected and why, since debug-level logs are easy to miss in
+        // support bundles. Reference assignment is atomic, so a plain volatile field
+        // is sufficient without an extra lock.
+        private volatile CandidateRecord? _lastCandidate;
+
+        private sealed class CandidateRecord
+        {
+            public uint VkCode;
+            public uint ScanCode;
+            public bool Accepted;
+            public string Reason = string.Empty;
+            public string Source = string.Empty;
+            public long TimestampTicks;
+        }
         
         // WMI event watcher for HP BIOS events
         private ManagementEventWatcher? _wmiEventWatcher;
@@ -203,6 +220,11 @@ namespace OmenCore.Services
                 : null;
 
             var config = _configService?.Config;
+            var lastCandidate = _lastCandidate;
+            double? lastCandidateAgeMs = lastCandidate != null
+                ? Math.Max(0, (DateTime.UtcNow.Ticks - lastCandidate.TimestampTicks) / (double)TimeSpan.TicksPerMillisecond)
+                : null;
+
             return new OmenKeyDiagnosticSnapshot
             {
                 Enabled = _isEnabled,
@@ -215,7 +237,13 @@ namespace OmenCore.Services
                 SuppressInRdp = config?.Features?.SuppressHotkeysInRdp == true,
                 LastNeverInterceptVkCode = Volatile.Read(ref _lastNeverInterceptVkCode),
                 LastNeverInterceptScanCode = Volatile.Read(ref _lastNeverInterceptScanCode),
-                LastNeverInterceptAgeMs = lastNeverInterceptAgeMs
+                LastNeverInterceptAgeMs = lastNeverInterceptAgeMs,
+                LastCandidateSource = lastCandidate?.Source,
+                LastCandidateVkCode = lastCandidate?.VkCode,
+                LastCandidateScanCode = lastCandidate?.ScanCode,
+                LastCandidateAccepted = lastCandidate?.Accepted,
+                LastCandidateReason = lastCandidate?.Reason,
+                LastCandidateAgeMs = lastCandidateAgeMs
             };
         }
 
@@ -706,6 +734,7 @@ namespace OmenCore.Services
             if (vkCode == VK_F12 && OmenLaunchAppScanCodes.Contains((int)scanCode))
             {
                 _logging.Debug($"Fn+F12 with dedicated OMEN scan code 0x{scanCode:X4} - OMEN key confirmed");
+                LogAcceptedCandidate("keyboard-hook", vkCode, scanCode, "f12-dedicated-omen-scan");
                 return true;
             }
 
@@ -751,6 +780,7 @@ namespace OmenCore.Services
                     if (!strictMode)
                     {
                         _logging.Debug($"VK_LAUNCH_APP2 with dedicated OMEN scan code 0x{scanCode:X4} accepted because strict OMEN key mode is disabled");
+                        LogAcceptedCandidate("keyboard-hook", vkCode, scanCode, "vk-launch-app2-omen-scan-non-strict");
                         return true;
                     }
 
@@ -774,6 +804,7 @@ namespace OmenCore.Services
                 }
 
                 _logging.Debug($"VK_OEM_OMEN (0xFF) detected - OMEN key");
+                LogAcceptedCandidate("keyboard-hook", vkCode, scanCode, "vk-oem-omen");
                 return true;
             }
             
@@ -793,6 +824,7 @@ namespace OmenCore.Services
                     if (!strictMode)
                     {
                         _logging.Debug($"VK_LAUNCH_APP1 (0xB6) with dedicated OMEN scan code 0x{scanCode:X4} accepted because strict OMEN key mode is disabled");
+                        LogAcceptedCandidate("keyboard-hook", vkCode, scanCode, "vk-launch-app1-omen-scan-non-strict");
                         return true;
                     }
 
@@ -816,6 +848,7 @@ namespace OmenCore.Services
                     return false;
                 }
                 _logging.Debug($"VK 157 (0x9D) detected with scan code: 0x{scanCode:X4} - OMEN key");
+                LogAcceptedCandidate("keyboard-hook", vkCode, scanCode, "vk157-omen-scan");
                 return true;
             }
             
@@ -829,6 +862,7 @@ namespace OmenCore.Services
                     return false;
                 }
                 _logging.Debug($"F24 (0x87) detected with scan code: 0x{scanCode:X4} - OMEN key");
+                LogAcceptedCandidate("keyboard-hook", vkCode, scanCode, "f24-omen-scan");
                 return true;
             }
             
@@ -841,6 +875,7 @@ namespace OmenCore.Services
                 if (scanCode == omenScan && (scanCode & 0xFF00) == 0xE000)
                 {
                     _logging.Debug($"OMEN extended scan code 0x{scanCode:X4} matched (VK=0x{vkCode:X2}) - OMEN key");
+                    LogAcceptedCandidate("keyboard-hook", vkCode, scanCode, "extended-scan-match");
                     return true;
                 }
             }
@@ -855,6 +890,7 @@ namespace OmenCore.Services
                         vkCode == VK_OEM_OMEN || vkCode == VK_OMEN_157)
                     {
                         _logging.Debug($"OMEN scan code 0x{scanCode:X4} with OMEN VK 0x{vkCode:X2} - OMEN key confirmed");
+                        LogAcceptedCandidate("keyboard-hook", vkCode, scanCode, "non-extended-scan-omen-vk-match");
                         return true;
                     }
                     LogRejectedCandidate("keyboard-hook", vkCode, scanCode, null, "non-extended-scan-with-non-omen-vk");
@@ -944,6 +980,29 @@ namespace OmenCore.Services
         private void LogRejectedCandidate(string source, uint vkCode, uint scanCode, uint? flags, string reason)
         {
             _logging.Debug($"OMEN candidate rejected: source={source} vk=0x{vkCode:X2} scan=0x{scanCode:X4} flags={(flags.HasValue ? $"0x{flags.Value:X}" : "n/a")} reason={reason}");
+            _lastCandidate = new CandidateRecord
+            {
+                VkCode = vkCode,
+                ScanCode = scanCode,
+                Accepted = false,
+                Reason = reason,
+                Source = source,
+                TimestampTicks = DateTime.UtcNow.Ticks
+            };
+        }
+
+        private void LogAcceptedCandidate(string source, uint vkCode, uint scanCode, string reason)
+        {
+            _logging.Debug($"OMEN candidate accepted: source={source} vk=0x{vkCode:X2} scan=0x{scanCode:X4} reason={reason}");
+            _lastCandidate = new CandidateRecord
+            {
+                VkCode = vkCode,
+                ScanCode = scanCode,
+                Accepted = true,
+                Reason = reason,
+                Source = source,
+                TimestampTicks = DateTime.UtcNow.Ticks
+            };
         }
 
         /// <summary>
@@ -1049,5 +1108,11 @@ namespace OmenCore.Services
         public int LastNeverInterceptVkCode { get; init; }
         public int LastNeverInterceptScanCode { get; init; }
         public double? LastNeverInterceptAgeMs { get; init; }
+        public string? LastCandidateSource { get; init; }
+        public uint? LastCandidateVkCode { get; init; }
+        public uint? LastCandidateScanCode { get; init; }
+        public bool? LastCandidateAccepted { get; init; }
+        public string? LastCandidateReason { get; init; }
+        public double? LastCandidateAgeMs { get; init; }
     }
 }

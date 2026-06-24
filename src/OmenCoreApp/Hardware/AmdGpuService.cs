@@ -18,9 +18,47 @@ namespace OmenCore.Hardware
         private bool _disposed;
         private IntPtr _adlContext = IntPtr.Zero;
 
-        // ADL return codes
+        // ADL return codes (AMD ADL SDK adl_defines.h — stable, publicly documented values)
         private const int ADL_OK = 0;
         private const int ADL_ERR = -1;
+        private const int ADL_ERR_NOT_INIT = -2;
+        private const int ADL_ERR_INVALID_PARAM = -3;
+        private const int ADL_ERR_INVALID_PARAM_SIZE = -4;
+        private const int ADL_ERR_INVALID_ADL_IDX = -5;
+        private const int ADL_ERR_INVALID_CONTROLLER_INDEX = -6;
+        private const int ADL_ERR_INVALID_DISPLAY_INDEX = -7;
+        private const int ADL_ERR_NOT_SUPPORTED = -8;
+        private const int ADL_ERR_NULL_POINTER = -9;
+        private const int ADL_ERR_DISABLED_ADAPTER = -10;
+        private const int ADL_ERR_INVALID_CALLBACK = -11;
+        private const int ADL_ERR_RESOURCE_CONFLICT = -12;
+        private const int ADL_ERR_SET_INCOMPLETE = -20;
+        private const int ADL_ERR_NO_XDISPLAY = -21;
+
+        /// <summary>
+        /// Translates a raw ADL2 return code into a human-readable reason for field diagnosis.
+        /// Logging the bare numeric code (e.g. "-8") is meaningless without the ADL SDK headers
+        /// in hand; this lets a field log report "Not Supported" directly.
+        /// </summary>
+        private static string DescribeAdlResult(int result) => result switch
+        {
+            ADL_OK => "OK",
+            ADL_ERR => "Generic error",
+            ADL_ERR_NOT_INIT => "ADL not initialized",
+            ADL_ERR_INVALID_PARAM => "Invalid parameter",
+            ADL_ERR_INVALID_PARAM_SIZE => "Invalid parameter size",
+            ADL_ERR_INVALID_ADL_IDX => "Invalid ADL index",
+            ADL_ERR_INVALID_CONTROLLER_INDEX => "Invalid controller index",
+            ADL_ERR_INVALID_DISPLAY_INDEX => "Invalid display index",
+            ADL_ERR_NOT_SUPPORTED => "Not supported by this adapter/driver",
+            ADL_ERR_NULL_POINTER => "Null pointer",
+            ADL_ERR_DISABLED_ADAPTER => "Adapter is disabled",
+            ADL_ERR_INVALID_CALLBACK => "Invalid callback",
+            ADL_ERR_RESOURCE_CONFLICT => "Resource conflict",
+            ADL_ERR_SET_INCOMPLETE => "Set incomplete (partially applied)",
+            ADL_ERR_NO_XDISPLAY => "No X display (Linux)",
+            _ => "Unknown ADL error code"
+        };
 
         // ADL function delegates
         private delegate int ADL2_Main_Control_Create(ADL_Main_Memory_Alloc callback, int enumConnectedAdapters, ref IntPtr context);
@@ -241,7 +279,7 @@ namespace OmenCore.Hardware
                 }
                 else
                 {
-                    _logging.Warn($"AMD GPU: SetCoreClockOffset failed with code {result}");
+                    _logging.Warn($"AMD GPU: SetCoreClockOffset failed: {DescribeAdlResult(result)} (code {result})");
                     return false;
                 }
             }
@@ -283,7 +321,7 @@ namespace OmenCore.Hardware
                 }
                 else
                 {
-                    _logging.Warn($"AMD GPU: SetMemoryClockOffset failed with code {result}");
+                    _logging.Warn($"AMD GPU: SetMemoryClockOffset failed: {DescribeAdlResult(result)} (code {result})");
                     return false;
                 }
             }
@@ -325,7 +363,7 @@ namespace OmenCore.Hardware
                 }
                 else
                 {
-                    _logging.Warn($"AMD GPU: SetPowerLimit failed with code {result}");
+                    _logging.Warn($"AMD GPU: SetPowerLimit failed: {DescribeAdlResult(result)} (code {result})");
                     return false;
                 }
             }

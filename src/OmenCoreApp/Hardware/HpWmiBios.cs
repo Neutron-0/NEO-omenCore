@@ -5,6 +5,7 @@ using System.Threading;
 using Microsoft.Management.Infrastructure;
 using Microsoft.Management.Infrastructure.Options;
 using OmenCore.Services;
+using OmenCore.Services.Diagnostics;
 
 namespace OmenCore.Hardware
 {
@@ -384,6 +385,12 @@ namespace OmenCore.Hardware
                     _sharedInstance = this;
                     _heartbeatTimer = new Timer(HeartbeatCallback, null, HeartbeatIntervalMs, HeartbeatIntervalMs);
                     _heartbeatEnabled = true;
+                    BackgroundTimerRegistry.Register(
+                        "HpWmiBiosHeartbeat",
+                        "HpWmiBios",
+                        $"Keeps HP WMI BIOS commands active on 2023+ models (every {HeartbeatIntervalMs / 1000}s)",
+                        HeartbeatIntervalMs,
+                        BackgroundTimerTier.Critical);
                     _logging?.Info($"✓ WMI BIOS heartbeat started (every {HeartbeatIntervalMs/1000}s)");
                 }
                 else
@@ -411,6 +418,7 @@ namespace OmenCore.Hardware
                     _heartbeatTimer?.Dispose();
                     _heartbeatTimer = null;
                     _sharedInstance = null;
+                    BackgroundTimerRegistry.Unregister("HpWmiBiosHeartbeat");
                     _logging?.Info("WMI BIOS heartbeat stopped");
                 }
             }

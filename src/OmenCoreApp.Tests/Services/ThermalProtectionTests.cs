@@ -303,5 +303,36 @@ namespace OmenCoreApp.Tests.Services
 
             logging.Dispose();
         }
+
+        [Fact]
+        public void ThermalProtection_EmergencyActivation_RecordsBothIndividualReadings()
+        {
+            // GitHub Discord reports (2026-06-23): fans spike to ~5000 RPM "for no reason" at idle
+            // temps on Victus 16-s0xxx and OMEN 16-xd0xxx, then drop back. The emergency tier is
+            // deliberately no-debounce (safety critical — see ThermalProtection_EmergencyThreshold_
+            // RaisesImmediately), so a single transient/glitchy sample can visibly spike fans. This
+            // does not change that behavior; it ensures the command history captures both individual
+            // readings (not just maxTemp) so a future report can show whether an activation was a
+            // sustained real event or a single-sample spike.
+            var logging = new LoggingService();
+            logging.Initialize();
+
+            var controller = new TrackingFanController();
+            var thermalProvider = new MockThermalProvider();
+            var notificationService = new NotificationService(logging);
+
+            var fanService = new FanService(controller, thermalProvider, logging, notificationService, 1000, new ResumeRecoveryDiagnosticsService());
+            fanService.ThermalProtectionEnabled = true;
+
+            var method = typeof(FanService).GetMethod("CheckThermalProtection",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            method!.Invoke(fanService, new object[] { 96.0, 42.0 });
+
+            var entry = fanService.GetCommandHistorySnapshot()
+                .FirstOrDefault(e => e.Command == "ThermalProtection.Emergency");
+            entry.Should().NotBeNull("emergency activation should be queryable in diagnostics, not just the app log");
+            entry!.Details.Should().Contain("cpu=96").And.Contain("gpu=42",
+                "both individual readings must be recorded, not just the combined maxTemp");
+        }
     }
 }

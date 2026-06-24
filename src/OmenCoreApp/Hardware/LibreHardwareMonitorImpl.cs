@@ -596,8 +596,11 @@ namespace OmenCore.Hardware
                                 "SELECT FreePhysicalMemory FROM Win32_OperatingSystem");
                             foreach (System.Management.ManagementObject obj in searcher.Get())
                             {
-                                var freeKb = Convert.ToUInt64(obj["FreePhysicalMemory"]);
-                                _cachedRamUsage = totalGb - (freeKb / 1024.0 / 1024.0);
+                                using (obj)
+                                {
+                                    var freeKb = Convert.ToUInt64(obj["FreePhysicalMemory"]);
+                                    _cachedRamUsage = totalGb - (freeKb / 1024.0 / 1024.0);
+                                }
                                 break;
                             }
                         }
@@ -1347,8 +1350,11 @@ namespace OmenCore.Hardware
                                             "SELECT FreePhysicalMemory FROM Win32_OperatingSystem");
                                         foreach (System.Management.ManagementObject obj in searcher.Get())
                                         {
-                                            var freeKb = Convert.ToUInt64(obj["FreePhysicalMemory"]);
-                                            _cachedRamUsage = _systemRamTotalGb - (freeKb / 1024.0 / 1024.0);
+                                            using (obj)
+                                            {
+                                                var freeKb = Convert.ToUInt64(obj["FreePhysicalMemory"]);
+                                                _cachedRamUsage = _systemRamTotalGb - (freeKb / 1024.0 / 1024.0);
+                                            }
                                             break;
                                         }
                                     }
@@ -1434,9 +1440,12 @@ namespace OmenCore.Hardware
                     var temps = new List<double>();
                     foreach (System.Management.ManagementObject obj in searcher.Get())
                     {
-                        var raw = (uint)obj["CurrentTemperature"];
-                        var celsius = raw / 10.0 - 273.15;
-                        temps.Add(celsius);
+                        using (obj)
+                        {
+                            var raw = (uint)obj["CurrentTemperature"];
+                            var celsius = raw / 10.0 - 273.15;
+                            temps.Add(celsius);
+                        }
                     }
                     if (temps.Count > 0)
                     {
@@ -1464,18 +1473,30 @@ namespace OmenCore.Hardware
 
         private double GetTotalPhysicalMemoryGB()
         {
+            // Total physical RAM cannot change while Windows is running. Several fallback paths
+            // in this class each called this method independently every tick; memoize into
+            // _systemRamTotalGb so only the first call ever queries WMI.
+            if (_systemRamTotalGb > 0)
+            {
+                return _systemRamTotalGb;
+            }
+
             try
             {
                 using var searcher = new System.Management.ManagementObjectSearcher("SELECT TotalPhysicalMemory FROM Win32_ComputerSystem");
                 foreach (System.Management.ManagementObject obj in searcher.Get())
                 {
-                    var bytes = Convert.ToUInt64(obj["TotalPhysicalMemory"]);
-                    return bytes / 1024.0 / 1024.0 / 1024.0; // Convert to GB
+                    using (obj)
+                    {
+                        var bytes = Convert.ToUInt64(obj["TotalPhysicalMemory"]);
+                        _systemRamTotalGb = bytes / 1024.0 / 1024.0 / 1024.0; // Convert to GB
+                        return _systemRamTotalGb;
+                    }
                 }
             }
             catch
             {
-                return 16; // Default assumption
+                return 16; // Not cached: a transient WMI failure can retry on the next call.
             }
             return 16;
         }

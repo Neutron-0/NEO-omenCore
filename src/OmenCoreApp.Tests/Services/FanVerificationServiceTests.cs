@@ -19,6 +19,7 @@ namespace OmenCoreApp.Tests.Services
                 RequestedPercent = 60,
                 ExpectedRpm = 3600,
                 ActualRpmAfter = 2000,
+                RpmSource = OmenCore.Models.RpmSource.WmiBios,
                 ExpectedLevel = 33,
                 ActualLevelAfter = 33,
                 LevelReadbackMatched = true,
@@ -44,6 +45,7 @@ namespace OmenCoreApp.Tests.Services
                 RequestedPercent = 60,
                 ExpectedRpm = 3600,
                 ActualRpmAfter = 1600,
+                RpmSource = OmenCore.Models.RpmSource.WmiBios,
                 ExpectedLevel = 33,
                 ActualLevelAfter = 33,
                 LevelReadbackMatched = true,
@@ -113,6 +115,99 @@ namespace OmenCoreApp.Tests.Services
 
             result.DeviationPercent.Should().Be(100,
                 "expected 0 RPM with non-zero measured RPM should report a clear mismatch instead of 0% deviation");
+        }
+
+        [Fact]
+        public void RpmDisplay_LabelsFanLevelDerivedValuesAsEstimates()
+        {
+            var result = new FanApplyResult
+            {
+                ActualRpmAfter = 3300,
+                RpmSource = OmenCore.Models.RpmSource.Estimated
+            };
+
+            result.RpmDisplay.Should().Be("~3300 RPM (fan-level estimate)");
+        }
+
+        [Fact]
+        public void FanTelemetry_DisplayLabelsEstimatedRpm()
+        {
+            var telemetry = new OmenCore.Models.FanTelemetry
+            {
+                SpeedRpm = 3300,
+                RpmSource = OmenCore.Models.RpmSource.Estimated,
+                RpmState = OmenCore.Models.TelemetryDataState.Valid
+            };
+
+            telemetry.DisplayRpmText.Should().Be("~3300 RPM (estimated)");
+        }
+
+        [Fact]
+        public void VerifyAppliedState_AcceptsMatchingLevelWhenRpmIsOnlyEstimated()
+        {
+            var logging = new LoggingService();
+            logging.Initialize();
+            var service = new FanVerificationService(wmiBios: null, fanService: null, logging);
+            var result = new FanApplyResult
+            {
+                RequestedPercent = 60,
+                ExpectedRpm = 3600,
+                ActualRpmAfter = 3300,
+                ExpectedLevel = 33,
+                ActualLevelAfter = 33,
+                LevelReadbackMatched = true,
+                RpmSource = OmenCore.Models.RpmSource.Estimated,
+                WmiCallSucceeded = true
+            };
+
+            var method = typeof(FanVerificationService).GetMethod("VerifyAppliedState", BindingFlags.Instance | BindingFlags.NonPublic);
+            var verified = (bool)method!.Invoke(service, new object[] { result })!;
+
+            verified.Should().BeTrue("matching level readback is the only independent evidence when displayed RPM is derived from that same level");
+        }
+
+        [Fact]
+        public void VerifyAppliedState_DoesNotTreatEstimatedRpmAsPhysicalEvidence()
+        {
+            var logging = new LoggingService();
+            logging.Initialize();
+            var service = new FanVerificationService(wmiBios: null, fanService: null, logging);
+            var result = new FanApplyResult
+            {
+                RequestedPercent = 100,
+                ExpectedRpm = 6000,
+                ActualRpmAfter = 6000,
+                ExpectedLevel = 55,
+                ActualLevelAfter = 33,
+                LevelReadbackMatched = false,
+                RpmSource = OmenCore.Models.RpmSource.Estimated,
+                WmiCallSucceeded = true
+            };
+
+            var method = typeof(FanVerificationService).GetMethod("VerifyAppliedState", BindingFlags.Instance | BindingFlags.NonPublic);
+            var verified = (bool)method!.Invoke(service, new object[] { result })!;
+
+            verified.Should().BeFalse("a level-derived estimate cannot independently verify physical fan response");
+        }
+
+        [Fact]
+        public void VerificationMismatch_DoesNotDescribeEstimatedValueAsExpectedPhysicalRpm()
+        {
+            var result = new FanApplyResult
+            {
+                ExpectedRpm = 6000,
+                ActualRpmAfter = 3300,
+                ExpectedLevel = 55,
+                ActualLevelAfter = 33,
+                RpmSource = OmenCore.Models.RpmSource.Estimated
+            };
+            var method = typeof(FanVerificationService).GetMethod("DescribeVerificationMismatch", BindingFlags.Static | BindingFlags.NonPublic);
+
+            var description = (string)method!.Invoke(null, new object[] { result })!;
+
+            description.Should().Contain("expected level 55");
+            description.Should().Contain("fan-level estimate");
+            description.Should().NotContain("expected ~6000 RPM");
         }
 
         [Fact]

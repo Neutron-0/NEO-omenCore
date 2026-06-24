@@ -328,7 +328,7 @@ namespace OmenCoreApp.Tests.Services
             report.Should().Contain("OMEN 17 db-1000");
             report.Should().Contain("Victus 15/16 field cohort");
             report.Should().Contain("Field validation pending");
-            report.Should().Contain("Keep v3.8.0 as RC/pre-release");
+            report.Should().Contain("Keep v3.8.1 as RC/pre-release");
         }
 
         [Fact]
@@ -491,7 +491,7 @@ namespace OmenCoreApp.Tests.Services
 
             string content = ReadFileFromExport(zipPath, "launch-readiness.txt");
 
-            content.Should().Contain("3.8.0 LAUNCH READINESS SNAPSHOT");
+            content.Should().Contain("3.8.1 LAUNCH READINESS SNAPSHOT");
             content.Should().Contain("[Fan Recovery]");
             content.Should().Contain("Fan service unavailable.");
             content.Should().Contain("[Performance Mode Apply Trace]");

@@ -122,7 +122,9 @@ namespace OmenCore.Models
         /// </summary>
         public string DisplayRpmText => RpmState == TelemetryDataState.Unavailable
             ? "RPM unavailable (fan responding)"
-            : $"{SpeedRpm} RPM";
+            : RpmSource == RpmSource.Estimated
+                ? $"~{SpeedRpm} RPM (estimated)"
+                : $"{SpeedRpm} RPM";
 
         /// <summary>
         /// Source of the RPM reading.
@@ -137,6 +139,7 @@ namespace OmenCore.Models
                     _rpmSource = value;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RpmSource)));
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RpmSourceDisplay)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayRpmText)));
                 }
             }
         }

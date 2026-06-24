@@ -1,14 +1,14 @@
 # OmenCore Installation Guide
 
-Complete installation, upgrade, portable, Linux, and uninstall instructions for OmenCore 3.8.0.
+Complete installation, upgrade, portable, Linux, and uninstall instructions for OmenCore 3.8.1.
 
 ## Choose Your Package
 
 | Package | Platform | Use This When |
 |---|---|---|
-| `OmenCoreSetup-3.8.0.exe` | Windows | You want the normal install flow, Start Menu entry, and optional PawnIO install. |
-| `OmenCore-3.8.0-win-x64.zip` | Windows | You want a portable copy, test build, or no installer changes. |
-| `OmenCore-3.8.0-linux-x64.zip` | Linux | You want the CLI and Avalonia GUI bundle. |
+| `OmenCoreSetup-3.8.1.exe` | Windows | You want the normal install flow, Start Menu entry, and optional PawnIO install. |
+| `OmenCore-3.8.1-win-x64.zip` | Windows | You want a portable copy, test build, or no installer changes. |
+| `OmenCore-3.8.1-linux-x64.zip` | Linux | You want the CLI and Avalonia GUI bundle. |
 
 Always download from the [latest GitHub Release](https://github.com/theantipopau/omencore/releases/latest), then compare the SHA256 hash against the release notes before running binaries.
 
@@ -23,7 +23,7 @@ Always download from the [latest GitHub Release](https://github.com/theantipopau
 
 ### Install
 
-1. Download `OmenCoreSetup-3.8.0.exe`.
+1. Download `OmenCoreSetup-3.8.1.exe`.
 2. Verify the SHA256 hash from the GitHub Release notes.
 3. Right-click the installer and choose **Run as administrator**.
 4. Keep **Install PawnIO Driver** selected unless you only need WMI-only features and monitoring.
@@ -49,7 +49,7 @@ Startup hardware restore is disabled by default. Leave it disabled unless you ha
 
 ### Install
 
-1. Download `OmenCore-3.8.0-win-x64.zip`.
+1. Download `OmenCore-3.8.1-win-x64.zip`.
 2. Verify the SHA256 hash from the GitHub Release notes.
 3. Extract to a normal writable folder, for example `C:\Tools\OmenCore`.
 4. Right-click `OmenCore.exe` and choose **Run as administrator**.
@@ -71,11 +71,11 @@ Deleting the extracted portable folder does not remove config, logs, or PawnIO.
 ## Windows Upgrade
 
 1. Exit OmenCore from the tray menu.
-2. Install `OmenCoreSetup-3.8.0.exe` over the previous version.
+2. Install `OmenCoreSetup-3.8.1.exe` over the previous version.
 3. Keep PawnIO selected if you use EC/MSR features.
 4. Launch as Administrator.
 5. Open Diagnostics and confirm:
-   - App version is `3.8.0`.
+   - App version is `3.8.1`.
    - Model identity uses exact ProductId where available.
    - Fan/RGB/performance capabilities match your hardware.
 
@@ -96,7 +96,7 @@ If upgrading from a much older version, export or back up `%APPDATA%\OmenCore\co
 ### Quick Start: CLI
 
 ```bash
-VERSION=3.8.0
+VERSION=3.8.1
 wget "https://github.com/theantipopau/omencore/releases/download/v${VERSION}/OmenCore-${VERSION}-linux-x64.zip"
 mkdir -p OmenCore-linux-x64
 unzip "OmenCore-${VERSION}-linux-x64.zip" -d OmenCore-linux-x64
@@ -229,6 +229,8 @@ mkdir -p ~/.config/omencore
 
 For fan reports, include what you clicked before the issue, whether **Restore OEM Auto** helped, and whether RPM/level readback changed.
 
+If Diagnostics shows `Unknown <Family> Model` or "Resolution source: Family fallback", your model is not yet in the capability database — see [README.md: Requesting Support For An Unrecognized Model](README.md#requesting-support-for-an-unrecognized-model) for exactly what to capture before filing the issue.
+
 ### Linux
 
 From a source checkout:
@@ -287,6 +289,17 @@ WMI V1 boards can hold stale manual floors. v3.7.1 enables floor-clear overrides
 - Use the Lighting page restore/apply action.
 - Export diagnostics and include `rgb-control-path.txt`.
 - OMEN Max per-key hardware detection does not mean the dedicated per-key editor is enabled yet.
+
+### Windows: Battery Care (Charge Limit) Fails To Enable
+
+- Confirm the laptop is on AC power; some HP firmware rejects the battery-care WMI command on battery.
+- Toggle the equivalent setting in OMEN Gaming Hub to confirm the feature works at the firmware level, then export diagnostics including `wmi-command-history.txt` and your BIOS version before filing an issue — this is a firmware/WMI command question, not something OmenCore can guess a fix for without that evidence.
+- This is independent of model identity: the toggle is always shown and always attempted regardless of whether your model has an exact capability profile.
+
+### Windows: Performance Profile Reverts To Balanced After Relaunch
+
+- Fixed in 3.8.1 for the tray menu, the `Ctrl+Shift+E` hotkey cycle, and the General page's quick-profile buttons (GitHub #145) — these previously applied the mode to hardware but never saved it as the startup preference.
+- If you still see this after upgrading, export diagnostics and include whether you changed modes from the System Control/Tuning page specifically (a different, already-persisting path) versus the tray/hotkey/General entry points.
 
 ### Windows: OSD Does Not Appear In Fullscreen Game
 
@@ -370,7 +383,7 @@ sudo rm -f /etc/modprobe.d/ec_sys.conf
 
 ## Release Operator Notes
 
-For maintainers preparing 3.8.0:
+For maintainers preparing 3.8.1:
 
 ```powershell
 dotnet restore OmenCore.sln
@@ -384,17 +397,17 @@ pwsh ./build-linux-package.ps1
 After building:
 
 ```powershell
-Get-FileHash artifacts\OmenCoreSetup-3.8.0.exe -Algorithm SHA256
-Get-FileHash artifacts\OmenCore-3.8.0-win-x64.zip -Algorithm SHA256
-Get-FileHash artifacts\OmenCore-3.8.0-linux-x64.zip -Algorithm SHA256
+Get-FileHash artifacts\OmenCoreSetup-3.8.1.exe -Algorithm SHA256
+Get-FileHash artifacts\OmenCore-3.8.1-win-x64.zip -Algorithm SHA256
+Get-FileHash artifacts\OmenCore-3.8.1-linux-x64.zip -Algorithm SHA256
 ```
 
-`artifacts\SHA256SUMS-3.8.0.txt` can be uploaded alongside the artifacts. Publish those hashes in the GitHub Release notes. Do not publish an in-app update without SHA256 hashes.
+`artifacts\SHA256SUMS-3.8.1.txt` can be uploaded alongside the artifacts. Publish those hashes in the GitHub Release notes. Do not publish an in-app update without SHA256 hashes.
 
 ## Additional Resources
 
 - [README.md](README.md)
-- [docs/CHANGELOG_v3.8.0.md](docs/CHANGELOG_v3.8.0.md)
+- [docs/CHANGELOG_v3.8.1.md](docs/CHANGELOG_v3.8.1.md)
 - [docs/FINAL_RELEASE_CHECKLIST.md](docs/FINAL_RELEASE_CHECKLIST.md)
 - [docs/LINUX_INSTALL_GUIDE.md](docs/LINUX_INSTALL_GUIDE.md)
 - [docs/ANTIVIRUS_FAQ.md](docs/ANTIVIRUS_FAQ.md)

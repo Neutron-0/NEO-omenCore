@@ -6,7 +6,7 @@
 
 ### Lightweight local control for HP OMEN and Victus gaming laptops
 
-[![Version](https://img.shields.io/badge/version-3.8.0-red.svg?style=for-the-badge)](docs/CHANGELOG_v3.8.0.md)
+[![Version](https://img.shields.io/badge/version-3.8.1-red.svg?style=for-the-badge)](docs/CHANGELOG_v3.8.1.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg?style=for-the-badge)](https://dotnet.microsoft.com/download/dotnet/8.0)
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/9WhJdabGk8)
@@ -46,14 +46,26 @@ It runs without ads, account prompts, cloud telemetry, or OMEN Gaming Hub. Hardw
 
 ## Current Release
 
-**Version:** 3.8.0<br>
-**Status:** Release candidate - local launch checks passed; field validation pending<br>
-**Release notes:** [docs/CHANGELOG_v3.8.0.md](docs/CHANGELOG_v3.8.0.md)<br>
+**Version:** 3.8.1<br>
+**Status:** Patch release - implementation in progress; hardware validation pending<br>
+**Release notes:** [docs/CHANGELOG_v3.8.1.md](docs/CHANGELOG_v3.8.1.md)<br>
 **Release gate:** [docs/FINAL_RELEASE_CHECKLIST.md](docs/FINAL_RELEASE_CHECKLIST.md)
 
-v3.8.0 is a field-driven control reliability release. It focuses on exact model identity, fan/profile truthfulness, RGB/tuning diagnostics, startup restore safety, OmenMon-style validation exports, RTSS overlay clarity, game-profile automation, and installer reliability.
+v3.8.1 is a post-3.8.0 field-reliability patch. It focuses on GitHub #141-#145 follow-up, fan-telemetry truthfulness, saved Custom fan-curve selection, GPU OC startup-reapply clarity, OMEN-key field diagnostics, performance-profile relaunch persistence, and Quick Access shortcut safety.
 
-### v3.8.0 Highlights
+### v3.8.1 Highlights
+
+- `8A18` OMEN 17-ck1xxx: conservative exact capability profile, with V1 fan-level fallback explicitly labeled as an estimate rather than measured RPM, and fan verification evidence kept honest about command-success vs. physical confirmation.
+- Quick Access popup shortcut is now configurable (Display Off, Lock Windows, or Disabled) to prevent accidental display-off clicks.
+- Saved Custom fan-curve selection now migrates correctly when `LastFanPresetName` is missing or stale, without bypassing the startup fan-write safety gate.
+- GPU OC Tuning page shows a dedicated startup-reapply status chip explaining whether a confirmed profile is enabled or blocked, and why.
+- The OMEN 16/Victus sensitive-model startup-restore safety override now matches real-world HP model-name variants instead of only the literal "OMEN 16" substring.
+- OMEN-key diagnostics now record the last accepted/rejected key candidate (source, VK/scan codes, and reason) for field debugging of #141-class reports.
+- `HpWmiBios` heartbeat, the fan countdown-extension reassert loop, and the Razer Chroma heartbeat are now visible in background-timer diagnostics.
+- `8D40` OMEN Slim 16-an0xxx: exact conservative identity added (GitHub #145), replacing low-confidence family fallback.
+- Fixed Performance Profile silently reverting to Balanced after relaunch when changed via the tray menu, the `Ctrl+Shift+E` hotkey cycle, or the General page's quick-profile buttons (GitHub #145) — these paths now persist the choice the same way the System Control page always did.
+
+### v3.8.0 Highlights (previous minor release)
 
 - Core-control readiness exports summarize fan backend/readback, RGB backend/surface, tuning startup/readback, hotkeys, monitoring health, and next validation actions.
 - Exact model routing was expanded for priority reports including `8C30`, `8DCD`, `878C`, `8600`, and `88EE`, while unsupported control paths stay gated.
@@ -66,15 +78,21 @@ v3.8.0 is a field-driven control reliability release. It focuses on exact model 
 
 ## Current Development Focus
 
-**v3.8.0 should stay RC/pre-release** until core controls are field-validated: fans, RGB, performance modes, overclocking/undervolting, startup restore, and hotkeys.
+**v3.8.1 should stay a patch/pre-release** until its tracked items have physical hardware validation: `8DCD` fan-thermal safety, `8D26` key routing, `8E9A` identity, background-resource budgets, and GPU OC startup reapply on real NVIDIA/AMD hardware.
 
-The active 3.8.0 work is tracked in:
+The active 3.8.1 work is tracked in:
+
+- [docs/CHANGELOG_v3.8.1.md](docs/CHANGELOG_v3.8.1.md) - patch release notes and validation status.
+- [docs/3.8.1-BUG-REPORTS.md](docs/3.8.1-BUG-REPORTS.md) - GitHub #141-#144, saved Custom fan selection, GPU OC persistence, background-resource work, test requirements, and hardware acceptance gates.
+- [docs/3.8.1-MIGRATION-HANDOFF.md](docs/3.8.1-MIGRATION-HANDOFF.md) - fresh-PC setup, repository state, implementation order, and release procedure.
+
+Prior-release work is kept for historical reference:
 
 - [docs/CHANGELOG_v3.8.0.md](docs/CHANGELOG_v3.8.0.md) - field fixes, UI polish, diagnostics, and validation status.
 - [docs/3.8.0-BUG-REPORTS.md](docs/3.8.0-BUG-REPORTS.md) - tracked model reports and issue follow-up.
 - [docs/3.8.0-CORE-CONTROLS-NEXT-STEPS.md](docs/3.8.0-CORE-CONTROLS-NEXT-STEPS.md) - practical next steps for fan, RGB, tuning, responsiveness, and release gates.
 
-The main 3.8.0 support improvement is a consolidated `core-control-readiness.txt` diagnostic report covering fan backend/readback state, RGB surface/backend state, tuning startup/readback state, monitoring health, and next validation actions. The active branch also adds field-validation scripts, OmenMon-Reborn parity diagnostics, startup restore category gates, RTSS FPS overlay clarity, safer game-profile automation, and first-pass OMEN Max HID per-key RGB routing pending real-device PID confirmation.
+The main 3.8.0 support improvement, a consolidated `core-control-readiness.txt` diagnostic report covering fan backend/readback state, RGB surface/backend state, tuning startup/readback state, monitoring health, and next validation actions, remains in place. 3.8.1 builds on it with OMEN-key candidate diagnostics and additional background-timer registry coverage.
 
 ## Downloads
 
@@ -82,9 +100,9 @@ Release artifacts are published on the [GitHub Releases](https://github.com/thea
 
 | Artifact | Platform | Recommended For |
 |---|---|---|
-| `OmenCoreSetup-3.8.0.exe` | Windows | Most users. Installs app and can install PawnIO. |
-| `OmenCore-3.8.0-win-x64.zip` | Windows | Portable use, testing, or no installer preference. |
-| `OmenCore-3.8.0-linux-x64.zip` | Linux | CLI plus Avalonia GUI, self-contained runtime. |
+| `OmenCoreSetup-3.8.1.exe` | Windows | Most users. Installs app and can install PawnIO. |
+| `OmenCore-3.8.1-win-x64.zip` | Windows | Portable use, testing, or no installer preference. |
+| `OmenCore-3.8.1-linux-x64.zip` | Linux | CLI plus Avalonia GUI, self-contained runtime. |
 
 Final GitHub release notes must include SHA256 hashes for every artifact. The in-app updater requires release hashes before it will install an update.
 
@@ -92,20 +110,20 @@ Final GitHub release notes must include SHA256 hashes for every artifact. The in
 
 ### Windows
 
-1. Download `OmenCoreSetup-3.8.0.exe` from [Releases](https://github.com/theantipopau/omencore/releases/latest).
+1. Download `OmenCoreSetup-3.8.1.exe` from [Releases](https://github.com/theantipopau/omencore/releases/latest).
 2. Verify the SHA256 hash from the release notes.
 3. Run the installer as Administrator.
 4. Keep PawnIO selected unless you only want monitoring and WMI-only features.
 5. Launch OmenCore from the Start Menu.
 
-Portable users can download `OmenCore-3.8.0-win-x64.zip`, extract it to a normal folder, and run `OmenCore.exe` as Administrator.
+Portable users can download `OmenCore-3.8.1-win-x64.zip`, extract it to a normal folder, and run `OmenCore.exe` as Administrator.
 
 See [INSTALL.md](INSTALL.md) for the full Windows guide.
 
 ### Linux
 
 ```bash
-VERSION=3.8.0
+VERSION=3.8.1
 wget "https://github.com/theantipopau/omencore/releases/download/v${VERSION}/OmenCore-${VERSION}-linux-x64.zip"
 mkdir -p OmenCore-linux-x64
 unzip "OmenCore-${VERSION}-linux-x64.zip" -d OmenCore-linux-x64
@@ -155,7 +173,7 @@ See [INSTALL.md](INSTALL.md) and [docs/LINUX_INSTALL_GUIDE.md](docs/LINUX_INSTAL
 - OMEN Max per-key-capable hardware detection plus first-pass HID per-key routing for known/inferred HP keyboard controller PIDs.
 - External RGB provider surfaces for Corsair, Logitech, Razer, OpenRGB, and system providers where available.
 - Built-in RGB scenes include static, breathing, spectrum, wave, ambient, audio-reactive, Heat Wave, Calm Pulse, and Lights Off paths where providers support them.
-- 3.8.0 readiness diagnostics report the active HP keyboard surface, observed physical surface, and whether a result is verified, accepted/unverified, unavailable, or blocked by a conflict.
+- Readiness diagnostics report the active HP keyboard surface, observed physical surface, and whether a result is verified, accepted/unverified, unavailable, or blocked by a conflict.
 
 Note: OMEN Max dedicated HID per-key routing is intentionally conservative until field logs confirm the correct USB PID list and physical keyboard segment mapping.
 
@@ -224,25 +242,33 @@ Linux control normally follows available sysfs/hwmon capability:
 3. `ec_sys` for older models.
 4. Diagnostic-only mode when no safe write path exists.
 
-## Known Limits In 3.8.0
+## Known Limits In 3.8.1
 
-- Some v3.8.0 fixes still require physical hardware validation, especially fan ramp-down, RGB surface routing, and GPU wattage parity.
+- Some 3.8.0 and 3.8.1 fixes still require physical hardware validation, especially fan ramp-down, RGB surface routing, and GPU wattage parity.
 - OMEN Max per-key RGB now has a first-pass HID backend in active development, but it is not fully verified until field logs confirm the USB PID list and physical segment behavior.
+- `8DCD` Victus 15 fan-speed collapse under sustained load (GitHub #143) is under investigation; treat it as thermal-safety critical until disproven.
+- `8D26` OMEN 16-ap0xxx dedicated key and Fn+P event routing (GitHub #141) needs shipped-artifact and physical-hardware confirmation.
 - OGH Eco mode parity is tracked but not implemented.
 - Direct PL1/PL2 controls remain firmware/MSR gated on many systems.
 - Exclusive fullscreen OSD behavior depends on Windows composition, RTSS, game mode, and anti-cheat behavior.
-- `8574` legacy OMEN 15 support is partial until fresh 3.8.0 diagnostics confirm effective fan command readback.
+- `8574` legacy OMEN 15 support is partial until fresh diagnostics confirm effective fan command readback.
 
-## Active 3.8.0 Validation Targets
+## Active 3.8.1 Validation Targets
 
+- `8D40` OMEN Slim 16-an0xxx: exact identity validation, plus Battery Care (Charge Limit) WMI evidence on this new thin-chassis line.
+- `8DCD` Victus 15: bounded, abortable load test confirming Performance mode no longer drops below 2000 RPM above 80C.
+- `8D26` OMEN 16-ap0xxx: Fn+F2 never-intercept behavior and dedicated OMEN-key/Fn+P event path on physical hardware.
+- `8E9A` HyperX OMEN MAX 16t-ah100: exact conservative identity pending full diagnostic evidence.
+- `8A18` OMEN 17-ck1xxx: bounded load test with independent physical RPM/temperature source.
 - `8D41` and `8D87` OMEN Max: WMI-only Max fan hold, Restore OEM Auto, and HID per-key RGB PID confirmation.
 - `8BD4` Victus 16: conservative WMI V1 Auto/Max handoff and WMI ColorTable RGB confirmation.
 - `8C30` Victus 15-fb1xxx: Quiet/Balanced/Performance WMI policy routing and wattage/RPM readback validation.
-- `8DCD` Victus 15: Performance mode routing with CPU package-power and PL1/PL2 readback before adding watt overrides.
 - `878C` OMEN 15-ek0xxx: Quick Profile fan wake/ramp validation after exact WMI fallback routing.
 - `8600` OMEN 15-dh0xxx: PawnIO install/reboot telemetry recovery plus Quiet/Balanced/Performance/Auto/Max fan-mode validation.
 - `88EE` Victus 16-e0194nw: exact ProductId identity confirmation plus fan/RGB/readback evidence before enabling capabilities beyond conservative routing.
 - `8BCD` Linux: degraded WMI/ACPI reporting with effective fan/RGB/battery readback before claiming full control.
+- GPU OC startup reapply: confirmed-profile reboot test on NVIDIA, plus AMD manual-only wording or equivalent persistence.
+- Background memory/responsiveness: scenario-matrix measurement against the 3.8.1 budgets before claiming any reduction.
 - Startup restore: keep hardware restore opt-in until fan, RGB, performance, undervolt, and GPU OC readback passes on the target model.
 
 ## Development
@@ -270,9 +296,9 @@ pwsh ./build-installer.ps1
 
 Expected outputs:
 
-- `artifacts/OmenCoreSetup-3.8.0.exe`
-- `artifacts/OmenCore-3.8.0-win-x64.zip`
-- `artifacts/SHA256SUMS-3.8.0.txt`
+- `artifacts/OmenCoreSetup-3.8.1.exe`
+- `artifacts/OmenCore-3.8.1-win-x64.zip`
+- `artifacts/SHA256SUMS-3.8.1.txt`
 
 ### Build Linux Artifact
 
@@ -282,10 +308,10 @@ pwsh ./build-linux-package.ps1
 
 Expected outputs:
 
-- `artifacts/OmenCore-3.8.0-linux-x64.zip`
-- `artifacts/OmenCore-3.8.0-linux-x64.zip.sha256`
+- `artifacts/OmenCore-3.8.1-linux-x64.zip`
+- `artifacts/OmenCore-3.8.1-linux-x64.zip.sha256`
 - `artifacts/version.json`
-- `artifacts/linux-version-verification-3.8.0-linux-x64.json`
+- `artifacts/linux-version-verification-3.8.1-linux-x64.json`
 
 ## Release Checklist
 
@@ -312,6 +338,8 @@ The current release gate is tracked in [docs/FINAL_RELEASE_CHECKLIST.md](docs/FI
 | PawnIO setup asks for `-install` or `-uninstall` | Use v3.8.0+ installer builds; standalone fallback is `PawnIO_setup.exe -install` from an elevated terminal |
 | Undervolt hidden | Model or BIOS may block MSR undervolt; check tuning readiness and startup recovery state |
 | RGB turns off or does not restore | Check active keyboard backend, target surface, accepted/unverified status, and conflicting HP lighting tools |
+| Battery Care (Charge Limit) fails | Confirm AC power is connected; compare against OMEN Gaming Hub; export `wmi-command-history.txt` and BIOS version |
+| Performance profile reverts to Balanced after relaunch | Fixed in 3.8.1 for tray/hotkey/General quick-profile changes (GitHub #145); if still seen, note which entry point you used |
 | OSD not visible in a game | Try borderless fullscreen or RTSS integration |
 | Linux permission denied | Run CLI command with `sudo` |
 
@@ -320,10 +348,12 @@ Windows logs are stored under `%LOCALAPPDATA%\OmenCore\`. Linux diagnostics can 
 ## Documentation
 
 - [INSTALL.md](INSTALL.md) - installation, upgrade, portable use, Linux setup, uninstall.
-- [docs/CHANGELOG_v3.8.0.md](docs/CHANGELOG_v3.8.0.md) - current release notes.
-- [docs/CHANGELOG_v3.7.1.md](docs/CHANGELOG_v3.7.1.md) - previous release notes.
+- [docs/CHANGELOG_v3.8.1.md](docs/CHANGELOG_v3.8.1.md) - current release notes.
+- [docs/3.8.1-BUG-REPORTS.md](docs/3.8.1-BUG-REPORTS.md) - active 3.8.1 field report tracking.
+- [docs/CHANGELOG_v3.8.0.md](docs/CHANGELOG_v3.8.0.md) - previous release notes.
+- [docs/CHANGELOG_v3.7.1.md](docs/CHANGELOG_v3.7.1.md) - earlier release notes.
 - [docs/3.8.0-CORE-CONTROLS-NEXT-STEPS.md](docs/3.8.0-CORE-CONTROLS-NEXT-STEPS.md) - core control validation and practical next steps.
-- [docs/3.8.0-BUG-REPORTS.md](docs/3.8.0-BUG-REPORTS.md) - active 3.8.0 field report tracking.
+- [docs/3.8.0-BUG-REPORTS.md](docs/3.8.0-BUG-REPORTS.md) - prior 3.8.0 field report tracking.
 - [docs/FINAL_RELEASE_CHECKLIST.md](docs/FINAL_RELEASE_CHECKLIST.md) - release gate.
 - [docs/3.7.1-BUG-REPORTS.md](docs/3.7.1-BUG-REPORTS.md) - field report tracking.
 - [docs/LINUX_INSTALL_GUIDE.md](docs/LINUX_INSTALL_GUIDE.md) - Linux details.
@@ -335,6 +365,7 @@ Windows logs are stored under `%LOCALAPPDATA%\OmenCore\`. Linux diagnostics can 
 
 | Version | Summary |
 |---|---|
+| 3.8.1 | Patch release: GitHub #141-#145 follow-up, fan-telemetry truthfulness, saved Custom curve fix, GPU OC startup-reapply clarity, OMEN-key field diagnostics, performance-profile relaunch persistence fix |
 | 3.8.0 | Release candidate: field fixes, fan/RGB/tuning readiness diagnostics, UI responsiveness, model-specific validation |
 | 3.7.1 | Quick Access profiles, WMI V1 fan recovery, profile-only fan gating, AMD ADL containment, launch diagnostics |
 | 3.7.0 | Runtime recovery, fan/profile authority, OMEN Max identity, Linux diagnose improvements |
@@ -349,6 +380,15 @@ Older release notes live in [docs/](docs/).
 ## Contributing
 
 Useful contributions include fresh diagnostic exports, model ProductId verification, EC/WMI behavior reports, Linux sysfs snapshots, translations, and focused bug fixes. Please include logs and the model identity summary when filing hardware-control issues.
+
+### Requesting Support For An Unrecognized Model
+
+If Diagnostics reports `Unknown <Family> Model` or "Resolution source: Family fallback / Low confidence" (as opposed to an exact ProductId match), your laptop works through conservative generic defaults rather than a model-specific profile. To get it added:
+
+1. Open **Diagnostics** (or **About**) and copy the **Model Identity Summary** in full, including `Capability ProductId`, `Baseboard ProductId`, `WMI model`, `System SKU` / HP support product number, and the keyboard identity lines.
+2. Note your CPU, GPU, and BIOS version, and whether fan control, Battery Care, RGB, and performance-mode persistence work or fail individually — a feature that already works via family fallback should stay marked as working so the new profile does not become more restrictive than what you have today.
+3. Open a [GitHub issue](https://github.com/theantipopau/omencore/issues) with that summary, your symptoms, and (if relevant) what OMEN Gaming Hub shows for the same feature.
+4. Exact identity entries always start conservative: WMI fan/profile control only where evidence already shows it working, with direct EC writes, MUX switching, undervolt, and RGB left unclaimed until a tester confirms the surface exists. Capabilities are widened in a follow-up once that evidence arrives — see [docs/3.8.1-BUG-REPORTS.md](docs/3.8.1-BUG-REPORTS.md) for examples of this pattern (`8D40`, `8A18`, `8E9A`).
 
 ## Safety And Disclaimer
 

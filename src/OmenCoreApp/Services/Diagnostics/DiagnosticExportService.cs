@@ -416,9 +416,9 @@ namespace OmenCore.Services.Diagnostics
             try
             {
                 var sb = new StringBuilder();
-                sb.AppendLine("=== 3.8.0 LAUNCH READINESS SNAPSHOT ===");
+                sb.AppendLine("=== 3.8.1 LAUNCH READINESS SNAPSHOT ===");
                 sb.AppendLine($"CapturedUtc: {DateTime.UtcNow:O}");
-                sb.AppendLine("Purpose: summarize the 3.8.0 field-validation state for fan recovery, performance-mode routing, CPU authority, RGB support, and hardware-worker containment.");
+                sb.AppendLine("Purpose: summarize the 3.8.1 field-validation state for fan recovery, performance-mode routing, CPU authority, RGB support, and hardware-worker containment.");
                 sb.AppendLine();
 
                 sb.AppendLine("[Fan Recovery]");
@@ -488,7 +488,7 @@ namespace OmenCore.Services.Diagnostics
                 sb.AppendLine("Expected hybrid behavior: unstable AMD ADL-backed iGPU telemetry can be quarantined while NVIDIA, CPU, fan, memory, battery, and storage telemetry remain active.");
 
                 File.WriteAllText(Path.Combine(exportPath, "launch-readiness.txt"), sb.ToString());
-                _logging.Info("Collected 3.8.0 launch readiness snapshot");
+                _logging.Info("Collected 3.8.1 launch readiness snapshot");
                 await Task.CompletedTask;
             }
             catch (Exception ex)
@@ -753,6 +753,15 @@ namespace OmenCore.Services.Diagnostics
                 {
                     sb.AppendLine("LastNeverInterceptKey: none recorded");
                 }
+
+                if (omenKey.LastCandidateAccepted.HasValue)
+                {
+                    sb.AppendLine($"LastOmenKeyCandidate: source={omenKey.LastCandidateSource}; vk=0x{omenKey.LastCandidateVkCode:X2}; scan=0x{omenKey.LastCandidateScanCode:X4}; accepted={FormatBool(omenKey.LastCandidateAccepted.Value)}; reason={omenKey.LastCandidateReason}; ageMs={omenKey.LastCandidateAgeMs:F0}");
+                }
+                else
+                {
+                    sb.AppendLine("LastOmenKeyCandidate: none recorded");
+                }
             }
 
             sb.AppendLine("ValidationRule: press the physical OMEN key and profile-cycle hotkey once, then verify logs show the expected hook/WMI source and no never-intercept suppression.");
@@ -951,7 +960,7 @@ namespace OmenCore.Services.Diagnostics
             var sb = new StringBuilder();
             sb.AppendLine("=== FIELD VALIDATION SCRIPT ===");
             sb.AppendLine($"CapturedUtc: {DateTime.UtcNow:O}");
-            sb.AppendLine("Purpose: repeatable v3.8.0 release-gate smoke script for fan control, RGB, performance mode, profile cycling, hotkeys, and startup restore.");
+            sb.AppendLine("Purpose: repeatable v3.8.1 release-gate smoke script for fan control, RGB, performance mode, profile cycling, hotkeys, and startup restore.");
             sb.AppendLine($"Config source: {source}");
             sb.AppendLine();
 
@@ -1043,7 +1052,7 @@ namespace OmenCore.Services.Diagnostics
                 return "Victus 15/16 field cohort";
             }
 
-            return "Not in v3.8.0 priority board list";
+            return "Not in v3.8.1 priority board list";
         }
 
         private async Task CollectPriorityModelValidationCardsAsync(
@@ -1076,7 +1085,7 @@ namespace OmenCore.Services.Diagnostics
             var sb = new StringBuilder();
             sb.AppendLine("=== PRIORITY MODEL VALIDATION CARDS ===");
             sb.AppendLine($"CapturedUtc: {DateTime.UtcNow:O}");
-            sb.AppendLine("Purpose: model-family validation cards for the v3.8.0 RC gate. Use the matching card first, then the generic field-validation-script.txt.");
+            sb.AppendLine("Purpose: model-family validation cards for the v3.8.1 RC gate. Use the matching card first, then the generic field-validation-script.txt.");
             sb.AppendLine($"Config source: {source}");
             sb.AppendLine();
 
@@ -1252,7 +1261,7 @@ namespace OmenCore.Services.Diagnostics
             var sb = new StringBuilder();
             sb.AppendLine("=== RC VALIDATION MATRIX ===");
             sb.AppendLine($"CapturedUtc: {DateTime.UtcNow:O}");
-            sb.AppendLine("Purpose: track v3.8.0 release-gate evidence by priority model cohort. Rows marked field-pending must not be advertised as verified until a clean tester pass is attached.");
+            sb.AppendLine("Purpose: track v3.8.1 release-gate evidence by priority model cohort. Rows marked field-pending must not be advertised as verified until a clean tester pass is attached.");
             sb.AppendLine();
 
             sb.AppendLine("[Detected Context]");
@@ -1346,7 +1355,7 @@ namespace OmenCore.Services.Diagnostics
 
             sb.AppendLine();
             sb.AppendLine("[Release Rule]");
-            sb.AppendLine("Keep v3.8.0 as RC/pre-release until priority fan/performance/hotkey/RGB rows either have clean field passes or release notes explicitly mark the path experimental/degraded.");
+            sb.AppendLine("Keep v3.8.1 as RC/pre-release until priority fan/performance/hotkey/RGB rows either have clean field passes or release notes explicitly mark the path experimental/degraded.");
 
             return sb.ToString();
         }

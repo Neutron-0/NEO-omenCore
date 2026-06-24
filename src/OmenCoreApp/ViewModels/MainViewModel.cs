@@ -3811,6 +3811,11 @@ namespace OmenCore.ViewModels
                         await dispatcher.InvokeAsync(() =>
                         {
                             SelectedPreset = targetPreset;
+                            // Persist the choice (same root cause as GitHub #145, fan side): a
+                            // tray-driven fan mode change applies directly through FanService and
+                            // previously never wrote LastFanPresetName, so it silently reverted on
+                            // relaunch.
+                            FanControl?.SelectPresetByNameNoApplyAndSave(confirmedModeName);
                             CurrentFanMode = confirmedModeName;
                             PushEvent($"🌀 Fan mode: {confirmedModeName}");
                             _notificationService.ShowFanModeChanged(confirmedModeName, "Quick Access");
@@ -3981,7 +3986,10 @@ namespace OmenCore.ViewModels
                     {
                         if (_systemControl != null)
                         {
-                            _systemControl.SelectModeByNameNoApply(mode);
+                            // Persist the choice (GitHub #145): a tray-driven mode change applies
+                            // directly through PerformanceModeService and previously never wrote
+                            // LastPerformanceModeName, so the mode silently reverted on relaunch.
+                            _systemControl.SelectModeByNameNoApplyAndSave(mode);
                         }
 
                         var confirmedMode = _performanceModeService.GetCurrentMode() ?? mode;
@@ -4071,8 +4079,10 @@ namespace OmenCore.ViewModels
                         CurrentFanMode = confirmedFanMode;
                         General?.SetSystemControlViewModel(_systemControl);
                         General?.SyncRuntimeState(confirmedPerformanceMode, confirmedFanMode);
-                        _systemControl?.SelectModeByNameNoApply(confirmedPerformanceMode);
-                        FanControl?.SelectPresetByNameNoApply(confirmedFanMode);
+                        // Persist both sides of this combined quick profile (GitHub #145 and its
+                        // analogous fan-preset gap).
+                        _systemControl?.SelectModeByNameNoApplyAndSave(confirmedPerformanceMode);
+                        FanControl?.SelectPresetByNameNoApplyAndSave(confirmedFanMode);
                         ShowHotkeyOsd("Profile", profile, "Tray");
                         PushEvent($"🎮 Profile: {profile} (fan: {confirmedFanMode})");
                     });
@@ -4271,7 +4281,7 @@ namespace OmenCore.ViewModels
                     }
 
                     _fanService.ApplyMaxCooling();
-                    FanControl?.SelectPresetByNameNoApply("Max");
+                    FanControl?.SelectPresetByNameNoApplyAndSave("Max");
                     ShowHotkeyOsd("Fan Mode", "Maximum Cooling", "Ctrl+Shift+M");
                     PushEvent("🌀 Fan: Maximum Cooling (hotkey)");
                 }
@@ -4490,7 +4500,7 @@ namespace OmenCore.ViewModels
                 ?? _fanService.ActivePresetName
                 ?? customPreset.Name;
 
-            _fanControl?.SelectPresetByNameNoApply(customPreset.Name);
+            _fanControl?.SelectPresetByNameNoApplyAndSave(customPreset.Name);
             General?.SyncRuntimeState(confirmedPerformanceMode, confirmedFanMode);
             if (General != null)
             {
@@ -4652,13 +4662,13 @@ namespace OmenCore.ViewModels
                     if (currentPreset?.Name == "Max")
                     {
                         _fanService.ApplyAutoMode();
-                        FanControl?.SelectPresetByNameNoApply("Auto");
+                        FanControl?.SelectPresetByNameNoApplyAndSave("Auto");
                         ShowHotkeyOsd("Fan Mode", "Auto (BIOS Control)", "OMEN Key");
                     }
                     else
                     {
                         _fanService.ApplyMaxCooling();
-                        FanControl?.SelectPresetByNameNoApply("Max");
+                        FanControl?.SelectPresetByNameNoApplyAndSave("Max");
                         ShowHotkeyOsd("Fan Mode", "Maximum Cooling", "OMEN Key");
                     }
                 }

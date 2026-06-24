@@ -364,11 +364,11 @@ namespace OmenCore.ViewModels
                 var fanApplied = _fanService.ApplyPreset(coolingPreset, immediate: true);
                 if (fanApplied)
                 {
-                    _fanControlViewModel?.SelectPresetByNameNoApply(coolingPreset.Name);
+                    _fanControlViewModel?.SelectPresetByNameNoApplyAndSave(coolingPreset.Name);
                 }
                 
-                // v2.8.6: Sync OMEN tab performance mode display
-                _systemControlViewModel?.SelectModeByNameNoApply("Performance");
+                // v2.8.6: Sync OMEN tab performance mode display; v3.8.1: also persist (GitHub #145)
+                _systemControlViewModel?.SelectModeByNameNoApplyAndSave("Performance");
 
                 SyncFromConfirmedRuntime("Performance profile");
 
@@ -429,15 +429,15 @@ namespace OmenCore.ViewModels
 
                 if (fanApplied)
                 {
-                    _fanControlViewModel?.SelectPresetByNameNoApply("Auto");
+                    _fanControlViewModel?.SelectPresetByNameNoApplyAndSave("Auto");
                 }
                 else
                 {
                     _fanService.ApplyAutoMode();
                 }
                 
-                // v2.8.6: Sync OMEN tab performance mode display
-                _systemControlViewModel?.SelectModeByNameNoApply("Balanced");
+                // v2.8.6: Sync OMEN tab performance mode display; v3.8.1: also persist (GitHub #145)
+                _systemControlViewModel?.SelectModeByNameNoApplyAndSave("Balanced");
 
                 SyncFromConfirmedRuntime("Balanced profile");
 
@@ -468,15 +468,15 @@ namespace OmenCore.ViewModels
 
                 if (fanApplied)
                 {
-                    _fanControlViewModel?.SelectPresetByNameNoApply("Quiet");
+                    _fanControlViewModel?.SelectPresetByNameNoApplyAndSave("Quiet");
                 }
                 else
                 {
                     _fanService.ApplyQuietMode();
                 }
                 
-                // v2.8.6: Sync OMEN tab performance mode display
-                _systemControlViewModel?.SelectModeByNameNoApply("Quiet");
+                // v2.8.6: Sync OMEN tab performance mode display; v3.8.1: also persist (GitHub #145)
+                _systemControlViewModel?.SelectModeByNameNoApplyAndSave("Quiet");
 
                 SyncFromConfirmedRuntime("Quiet profile");
 

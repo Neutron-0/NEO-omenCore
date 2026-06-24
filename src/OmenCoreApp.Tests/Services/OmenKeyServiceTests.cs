@@ -55,6 +55,54 @@ namespace OmenCoreApp.Tests.Services
             snapshot.StrictMode.Should().BeTrue();
             snapshot.FirmwareFnPProfileCycleEnabled.Should().BeFalse();
             snapshot.LastNeverInterceptAgeMs.Should().BeNull();
+            snapshot.LastCandidateAccepted.Should().BeNull();
+            snapshot.LastCandidateReason.Should().BeNull();
+        }
+
+        [Fact]
+        public void GetDiagnosticSnapshot_RecordsAcceptedCandidate_AfterDedicatedOmenKey()
+        {
+            using var service = CreateService();
+
+            InvokeIsOmenKey(service, VkF12, DedicatedOmenLaunchScan).Should().BeTrue();
+
+            var snapshot = service.GetDiagnosticSnapshot();
+            snapshot.LastCandidateAccepted.Should().BeTrue();
+            snapshot.LastCandidateSource.Should().Be("keyboard-hook");
+            snapshot.LastCandidateVkCode.Should().Be(VkF12);
+            snapshot.LastCandidateScanCode.Should().Be(DedicatedOmenLaunchScan);
+            snapshot.LastCandidateReason.Should().Be("f12-dedicated-omen-scan");
+            snapshot.LastCandidateAgeMs.Should().NotBeNull();
+        }
+
+        [Fact]
+        public void GetDiagnosticSnapshot_RecordsRejectedCandidate_ForBrightnessConflictScan()
+        {
+            using var service = CreateService();
+            const uint vkLaunchApp2 = 0xB7;
+            const uint brightnessConflictScan = 0x002B;
+
+            InvokeIsOmenKey(service, vkLaunchApp2, brightnessConflictScan).Should().BeFalse();
+
+            var snapshot = service.GetDiagnosticSnapshot();
+            snapshot.LastCandidateAccepted.Should().BeFalse();
+            snapshot.LastCandidateReason.Should().Be("brightness-key-conflict-launch-app-scan");
+        }
+
+        [Fact]
+        public void GetDiagnosticSnapshot_LatestCandidateOverwritesPreviousOne()
+        {
+            using var service = CreateService();
+            const uint vkLaunchApp2 = 0xB7;
+            const uint brightnessConflictScan = 0x002B;
+
+            InvokeIsOmenKey(service, VkF12, DedicatedOmenLaunchScan).Should().BeTrue();
+            InvokeIsOmenKey(service, vkLaunchApp2, brightnessConflictScan).Should().BeFalse();
+
+            var snapshot = service.GetDiagnosticSnapshot();
+            snapshot.LastCandidateAccepted.Should().BeFalse();
+            snapshot.LastCandidateVkCode.Should().Be(vkLaunchApp2);
+            snapshot.LastCandidateScanCode.Should().Be(brightnessConflictScan);
         }
 
         private static OmenKeyService CreateService()

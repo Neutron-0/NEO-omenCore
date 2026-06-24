@@ -749,6 +749,36 @@ namespace OmenCore.Hardware
                         "per OGH reference behaviour. Set UserVerified=true once Product ID confirmed."
             });
 
+            // OMEN Slim 16 (2025) - an0xxx series
+            // GitHub Issue #145: ProductId 8D40, WMI model "OMEN Slim Gaming Laptop 16-an0xxx",
+            // SKU 1H85302L6K. Falls back to broad OMEN16 family defaults without a specific entry.
+            // "Slim" is a new, thinner chassis line not previously seen in this database — do not
+            // assume it shares EC register layout, MUX switch, GPU TGP boost range, undervolt
+            // support, or keyboard RGB surface with the standard-chassis 16-ap0/am0 siblings just
+            // because it shares the same 2025 WMI command generation. Reporter confirms core WMI
+            // fan/profile control already works via family fallback, so that much is shared.
+            AddModel(new ModelCapabilities
+            {
+                ProductId = "8D40",
+                ModelName = "OMEN Slim 16 (2025) an0xxx",
+                ModelNamePattern = "16-an0",
+                ModelYear = 2025,
+                Family = OmenModelFamily.OMEN16,
+                SupportsFanControlWmi = true,
+                SupportsFanControlEc = false,
+                SupportsFanCurves = true,
+                SupportsIndependentFanCurves = false,
+                FanZoneCount = 2,
+                MaxFanLevel = 55,
+                SupportsPerformanceModes = true,
+                HasMuxSwitch = false,
+                SupportsGpuPowerBoost = true,
+                HasFourZoneRgb = false, // Keyboard/RGB surface unconfirmed on this new thin chassis
+                SupportsUndervolt = false, // CPU vendor/model not yet confirmed
+                UserVerified = false,
+                Notes = "GitHub #145 - OMEN Slim Gaming Laptop 16-an0xxx, ProductId 8D40, SKU 1H85302L6K. Exact conservative profile: WMI V1 fan/profile control retained (matches working family-fallback behavior), direct EC writes and independent curves disabled pending register-layout evidence, MUX/RGB/undervolt left unclaimed until this new thin-chassis line's hardware surface is confirmed. Reported Battery Care (Charge Limit) WMI failure and Performance-mode persistence are tracked separately — see 3.8.1-BUG-REPORTS.md."
+            });
+
             // ═══════════════════════════════════════════════════════════════════════════════════
             // OMEN MAX Series (2025+ flagship models)
             // ═══════════════════════════════════════════════════════════════════════════════════
@@ -902,6 +932,30 @@ namespace OmenCore.Hardware
                 HasFourZoneRgb = true,
                 UserVerified = false,
                 Notes = "8BB1 is shared with Victus 15-fa1xxx; OMEN 17 profile selected when model name lacks 15-fa1 substring"
+            });
+
+            // OMEN 17-ck1xxx (2022) — GitHub #134/#144 field diagnostics.
+            // WMI V1 fan levels are command/readback levels, not independent physical RPM.
+            // Keep direct EC and independent curves disabled until board-safe registers are verified.
+            AddModel(new ModelCapabilities
+            {
+                ProductId = "8A18",
+                ModelName = "OMEN 17-ck1xxx (2022)",
+                ModelNamePattern = "17-ck1",
+                ModelYear = 2022,
+                Family = OmenModelFamily.OMEN17,
+                SupportsFanControlWmi = true,
+                SupportsFanControlEc = false,
+                SupportsFanCurves = true,
+                SupportsIndependentFanCurves = false,
+                SupportsRpmReadback = false,
+                FanZoneCount = 2,
+                MaxFanLevel = 55,
+                HasMuxSwitch = true,
+                SupportsGpuPowerBoost = true,
+                HasFourZoneRgb = true,
+                UserVerified = false,
+                Notes = "GitHub #134/#144 — WMI V1 control with worker-backed CPU temperature; fan-level fallback is estimated telemetry, not physical RPM. Direct EC remains unverified."
             });
 
             // Virtual product ID resolved via ModelNamePattern for ambiguous 8BB1 systems.

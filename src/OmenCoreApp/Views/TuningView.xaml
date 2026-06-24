@@ -896,10 +896,17 @@
                                                    FontSize="10"
                                                    Foreground="{StaticResource TextSecondaryBrush}"/>
                                     </Border>
-                                    <Border Background="#13233A" CornerRadius="10" Padding="8,2">
+                                    <Border Background="#13233A" CornerRadius="10" Padding="8,2" Margin="0,0,6,0">
                                         <TextBlock Text="{Binding SystemControl.GpuOcConfirmedChipText}"
                                                    FontSize="10"
                                                    Foreground="#8FC7FF"/>
+                                    </Border>
+                                    <Border Background="#1A1F2A" CornerRadius="10" Padding="8,2"
+                                            ToolTip="Whether the confirmed GPU OC profile is currently authorized to reapply when OmenCore starts. Saving or selecting a profile alone never authorizes a startup write.">
+                                        <TextBlock Text="{Binding SystemControl.GpuOcStartupReapplyChipText}"
+                                                   FontSize="10"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{Binding SystemControl.GpuOcStartupReapplyChipBrush}"/>
                                     </Border>
                                 </WrapPanel>
                             </StackPanel>
@@ -1102,6 +1109,8 @@
                                     <Run Text="✓ AMD GPU Overclocking (ADL2)" FontWeight="Bold" Foreground="#4CAF50"/>
                                     <LineBreak/>
                                     <Run Text="AMD Radeon GPU overclocking is available via AMD Display Library. Adjust clock offsets and power limits below."/>
+                                    <LineBreak/>
+                                    <Run Text="Manual apply only: AMD offsets are not saved and do not reapply when OmenCore starts. Reapply after every reboot." FontWeight="SemiBold" Foreground="#FFB74D"/>
                                 </TextBlock>
                             </Border>
                             

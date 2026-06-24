@@ -414,6 +414,21 @@ namespace OmenCoreApp.Tests.Hardware
         }
 
         [Fact]
+        public void ReadFanSpeeds_MarksV1FanLevelFallbackAsEstimated()
+        {
+            var fake = new ResetSequenceFakeWmiBios();
+            var controller = new WmiFanController(null, null, 0, injectedWmiBios: fake);
+            var wrapper = new OmenCore.Hardware.WmiFanControllerWrapper(controller);
+
+            var speeds = wrapper.ReadFanSpeeds().ToList();
+
+            speeds.Should().HaveCount(2);
+            speeds[0].SpeedRpm.Should().Be(2000);
+            speeds[0].RpmSource.Should().Be(RpmSource.Estimated);
+            speeds[1].RpmSource.Should().Be(RpmSource.Estimated);
+        }
+
+        [Fact]
         public void CountdownExtensionCallback_MaxMode_ModelOverride_ReappliesAfterOneLowSample()
         {
             var fake = new MaintenanceFakeWmiBios();

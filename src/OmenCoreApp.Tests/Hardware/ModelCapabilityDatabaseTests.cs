@@ -111,6 +111,51 @@ namespace OmenCoreApp.Tests.Hardware
         }
 
         [Fact]
+        public void GetCapabilities_8A18_Omen17Ck1xxx_UsesConservativeV1Profile()
+        {
+            var caps = ModelCapabilityDatabase.GetCapabilities("8A18");
+
+            caps.ProductId.Should().Be("8A18");
+            caps.ModelName.Should().Contain("17-ck1");
+            caps.Family.Should().Be(OmenModelFamily.OMEN17);
+            caps.SupportsFanControlWmi.Should().BeTrue();
+            caps.SupportsFanControlEc.Should().BeFalse();
+            caps.SupportsFanCurves.Should().BeTrue();
+            caps.SupportsIndependentFanCurves.Should().BeFalse();
+            caps.SupportsRpmReadback.Should().BeFalse("V1 fan levels are not independent physical RPM evidence");
+            caps.MaxFanLevel.Should().Be(55);
+            caps.UserVerified.Should().BeFalse("the submitted logs still require bounded physical validation");
+        }
+
+        [Fact]
+        public void GetCapabilities_8D40_OmenSlim16An0xxx_UsesConservativeUnclaimedProfile()
+        {
+            var caps = ModelCapabilityDatabase.GetCapabilities("8D40");
+
+            caps.ProductId.Should().Be("8D40");
+            caps.ModelName.Should().Contain("Slim");
+            caps.Family.Should().Be(OmenModelFamily.OMEN16);
+            caps.SupportsFanControlWmi.Should().BeTrue();
+            caps.SupportsFanControlEc.Should().BeFalse();
+            caps.SupportsFanCurves.Should().BeTrue();
+            caps.SupportsIndependentFanCurves.Should().BeFalse();
+            caps.HasMuxSwitch.Should().BeFalse("MUX presence is unconfirmed on this new thin chassis");
+            caps.HasFourZoneRgb.Should().BeFalse("keyboard/RGB surface has no database match and must not be assumed");
+            caps.SupportsUndervolt.Should().BeFalse("CPU vendor/model is not yet confirmed for this board");
+            caps.UserVerified.Should().BeFalse("GitHub #145 still requires hardware validation");
+        }
+
+        [Fact]
+        public void GetPreferredCapabilities_8D40_MatchesOmenSlimWmiModelName()
+        {
+            var caps = ModelCapabilityDatabase.GetPreferredCapabilities(
+                "8D40", "OMEN Slim Gaming Laptop 16-an0xxx");
+
+            caps.Should().NotBeNull();
+            caps!.ProductId.Should().Be("8D40");
+        }
+
+        [Fact]
         public void GetPreferredCapabilities_878C_Omen15Ek0xxx_UsesWmiThermalPolicyFallback()
         {
             var caps = ModelCapabilityDatabase.GetPreferredCapabilities("878C", "OMEN Laptop 15-ek0xxx");

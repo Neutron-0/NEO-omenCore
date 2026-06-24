@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using OmenCore.Models;
 using OmenCore.Services;
+using OmenCore.Services.Diagnostics;
 
 namespace OmenCore.Hardware
 {
@@ -1332,9 +1333,12 @@ namespace OmenCore.Hardware
                         fan1Percent = Math.Clamp((fan1Rpm * 100) / 5500, 0, 100);
                         fan2Percent = Math.Clamp((fan2Rpm * 100) / 5500, 0, 100);
                         gotValidData = true;
-                        rpmSource = RpmSource.WmiBios;
+                        // GetFanLevel is a command/readback level. The x100 conversion is useful
+                        // for a rough display value on classic V1 systems, but it is not an
+                        // independent tachometer measurement and must never verify physical RPM.
+                        rpmSource = RpmSource.Estimated;
                         
-                        _logging?.Debug($"HP WMI Fan levels: Fan1={fanLevel.Value.fan1} -> {fan1Rpm} RPM ({fan1Percent}%), Fan2={fanLevel.Value.fan2} -> {fan2Rpm} RPM ({fan2Percent}%)");
+                        _logging?.Debug($"HP WMI fan-level estimate: Fan1={fanLevel.Value.fan1} -> ~{fan1Rpm} RPM ({fan1Percent}%), Fan2={fanLevel.Value.fan2} -> ~{fan2Rpm} RPM ({fan2Percent}%)");
                     }
                 }
                 
@@ -1579,6 +1583,12 @@ namespace OmenCore.Hardware
                 _countdownExtensionTimer = new Timer(CountdownExtensionCallback, null,
                     CountdownExtensionInitialDelayMs, CountdownExtensionIntervalMs);
                 _countdownExtensionEnabled = true;
+                BackgroundTimerRegistry.Register(
+                    "FanCountdownExtension",
+                    "WmiFanController",
+                    $"Reasserts fan settings to prevent BIOS reversion (every {CountdownExtensionIntervalMs / 1000}s)",
+                    CountdownExtensionIntervalMs,
+                    BackgroundTimerTier.Critical);
                 _logging?.Info("✓ Fan countdown extension enabled (prevents settings reverting)");
             }
         }
@@ -1595,6 +1605,7 @@ namespace OmenCore.Hardware
                 _countdownExtensionTimer?.Dispose();
                 _countdownExtensionTimer = null;
                 _countdownExtensionEnabled = false;
+                BackgroundTimerRegistry.Unregister("FanCountdownExtension");
                 _logging?.Info("Fan countdown extension stopped");
             }
         }

@@ -1292,6 +1292,39 @@ namespace OmenCore.ViewModels
             }
         }
 
+        /// <summary>
+        /// Tells the user, independent of any apply-success message, whether the confirmed GPU OC
+        /// profile is currently authorized to reapply at OmenCore startup and why. Saving or
+        /// selecting a profile never implies startup authorization on its own.
+        /// </summary>
+        public string GpuOcStartupReapplyChipText
+        {
+            get
+            {
+                var config = _configService.Config;
+                var confirmedForStartup = config.GpuOc?.ApplyOnStartup == true;
+                var model = _systemInfoService?.GetSystemInfo().Model;
+                return $"Startup: {StartupRestorePolicy.DescribeTuningStartupReapplyState(config, confirmedForStartup, model)}";
+            }
+        }
+
+        public System.Windows.Media.Brush GpuOcStartupReapplyChipBrush
+        {
+            get
+            {
+                var text = GpuOcStartupReapplyChipText;
+                if (text.Contains("Enabled", StringComparison.OrdinalIgnoreCase))
+                {
+                    return System.Windows.Media.Brushes.LimeGreen;
+                }
+                if (text.Contains("Blocked", StringComparison.OrdinalIgnoreCase))
+                {
+                    return System.Windows.Media.Brushes.OrangeRed;
+                }
+                return System.Windows.Media.Brushes.Gray;
+            }
+        }
+
         private bool GpuOcHasMismatch
         {
             get
@@ -1830,7 +1863,7 @@ namespace OmenCore.ViewModels
                 return;
             }
 
-            if (!ValidateGpuOcPowerSourceForIncrease())
+            if (!ValidateGpuOcPowerSourceForIncrease(showDialogIfBlocked: true))
             {
                 return;
             }
@@ -2937,8 +2970,7 @@ namespace OmenCore.ViewModels
             }
 
             var model = _systemInfoService?.GetSystemInfo().Model ?? string.Empty;
-            bool riskyModel = model.Contains("OMEN 16", StringComparison.OrdinalIgnoreCase) ||
-                              model.Contains("Victus", StringComparison.OrdinalIgnoreCase);
+            bool riskyModel = StartupRestorePolicy.IsSensitiveModel(model);
 
             if (riskyModel && !config.AllowStartupRestoreOnOmen16OrVictus)
             {
@@ -4325,7 +4357,7 @@ namespace OmenCore.ViewModels
         /// </summary>
         private void ApplyGpuOc()
         {
-            if (!ValidateGpuOcPowerSourceForIncrease())
+            if (!ValidateGpuOcPowerSourceForIncrease(showDialogIfBlocked: true))
             {
                 return;
             }
@@ -4334,7 +4366,7 @@ namespace OmenCore.ViewModels
             GpuOcStatus = result.StatusText;
         }
 
-        private bool ValidateGpuOcPowerSourceForIncrease()
+        private bool ValidateGpuOcPowerSourceForIncrease(bool showDialogIfBlocked)
         {
             if (_nvapiService == null)
             {
@@ -4374,13 +4406,16 @@ namespace OmenCore.ViewModels
                 return true;
             }
 
-            System.Windows.MessageBox.Show(
-                "GPU OC increase detected while running on battery power.\n\n" +
-                "Applying higher clocks/power limits on battery can cause unstable clocks, rapid battery drain, and sudden throttling.\n\n" +
-                "Connect AC power before increasing GPU OC settings.",
-                "AC Power Recommended",
-                System.Windows.MessageBoxButton.OK,
-                System.Windows.MessageBoxImage.Warning);
+            if (showDialogIfBlocked)
+            {
+                System.Windows.MessageBox.Show(
+                    "GPU OC increase detected while running on battery power.\n\n" +
+                    "Applying higher clocks/power limits on battery can cause unstable clocks, rapid battery drain, and sudden throttling.\n\n" +
+                    "Connect AC power before increasing GPU OC settings.",
+                    "AC Power Recommended",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Warning);
+            }
 
             GpuOcStatus = "GPU OC increase blocked: connect AC power first";
             _logging.Warn("Blocked GPU OC increase because the system is on battery power.");
@@ -4389,6 +4424,16 @@ namespace OmenCore.ViewModels
         
         private void ApplyGpuOcStartupRestore()
         {
+            // The interactive Apply/Test Apply paths block an OC increase on battery power
+            // (unstable clocks, rapid drain, sudden throttling). Startup restore must honor the
+            // same safety gate — a modal dialog during boot would be disruptive, so this skips
+            // silently with a logged reason instead of showing the "AC Power Recommended" prompt.
+            if (!ValidateGpuOcPowerSourceForIncrease(showDialogIfBlocked: false))
+            {
+                _logging.Warn("Skipped GPU OC startup restore because the system is on battery power.");
+                return;
+            }
+
             var result = ApplyGpuOcValues(GpuCoreClockOffset, GpuMemoryClockOffset, GpuPowerLimitPercent, GpuVoltageOffsetMv, false, "Restored");
             GpuOcStatus = result.StatusText;
         }
@@ -4612,8 +4657,10 @@ namespace OmenCore.ViewModels
                 config.GpuOc.PowerLimitPercent = GpuPowerLimitPercent;
                 config.GpuOc.VoltageOffsetMv = GpuOcAvailable ? GpuVoltageOffsetMv : 0;
                 config.GpuOc.ApplyOnStartup = applyOnStartup;
-                
+
                 _configService.Save(config);
+                OnPropertyChanged(nameof(GpuOcStartupReapplyChipText));
+                OnPropertyChanged(nameof(GpuOcStartupReapplyChipBrush));
                 _logging.Info($"GPU OC settings saved: Core={GpuCoreClockOffset}, Mem={GpuMemoryClockOffset}, Power={GpuPowerLimitPercent}%, Voltage={GpuVoltageOffsetMv}mV, StartupReapply={applyOnStartup}");
             }
             catch (Exception ex)
@@ -4994,11 +5041,16 @@ namespace OmenCore.ViewModels
         
         /// <summary>
         /// Select a performance mode by name without applying it.
-        /// Used for UI synchronization when mode is changed externally (e.g., power automation).
+        /// Used for UI synchronization when mode is changed externally and the change should
+        /// NOT become the persisted startup preference (e.g. automatic power-source switching,
+        /// or a temporary safety rollback). For a deliberate user action that already applied
+        /// the mode through a different entry point (tray menu, hotkey, General quick-profile
+        /// buttons), use <see cref="SelectModeByNameNoApplyAndSave"/> instead so the choice
+        /// survives a relaunch.
         /// </summary>
         public void SelectModeByNameNoApply(string modeName)
         {
-            var mode = PerformanceModes.FirstOrDefault(m => 
+            var mode = PerformanceModes.FirstOrDefault(m =>
                 m.Name.Equals(modeName, StringComparison.OrdinalIgnoreCase));
             if (mode != null && _selectedPerformanceMode != mode)
             {
@@ -5010,7 +5062,26 @@ namespace OmenCore.ViewModels
                 OnPropertyChanged(nameof(IsPerformanceMode));
             }
         }
-        
+
+        /// <summary>
+        /// Select a performance mode by name without re-applying it to hardware, and persist it
+        /// as the startup preference. Use this when another entry point (tray menu, hotkey quick
+        /// profile, General page quick-profile buttons) already applied the mode directly through
+        /// <see cref="PerformanceModeService"/> and only needs this view-model's selection and
+        /// config persistence kept in sync — otherwise the choice silently reverts to the last
+        /// value saved via this page's own controls on next launch (GitHub #145).
+        /// </summary>
+        public void SelectModeByNameNoApplyAndSave(string modeName)
+        {
+            SelectModeByNameNoApply(modeName);
+            var mode = PerformanceModes.FirstOrDefault(m =>
+                m.Name.Equals(modeName, StringComparison.OrdinalIgnoreCase));
+            if (mode != null)
+            {
+                SavePerformanceModeToConfig(mode.Name);
+            }
+        }
+
         /// <summary>
         /// Select and apply a performance mode but don't save to config.
         /// Used when restoring defaults after game exit - we apply balanced mode 

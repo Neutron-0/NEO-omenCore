@@ -87,11 +87,15 @@
                                         <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}">
                                             <Run Text="Requested: " />
                                             <Run Text="{Binding RequestedPercent, Mode=OneWay}" />
-                                            <Run Text="%  , RPM: " />
-                                            <Run Text="{Binding ActualRpmAfter, Mode=OneWay}" />
+                                            <Run Text="%  , Readback: " />
+                                            <Run Text="{Binding RpmDisplay, Mode=OneWay}" />
                                             <Run Text=" (±" />
                                             <Run Text="{Binding DeviationPercent, StringFormat={}{0:F1}%, Mode=OneWay}" />
                                             <Run Text=")" />
+                                        </TextBlock>
+                                        <TextBlock FontSize="11" Foreground="{StaticResource TextMutedBrush}">
+                                            <Run Text="Evidence: " />
+                                            <Run Text="{Binding VerificationEvidence, Mode=OneWay}" />
                                         </TextBlock>
                                         <TextBlock FontSize="11" Foreground="{StaticResource TextMutedBrush}"
                                                    TextWrapping="Wrap">

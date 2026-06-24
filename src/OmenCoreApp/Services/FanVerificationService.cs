@@ -21,6 +21,7 @@ namespace OmenCore.Services
         public int ActualRpmAfter { get; set; }
         public int ExpectedRpm { get; set; }
         public int ActualLevelAfter { get; set; }
+        public RpmSource RpmSource { get; set; } = RpmSource.Unknown;
         public bool WmiCallSucceeded { get; set; }
         public bool VerificationPassed { get; set; }
         public bool LevelReadbackMatched { get; set; }
@@ -52,6 +53,14 @@ namespace OmenCore.Services
         public double DeviationPercent => ExpectedRpm > 0 
             ? Math.Abs(ActualRpmAfter - ExpectedRpm) / (double)ExpectedRpm * 100 
             : (ActualRpmAfter <= 0 ? 0 : 100);
+
+        public string RpmDisplay => RpmSource switch
+        {
+            RpmSource.Estimated => $"~{ActualRpmAfter} RPM (fan-level estimate)",
+            RpmSource.Unknown when ActualRpmAfter <= 0 => "Physical RPM unavailable",
+            RpmSource.Unknown => $"{ActualRpmAfter} RPM (source unverified)",
+            _ => $"{ActualRpmAfter} RPM ({RpmSource})"
+        };
         
         /// <summary>
         /// Overall verification score 0-100 (v2.7.0).
@@ -184,6 +193,16 @@ namespace OmenCore.Services
             }
             return 0;
         }
+
+        private RpmSource GetCurrentRpmSource(int fanIndex)
+        {
+            if (_fanService?.FanTelemetry != null && _fanService.FanTelemetry.Count > fanIndex)
+            {
+                return _fanService.FanTelemetry[fanIndex].RpmSource;
+            }
+
+            return RpmSource.Unknown;
+        }
         
         /// <summary>
         /// Get fan name from telemetry.
@@ -314,6 +333,7 @@ namespace OmenCore.Services
                     
                     // Use average RPM for verification
                     result.ActualRpmAfter = (int)rpmSamples.Average();
+                    result.RpmSource = GetCurrentRpmSource(fanIndex);
                     result.SampleCount = VerificationSamples;
                     result.ActualLevelAfter = ReadCurrentLevel(fanIndex);
                     result.LevelReadbackMatched = IsLevelReadbackMatch(result);
@@ -344,7 +364,7 @@ namespace OmenCore.Services
                     }
                     else if (attempt < VerificationRetries)
                     {
-                        _logging.Warn($"Fan {fanIndex} verification attempt {attempt + 1} failed: Expected ~{result.ExpectedRpm} RPM / level {result.ExpectedLevel}, got {result.ActualRpmAfter} RPM / level {result.ActualLevelAfter} ({result.DeviationPercent:F1}% deviation). Retrying...");
+                        _logging.Warn($"Fan {fanIndex} verification attempt {attempt + 1} inconclusive: {DescribeVerificationMismatch(result)}. Retrying...");
                         await Task.Delay(RetryDelayMs, ct);
                     }
                 }
@@ -352,8 +372,8 @@ namespace OmenCore.Services
                 // Final diagnostic message if verification still failed
                 if (!result.VerificationPassed)
                 {
-                    _logging.Error($"Fan {fanIndex} verification failed after {totalAttempts} attempts: expected ~{result.ExpectedRpm} RPM, got {result.ActualRpmAfter} RPM");
-                    result.ErrorMessage = $"Fan verification failed after {totalAttempts} attempts: expected ~{result.ExpectedRpm} RPM / level {result.ExpectedLevel}, got {result.ActualRpmAfter} RPM / level {result.ActualLevelAfter}";
+                    _logging.Error($"Fan {fanIndex} verification remained inconclusive after {totalAttempts} attempts: {DescribeVerificationMismatch(result)}");
+                    result.ErrorMessage = $"Fan verification remained inconclusive after {totalAttempts} attempts: {DescribeVerificationMismatch(result)}";
                     
                     // Track failure for diagnostics — report only, do NOT change fan state.
                     // Previously this called SetFanMode(Default) which would kill any active
@@ -456,6 +476,7 @@ namespace OmenCore.Services
 
                     // Use average RPM
                     result.ActualRpmAfter = (int)rpmSamples.Average();
+                    result.RpmSource = GetCurrentRpmSource(fanIndex);
                     result.SampleCount = VerificationSamples;
                     result.ActualLevelAfter = ReadCurrentLevel(fanIndex);
                     result.LevelReadbackMatched = IsLevelReadbackMatch(result);
@@ -486,7 +507,7 @@ namespace OmenCore.Services
                     }
                     else if (attempt < VerificationRetries)
                     {
-                        _logging.Warn($"Fan {fanIndex} verification attempt {attempt + 1} failed: Expected ~{result.ExpectedRpm} RPM / level {result.ExpectedLevel}, got {result.ActualRpmAfter} RPM / level {result.ActualLevelAfter} ({result.DeviationPercent:F1}% deviation). Retrying...");
+                        _logging.Warn($"Fan {fanIndex} verification attempt {attempt + 1} inconclusive: {DescribeVerificationMismatch(result)}. Retrying...");
                         await Task.Delay(RetryDelayMs, ct);
                     }
                 }
@@ -494,8 +515,8 @@ namespace OmenCore.Services
                 // Final diagnostic
                 if (!result.VerificationPassed)
                 {
-                    _logging.Error($"Fan {fanIndex} verification failed after {totalAttempts} attempts: expected ~{result.ExpectedRpm} RPM, got {result.ActualRpmAfter} RPM");
-                    result.ErrorMessage = $"Fan verification failed after {totalAttempts} attempts: expected ~{result.ExpectedRpm} RPM / level {result.ExpectedLevel}, got {result.ActualRpmAfter} RPM / level {result.ActualLevelAfter}";
+                    _logging.Error($"Fan {fanIndex} verification remained inconclusive after {totalAttempts} attempts: {DescribeVerificationMismatch(result)}");
+                    result.ErrorMessage = $"Fan verification remained inconclusive after {totalAttempts} attempts: {DescribeVerificationMismatch(result)}";
                 }
             }
             catch (Exception ex)
@@ -674,6 +695,14 @@ namespace OmenCore.Services
                 return true;
             }
 
+            // Classic V1 GetFanLevel values are surfaced as an Estimated RPM for display.
+            // When the requested level itself matches, do not compare that derived estimate
+            // against a second generic RPM curve and call the same evidence contradictory.
+            if (result.RpmSource == RpmSource.Estimated)
+            {
+                return true;
+            }
+
             if (result.ExpectedRpm <= 0)
             {
                 return result.ActualRpmAfter <= 1000;
@@ -689,6 +718,11 @@ namespace OmenCore.Services
         /// </summary>
         private bool VerifyRpm(FanApplyResult result)
         {
+            if (!IsPhysicalRpmSource(result.RpmSource))
+            {
+                return false;
+            }
+
             // If requesting 0%, fan should be off or very low
             if (result.RequestedPercent == 0)
             {
@@ -712,6 +746,24 @@ namespace OmenCore.Services
             tolerance = Math.Max(tolerance, 500);
             
             return Math.Abs(result.ActualRpmAfter - result.ExpectedRpm) <= tolerance;
+        }
+
+        private static bool IsPhysicalRpmSource(RpmSource source)
+        {
+            return source == RpmSource.EcDirect ||
+                   source == RpmSource.HardwareMonitor ||
+                   source == RpmSource.Afterburner ||
+                   source == RpmSource.WmiBios;
+        }
+
+        private static string DescribeVerificationMismatch(FanApplyResult result)
+        {
+            if (IsPhysicalRpmSource(result.RpmSource))
+            {
+                return $"expected ~{result.ExpectedRpm} RPM / level {result.ExpectedLevel}, got {result.ActualRpmAfter} RPM ({result.RpmSource}) / level {result.ActualLevelAfter} ({result.DeviationPercent:F1}% deviation)";
+            }
+
+            return $"expected level {result.ExpectedLevel}, got level {result.ActualLevelAfter}; {result.RpmDisplay} is not independent physical RPM evidence";
         }
 
         private static string DetermineVerificationEvidence(bool rpmMatched, bool levelMatched)
@@ -771,6 +823,10 @@ namespace OmenCore.Services
                     return standardResult;
                 }
 
+                // Preserve command/readback provenance from the standard attempt. A failed
+                // verification does not mean the firmware command itself returned failure.
+                result = standardResult;
+
                 _logging.Warn($"Standard verification failed for fan {fanIndex}, attempting enhanced verification cycles...");
 
                 // Enhanced verification: multiple read-back attempts
@@ -785,28 +841,33 @@ namespace OmenCore.Services
                     var (avgRpm, minRpm, maxRpm) = await GetStableFanRpmAsync(fanIndex, 7, ct); // 7 samples
 
                     result.ActualRpmAfter = avgRpm;
+                    result.RpmSource = GetCurrentRpmSource(fanIndex);
+                    result.ActualLevelAfter = ReadCurrentLevel(fanIndex);
+                    result.LevelReadbackMatched = IsLevelReadbackMatch(result);
 
                     // Check if we're within a more lenient tolerance for enhanced verification
                     var lenientTolerance = result.ExpectedRpm * (RpmTolerance * 1.5); // 50% more lenient
-                    var withinLenientTolerance = Math.Abs(result.ActualRpmAfter - result.ExpectedRpm) <= lenientTolerance;
+                    var withinLenientTolerance = IsPhysicalRpmSource(result.RpmSource) &&
+                        Math.Abs(result.ActualRpmAfter - result.ExpectedRpm) <= lenientTolerance;
+                    var levelEvidenceAccepted = IsLevelOnlyEvidenceAcceptable(result);
 
-                    if (withinLenientTolerance)
+                    if (withinLenientTolerance || levelEvidenceAccepted)
                     {
+                        result.VerificationEvidence = DetermineVerificationEvidence(withinLenientTolerance, levelEvidenceAccepted);
                         _logging.Info($"✓ Enhanced verification passed on cycle {cycle} for fan {fanIndex}: {avgRpm} RPM (range: {minRpm}-{maxRpm})");
                         result.VerificationPassed = true;
-                        result.WmiCallSucceeded = true; // Assume it worked since we got here
                         result.Duration = DateTime.Now - startTime;
                         return result;
                     }
 
-                    _logging.Warn($"Enhanced verification cycle {cycle} failed: expected ~{result.ExpectedRpm}, got {avgRpm} RPM (range: {minRpm}-{maxRpm})");
+                    _logging.Warn($"Enhanced verification cycle {cycle} inconclusive: {DescribeVerificationMismatch(result)} (sample range: {minRpm}-{maxRpm})");
                 }
 
                 // All verification attempts failed
                 result.ActualRpmAfter = GetCurrentRpm(fanIndex);
+                result.RpmSource = GetCurrentRpmSource(fanIndex);
                 result.VerificationPassed = false;
-                result.WmiCallSucceeded = false;
-                result.ErrorMessage = $"Enhanced verification failed after multiple attempts: expected ~{result.ExpectedRpm}, got {result.ActualRpmAfter}";
+                result.ErrorMessage = $"Enhanced verification remained inconclusive after multiple attempts: expected level {result.ExpectedLevel}, got {result.ActualLevelAfter}; RPM source={result.RpmSource}";
 
                 // Auto-revert if enabled and requested
                 if (autoRevertOnFailure && AutoRevertOnFailure)

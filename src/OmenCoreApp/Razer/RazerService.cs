@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using OmenCore.Services;
+using OmenCore.Services.Diagnostics;
 
 namespace OmenCore.Razer
 {
@@ -182,6 +183,13 @@ namespace OmenCore.Razer
             _heartbeatTimer.Elapsed += async (s, e) => await SendHeartbeatAsync();
             _heartbeatTimer.AutoReset = true;
             _heartbeatTimer.Start();
+
+            BackgroundTimerRegistry.Register(
+                "RazerChromaHeartbeat",
+                "RazerService",
+                $"Keeps the Razer Chroma SDK session alive (every {_heartbeatInterval}ms)",
+                _heartbeatInterval,
+                BackgroundTimerTier.Optional);
         }
         
         private async Task SendHeartbeatAsync()
@@ -735,9 +743,10 @@ namespace OmenCore.Razer
                 return;
 
             _logging.Info("Disposing RazerService");
-            
+
             _heartbeatTimer?.Stop();
             _heartbeatTimer?.Dispose();
+            BackgroundTimerRegistry.Unregister("RazerChromaHeartbeat");
 
             _reconnectTimer?.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
             _reconnectTimer?.Dispose();

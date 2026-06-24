@@ -29,13 +29,20 @@ namespace OmenCoreApp.Tests.ViewModels
             public string Backend => "Test";
             public int LastSetPercent { get; private set; } = -1;
             public int SetCallCount { get; private set; } = 0;
+            public int ApplyPresetCallCount { get; private set; }
+            public int ApplyCustomCurveCallCount { get; private set; }
 
             public bool ApplyPreset(FanPreset preset)
             {
+                ApplyPresetCallCount++;
                 return true;
             }
 
-            public bool ApplyCustomCurve(System.Collections.Generic.IEnumerable<FanCurvePoint> curve) => true;
+            public bool ApplyCustomCurve(System.Collections.Generic.IEnumerable<FanCurvePoint> curve)
+            {
+                ApplyCustomCurveCallCount++;
+                return true;
+            }
             public bool SetFanSpeed(int percent) { LastSetPercent = percent; SetCallCount++; return true; }
             public bool SetFanSpeeds(int cpuPercent, int gpuPercent) { LastSetPercent = System.Math.Max(cpuPercent, gpuPercent); SetCallCount++; return true; }
             public bool SetMaxFanSpeed(bool enabled) => true;
@@ -309,6 +316,66 @@ namespace OmenCoreApp.Tests.ViewModels
             vm.SelectedPreset!.Name.Should().Be("Custom");
             vm.CustomFanCurve.Select(p => p.TemperatureC).Should().Equal(42, 82);
             vm.CustomFanCurve.Select(p => p.FanPercent).Should().Equal(33, 88);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("Renamed curve")]
+        public void Constructor_MigratesSavedAdHocCurveWhenLastPresetIsMissingOrStale(string? lastPresetName)
+        {
+            var configService = new ConfigurationService();
+            var config = configService.Load();
+            config.LastFanPresetName = lastPresetName;
+            config.CustomFanCurve = new()
+            {
+                new FanCurvePoint { TemperatureC = 45, FanPercent = 35 },
+                new FanCurvePoint { TemperatureC = 85, FanPercent = 95 }
+            };
+            configService.Save(config);
+
+            var vm = CreateViewModel();
+
+            vm.SelectedPreset.Should().NotBeNull();
+            vm.SelectedPreset!.Name.Should().Be("Custom");
+            vm.CustomFanCurve.Select(p => p.TemperatureC).Should().Equal(45, 85);
+            vm.CustomFanCurve.Select(p => p.FanPercent).Should().Equal(35, 95);
+            var controller = GetTestFanController(vm);
+            controller.ApplyPresetCallCount.Should().Be(0,
+                "restoring the saved UI selection must not apply fan hardware during construction");
+            controller.ApplyCustomCurveCallCount.Should().Be(0,
+                "restoring the saved UI selection must not apply fan hardware during construction");
+            new ConfigurationService().Load().LastFanPresetName.Should().Be("Custom");
+        }
+
+        [Fact]
+        public void SelectPresetByNameNoApplyAndSave_UpdatesSelectionAndPersistsLastFanPresetName()
+        {
+            var vm = CreateViewModel();
+
+            vm.SelectPresetByNameNoApplyAndSave("Max");
+
+            vm.SelectedPreset!.Name.Should().Be("Max");
+            var controller = GetTestFanController(vm);
+            controller.ApplyPresetCallCount.Should().Be(0,
+                "the preset was already applied to hardware by the caller (tray/hotkey/General quick-profile); this method must only sync UI and persist");
+            new ConfigurationService().Load().LastFanPresetName.Should().Be("Max");
+        }
+
+        [Fact]
+        public void SelectPresetByNameNoApply_DoesNotPersistLastFanPresetName()
+        {
+            var vm = CreateViewModel();
+            vm.SelectPresetByNameNoApplyAndSave("Max");
+
+            // A subsequent automatic/temporary sync (e.g. power-source automation) must not
+            // overwrite the user's deliberately saved startup preference.
+            vm.SelectPresetByNameNoApply("Quiet");
+
+            vm.SelectedPreset!.Name.Should().Be("Quiet");
+            new ConfigurationService().Load().LastFanPresetName.Should().Be("Max",
+                "SelectPresetByNameNoApply is used for automatic/temporary preset changes and must not " +
+                "silently overwrite the last deliberately saved startup preference");
         }
 
         [Fact]

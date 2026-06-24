@@ -257,18 +257,41 @@ namespace OmenCore.ViewModels
         
         /// <summary>
         /// Selects a preset by name without applying it (for external sync from GeneralViewModel).
-        /// Use this when the fan mode has already been applied externally.
+        /// Use this when the fan mode has already been applied externally, AND the change should
+        /// NOT become the persisted startup preference (e.g. automatic power-source switching).
+        /// For a deliberate user action that already applied the preset through a different entry
+        /// point (tray menu, hotkey, General quick-profile buttons), use
+        /// <see cref="SelectPresetByNameNoApplyAndSave"/> instead so the choice survives a relaunch.
         /// </summary>
         public void SelectPresetByNameNoApply(string presetName)
         {
-            var preset = FanPresets.FirstOrDefault(p => 
+            var preset = FanPresets.FirstOrDefault(p =>
                 p.Name.Equals(presetName, StringComparison.OrdinalIgnoreCase));
-            
+
             if (preset != null)
             {
                 _suppressApplyOnSelection = true;
                 SelectedPreset = preset;
                 _suppressApplyOnSelection = false;
+            }
+        }
+
+        /// <summary>
+        /// Select a fan preset by name without re-applying it to hardware, and persist it as the
+        /// startup preference. Use this when another entry point (tray menu, hotkey, General page
+        /// quick-profile buttons, OMEN key) already applied the preset directly through
+        /// <see cref="FanService"/> and only needs this view-model's selection and config
+        /// persistence kept in sync — otherwise the choice silently reverts to the last value saved
+        /// via this page's own controls on next launch (same root cause as GitHub #145, for fans).
+        /// </summary>
+        public void SelectPresetByNameNoApplyAndSave(string presetName)
+        {
+            SelectPresetByNameNoApply(presetName);
+            var preset = FanPresets.FirstOrDefault(p =>
+                p.Name.Equals(presetName, StringComparison.OrdinalIgnoreCase));
+            if (preset != null)
+            {
+                SaveLastPresetToConfig(preset.Name);
             }
         }
         
@@ -930,7 +953,7 @@ namespace OmenCore.ViewModels
         {
             var success = _fanService.RestoreOemAutoControl();
             ActiveFanMode = "Auto";
-            SelectPresetByNameNoApply("Auto");
+            SelectPresetByNameNoApplyAndSave("Auto");
             CurveApplyStatus = success
                 ? "OEM auto restored"
                 : "OEM auto restore did not report success";
@@ -1287,6 +1310,26 @@ namespace OmenCore.ViewModels
                 }
             }
 
+            // Older configs can contain the last applied ad-hoc curve without the
+            // corresponding preset name. A stale name can produce the same state
+            // after a preset is renamed outside OmenCore. RestoreAdHocCustomCurveFromConfig
+            // has already materialized that saved curve as the manual Custom preset,
+            // so prefer it for UI hydration and repair the selection metadata. This
+            // does not apply the curve because constructor selection is suppressed.
+            if (FanCurvesAvailable &&
+                _configService.Config.CustomFanCurve is { Count: >= 2 })
+            {
+                var customPreset = FanPresets.FirstOrDefault(p =>
+                    !p.IsBuiltIn &&
+                    p.Mode == FanMode.Manual &&
+                    p.Name.Equals("Custom", StringComparison.OrdinalIgnoreCase));
+                if (customPreset != null)
+                {
+                    RepairLastPresetSelection(customPreset.Name, lastPresetName);
+                    return customPreset;
+                }
+            }
+
             if (!FanCurvesAvailable)
             {
                 var autoPreset = FanPresets.FirstOrDefault(p => p.Name == "Auto");
@@ -1298,6 +1341,25 @@ namespace OmenCore.ViewModels
             }
 
             return FanPresets.FirstOrDefault(p => p.Name == "Auto") ?? FanPresets[2];
+        }
+
+        private void RepairLastPresetSelection(string presetName, string? stalePresetName)
+        {
+            try
+            {
+                var config = _configService.Config;
+                config.LastFanPresetName = presetName;
+                _configService.Save(config);
+
+                var previousSelection = string.IsNullOrWhiteSpace(stalePresetName)
+                    ? "missing"
+                    : $"'{stalePresetName}'";
+                _logging.Info($"Repaired fan preset selection from {previousSelection} to '{presetName}' using the saved custom curve");
+            }
+            catch (Exception ex)
+            {
+                _logging.Warn($"Failed to repair saved fan preset selection: {ex.Message}");
+            }
         }
 
         private void RestoreAdHocCustomCurveFromConfig()

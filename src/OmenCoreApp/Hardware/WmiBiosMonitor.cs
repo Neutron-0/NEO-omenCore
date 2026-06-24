@@ -152,9 +152,19 @@ namespace OmenCore.Hardware
         private bool _gpuEngineFallbackLogged;
         private string _gpuLoadSource = "NVAPI";
         
-        // SSD temperature
+        // SSD temperature — queried via a separate root\Microsoft\Windows\Storage WMI namespace
+        // connection, which is more expensive than a same-namespace query. The value changes
+        // slowly, so it does not need to be re-queried on every monitoring tick (previously was).
         private double _cachedSsdTemp;
         private bool _ssdTempAvailable = true; // Optimistic, disable on first failure
+        private DateTime _lastSsdTempQueryUtc = DateTime.MinValue;
+        private static readonly TimeSpan SsdTempQueryInterval = TimeSpan.FromSeconds(5);
+
+        // CPU clock speed (Win32_Processor) is telemetry/display-only (not used by any control
+        // or safety decision); throttling its WMI query reduces redundant polling pressure
+        // without any user-visible change at typical monitoring cadence.
+        private DateTime _lastCpuClockQueryUtc = DateTime.MinValue;
+        private static readonly TimeSpan CpuClockQueryInterval = TimeSpan.FromSeconds(2);
         
         // Battery
         private double _cachedBatteryDischargeRate;
@@ -859,14 +869,18 @@ namespace OmenCore.Hardware
                 // Provides current CPU frequency in MHz.
                 // ═══════════════════════════════════════════════════════════════
                 
-                try
+                if (DateTime.UtcNow - _lastCpuClockQueryUtc >= CpuClockQueryInterval)
                 {
-                    var clockMhz = GetCpuCurrentClockMhz();
-                    if (clockMhz > 0) _cachedCpuClockMhz = clockMhz;
-                }
-                catch
-                {
-                    // WMI query may fail
+                    _lastCpuClockQueryUtc = DateTime.UtcNow;
+                    try
+                    {
+                        var clockMhz = GetCpuCurrentClockMhz();
+                        if (clockMhz > 0) _cachedCpuClockMhz = clockMhz;
+                    }
+                    catch
+                    {
+                        // WMI query may fail
+                    }
                 }
                 
                 // ═══════════════════════════════════════════════════════════════
@@ -904,8 +918,9 @@ namespace OmenCore.Hardware
                 // SOURCE 5: WMI — SSD Temperature + Battery Discharge Rate
                 // ═══════════════════════════════════════════════════════════════
                 
-                if (_ssdTempAvailable)
+                if (_ssdTempAvailable && DateTime.UtcNow - _lastSsdTempQueryUtc >= SsdTempQueryInterval)
                 {
+                    _lastSsdTempQueryUtc = DateTime.UtcNow;
                     try
                     {
                         _cachedSsdTemp = GetSsdTemperature();
@@ -1187,7 +1202,6 @@ namespace OmenCore.Hardware
                         {
                             _logging?.Info($"[WmiBiosMonitor] CPU temp source override active for model '{_systemModel}': using worker sensor ({fallbackCpuTemp:F1}°C)");
                             _modelCpuTempPreferenceLogged = true;
-                            SetCpuTemperatureAuthority("LHM Worker Override", $"Model override active for '{_systemModel}'");
                         }
                         else if (!_cpuTempFallbackLogged)
                         {
@@ -1195,9 +1209,11 @@ namespace OmenCore.Hardware
                             _cpuTempFallbackLogged = true;
                         }
 
-                        SetCpuTemperatureAuthority(
-                            "LHM Fallback",
-                            $"WMI/ACPI authority rejected ({previous:F1}C) vs fallback ({fallbackCpuTemp:F1}C), load={_cachedCpuLoad:F0}%, power={_cachedCpuPowerWatts:F1}W");
+                        var fallbackAuthoritySource = GetCpuFallbackAuthoritySource(_workerBackedCpuTempOverrideEnabled);
+                        var fallbackAuthorityReason = _workerBackedCpuTempOverrideEnabled
+                            ? $"Model override active for '{_systemModel}'"
+                            : $"WMI/ACPI authority rejected ({previous:F1}C) vs fallback ({fallbackCpuTemp:F1}C), load={_cachedCpuLoad:F0}%, power={_cachedCpuPowerWatts:F1}W";
+                        SetCpuTemperatureAuthority(fallbackAuthoritySource, fallbackAuthorityReason);
 
                         if (_cpuAuthorityMismatchConsecutiveReadings >= CpuAuthorityMismatchConfirmReadings)
                         {
@@ -1247,6 +1263,11 @@ namespace OmenCore.Hardware
                    capturedUtc != DateTime.MinValue &&
                    nowUtc >= capturedUtc &&
                    (nowUtc - capturedUtc).TotalSeconds <= WorkerCpuTempLastGoodGraceSeconds;
+        }
+
+        private static string GetCpuFallbackAuthoritySource(bool workerBackedModelOverride)
+        {
+            return workerBackedModelOverride ? "LHM Worker Override" : "LHM Fallback";
         }
 
         private void SetCpuTemperatureAuthority(string source, string reason)
@@ -1303,10 +1324,13 @@ namespace OmenCore.Hardware
                 using var searcher = new System.Management.ManagementObjectSearcher("SELECT Model FROM Win32_ComputerSystem");
                 foreach (var obj in searcher.Get())
                 {
-                    var model = obj["Model"]?.ToString();
-                    if (!string.IsNullOrWhiteSpace(model))
+                    using (obj)
                     {
-                        return model.Trim();
+                        var model = obj["Model"]?.ToString();
+                        if (!string.IsNullOrWhiteSpace(model))
+                        {
+                            return model.Trim();
+                        }
                     }
                 }
             }
@@ -2004,17 +2028,32 @@ namespace OmenCore.Hardware
             }
         }
         
+        // Total physical RAM cannot change while Windows is running, so it is safe (and much
+        // cheaper) to query WMI for it once and reuse the value forever, instead of re-querying
+        // on every monitoring tick (this was previously called twice per tick from this class
+        // alone: once directly and once nested inside GetUsedMemoryGB).
+        private static double? _cachedTotalPhysicalMemoryGB;
+
         private static double GetTotalPhysicalMemoryGB()
         {
+            if (_cachedTotalPhysicalMemoryGB.HasValue)
+            {
+                return _cachedTotalPhysicalMemoryGB.Value;
+            }
+
             try
             {
                 using var searcher = new System.Management.ManagementObjectSearcher(
                     "SELECT TotalPhysicalMemory FROM Win32_ComputerSystem");
                 foreach (var obj in searcher.Get())
                 {
-                    if (obj["TotalPhysicalMemory"] is ulong bytes)
+                    using (obj)
                     {
-                        return bytes / (1024.0 * 1024 * 1024);
+                        if (obj["TotalPhysicalMemory"] is ulong bytes)
+                        {
+                            _cachedTotalPhysicalMemoryGB = bytes / (1024.0 * 1024 * 1024);
+                            return _cachedTotalPhysicalMemoryGB.Value;
+                        }
                     }
                 }
             }
@@ -2022,9 +2061,9 @@ namespace OmenCore.Hardware
             {
                 // WMI query failed — return safe default; static method has no access to instance logger
             }
-            return 16; // Default assumption
+            return 16; // Not cached: a transient WMI failure can retry on the next call.
         }
-        
+
         private static double GetUsedMemoryGB()
         {
             try
@@ -2033,11 +2072,14 @@ namespace OmenCore.Hardware
                     "SELECT FreePhysicalMemory FROM Win32_OperatingSystem");
                 foreach (var obj in searcher.Get())
                 {
-                    if (obj["FreePhysicalMemory"] is ulong freeKb)
+                    using (obj)
                     {
-                        double totalGb = GetTotalPhysicalMemoryGB();
-                        double freeGb = freeKb / (1024.0 * 1024);
-                        return totalGb - freeGb;
+                        if (obj["FreePhysicalMemory"] is ulong freeKb)
+                        {
+                            double totalGb = GetTotalPhysicalMemoryGB();
+                            double freeGb = freeKb / (1024.0 * 1024);
+                            return totalGb - freeGb;
+                        }
                     }
                 }
             }

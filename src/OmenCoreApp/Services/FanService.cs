@@ -445,9 +445,7 @@ namespace OmenCore.Services
                     .Select((fan, index) =>
                     {
                         var name = string.IsNullOrWhiteSpace(fan.Name) ? $"Fan {index + 1}" : fan.Name;
-                        var rpmText = fan.RpmState == TelemetryDataState.Unavailable
-                            ? "RPM unavailable"
-                            : $"{fan.SpeedRpm} RPM";
+                        var rpmText = fan.DisplayRpmText;
                         return $"{name}: {rpmText}, duty {fan.DutyCyclePercent}%, state {fan.RpmState}, source {fan.RpmSourceDisplay}";
                     })
                     .ToList();
@@ -2202,10 +2200,17 @@ namespace OmenCore.Services
                     
                     _thermalProtectionActive = true;
                     _logging.Warn($"⚠️ THERMAL EMERGENCY: {maxTemp:F0}°C - forcing fans to 100%!");
-                    
+
+                    // Record both individual readings (not just maxTemp) so a field report can
+                    // tell whether this was a sustained real event or a single-sample sensor
+                    // glitch — this tier intentionally has no debounce (safety critical), so it
+                    // is the most exposed to a transient bad reading triggering a visible spike.
+                    RecordFanCommand("ThermalProtection.Emergency", "100%", true,
+                        $"cpu={cpuTemp:F1}C gpu={gpuTemp:F1}C maxTemp={maxTemp:F1}C (no debounce - safety critical)");
+
                     // Notify user of thermal protection activation
                     _notificationService?.ShowThermalProtectionActivated(maxTemp, "Emergency - Max Fans");
-                    
+
                     // FIRST activation — always write immediately
                     SetFanSpeedSerialized(100);
                     _lastThermalFanWriteTime = now;
@@ -2282,6 +2287,8 @@ namespace OmenCore.Services
                     return;
                 }
                 
+                RecordFanCommand("ThermalProtection.Warning", $"{thermalTargetPercent}%", true,
+                    $"cpu={cpuTemp:F1}C gpu={gpuTemp:F1}C maxTemp={maxTemp:F1}C sustainedFor={(now - _thermalAboveThresholdSince).TotalSeconds:F0}s");
                 SetFanSpeedSerialized(thermalTargetPercent);
                 _lastThermalFanWriteTime = now;
                 _lastThermalFanPercent = thermalTargetPercent;
@@ -2311,6 +2318,8 @@ namespace OmenCore.Services
                 }
                 _thermalProtectionActive = false;
                 _logging.Info($"✓ Temps normalized ({maxTemp:F0}°C) - thermal protection released");
+                RecordFanCommand("ThermalProtection.Release", "restoring previous state", true,
+                    $"cpu={cpuTemp:F1}C gpu={gpuTemp:F1}C maxTemp={maxTemp:F1}C belowReleaseFor={belowDuration:F0}s");
                 
                 // BUG FIX v2.3.1: SAFE RELEASE - Don't let BIOS drop fans to 0 RPM at warm temps!
                 // If temps are still "gaming warm" (above ThermalSafeReleaseTemp), keep fans

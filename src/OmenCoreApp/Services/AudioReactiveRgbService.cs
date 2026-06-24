@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NAudio.Wave;
+using OmenCore.Services.Diagnostics;
 using OmenCore.Services.Rgb;
 
 namespace OmenCore.Services
@@ -652,6 +653,13 @@ namespace OmenCore.Services
             _isCapturing = true;
             _capture.StartRecording();
             _readTimer = new System.Threading.Timer(ReadBufferedSamples, null, 0, 33);
+
+            BackgroundTimerRegistry.Register(
+                "AudioReactiveRgbCapture",
+                "AudioReactiveRgbService",
+                "Reads buffered WASAPI loopback audio samples for Audio-Reactive RGB (every 33ms while active)",
+                33,
+                BackgroundTimerTier.Optional);
         }
 
         public void Stop()
@@ -660,6 +668,8 @@ namespace OmenCore.Services
 
             _readTimer?.Dispose();
             _readTimer = null;
+
+            BackgroundTimerRegistry.Unregister("AudioReactiveRgbCapture");
 
             try
             {
