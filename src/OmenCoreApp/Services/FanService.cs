@@ -628,14 +628,31 @@ namespace OmenCore.Services
             _thermalAboveThresholdSince = DateTime.MinValue;
             _thermalBelowReleaseSince = DateTime.MinValue;
 
+            // Stop any backend-owned Max-mode keepalive/reassertion timer unconditionally and
+            // first, before attempting the BIOS auto-control restore below. That timer (when
+            // present) runs on its own independent schedule inside the fan controller with no
+            // suspend awareness of its own — it previously only stopped as a side effect of
+            // RestoreAutoControlSerialized() succeeding. If that call threw or its underlying
+            // WMI write failed (both plausible while the system is mid-suspend), the timer kept
+            // firing every few seconds and reasserting Max fan mode for as long as the process
+            // had threads running during the suspend transition (GitHub #146: fans observed
+            // stuck at max through lid-close, followed by a BIOS thermal shutdown while the
+            // laptop sat in a closed bag).
             try
             {
-                if (FanWritesAvailable)
-                {
-                    RestoreAutoControlSerialized();
-                }
+                _fanController.StopCountdownExtension();
+            }
+            catch (Exception ex)
+            {
+                _logging.Warn($"Failed to stop fan countdown extension during suspend: {ex.Message}");
+            }
 
-                _logging.Info("System suspend detected — fan engine paused and BIOS auto fan control restored");
+            try
+            {
+                var restored = FanWritesAvailable && RestoreAutoControlSerialized();
+                _logging.Info(restored
+                    ? "System suspend detected — fan engine paused and BIOS auto fan control restored"
+                    : "System suspend detected — fan engine paused (BIOS auto fan control restore was not available or did not succeed; Max-mode keepalive has been stopped regardless)");
             }
             catch (Exception ex)
             {

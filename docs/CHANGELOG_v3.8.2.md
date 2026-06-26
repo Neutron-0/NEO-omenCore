@@ -42,6 +42,35 @@ v3.8.2 exists solely to fix a critical regression reported within hours of the v
 - The original reporter has not yet confirmed v3.8.2 resolves the hang on their `8BCD` hardware. Do not mark this "Fixed" in the public sense until they confirm — see Release Conditions below.
 - This fix addresses the protocol-desync/hang mechanism; it does not change the deeper question of *why* the worker sometimes responds slowly on this model (driver contention, etc.). If slow responses continue, they should now degrade gracefully (timeout + clean reconnect) instead of cascading into a hang.
 
+### Critical (Safety): Fans Stuck At Max Independent Of Temperature; Lid-Close Failed To Suspend, Followed By A BIOS Thermal Shutdown (BUG-3820-004)
+
+**Reported by:** nsilveri ([GitHub #146](https://github.com/theantipopau/omencore/issues/146)), 2026-06-25. OMEN Laptop 15-en1xxx, ProductId `88D2`, AMD Ryzen 7 5800H + NVIDIA RTX 3070 hybrid GPU, v3.8.0. Fans were observed stuck at maximum speed independent of temperature; the reporter closed the lid to trigger standby, the laptop did not actually enter low-power standby (fans kept running, screen stayed black), and was later found powered on with a BIOS message reporting a shutdown due to overheating — while sitting closed inside a backpack.
+
+**Root cause:** `WmiFanController`'s Max-mode keepalive/reassertion timer (`CountdownExtensionCallback`) runs on its own independent `System.Threading.Timer`, separate from `FanService`'s monitor loop, with no suspend awareness of its own:
+
+- It was only stopped as a side effect reached partway through a *successful* `RestoreAutoControl()` call. `RestoreAutoControl()` had an early `if (!IsAvailable) return false;` guard *before* that point — any transient WMI unavailability (plausible during a suspend transition) skipped stopping the timer entirely.
+- `FanService.HandleSystemSuspend()` only attempted the restore `if (FanWritesAvailable)` and silently discarded the result either way, so a failed or skipped restore during suspend left the keepalive timer running with no further attempt to stop it — while the rest of the system correctly proceeded to suspend.
+- Net effect: if Max mode was active at lid-close and the BIOS auto-control restore failed or was skipped for any reason during the brief suspend transition window, the timer kept reasserting Max fan mode via WMI every ~8 seconds for as long as the process had threads scheduled, directly matching "fans remained at full speed" through lid-close — periodic background hardware I/O of exactly the kind that can interfere with a clean Modern Standby/S0ix transition.
+
+**Fix:**
+- `IFanController.StopCountdownExtension()` added as a default no-op interface method, overridden in `WmiFanControllerWrapper` to delegate to the real timer.
+- `WmiFanController.RestoreAutoControl()` now stops the countdown timer unconditionally, first, before the `IsAvailable` check and before any reset-sequence logic — closing the gap for every caller (manual "switch to Auto," preset switching, suspend handling), not just suspend.
+- `FanService.HandleSystemSuspend()` additionally calls `StopCountdownExtension()` directly and unconditionally (defense in depth for the case where fan writes are unavailable entirely and `RestoreAutoControl()` is never invoked), and now correctly logs whether the BIOS auto-control restore actually succeeded instead of unconditionally claiming success regardless of outcome.
+
+**Scope discipline — what this does NOT change:** No fan curve, thermal-protection threshold, or EC-write gating logic was touched while the system is awake. The change is scoped entirely to suspend-time and restore-to-auto behavior, and strictly *reduces* background WMI write activity during those transitions rather than adding any.
+
+**Investigated but deliberately not fixed in this patch:** the reporter also described the displayed "GPU temperature" as ambiguous and consistently higher than CPU temperature even with the dGPU confirmed idle. Code review found the root cause — `WmiBiosMonitor` unconditionally prefers the NVIDIA dGPU's NVAPI die-temperature reading over the WMI BIOS's own GPU reading whenever NVAPI is available, regardless of which GPU is actually active, and that value feeds fan-curve evaluation via `Math.Max(cpuTemp, gpuTemp)`. A correct fix needs a reliable "is the dGPU actually active" signal wired into the monitoring loop without regressing temperature accuracy on the majority of models where the NVIDIA dGPU genuinely is the active GPU — broader and riskier than this patch's evidence (a single report) justifies. See `BUG-3820-004` in [3.8.1-BUG-REPORTS.md](3.8.1-BUG-REPORTS.md) for the full writeup.
+
+**Verification performed in this environment (not OMEN hardware):**
+- Added `FanServiceSuspendTests.cs` (5 new tests) proving the keepalive timer is stopped on suspend in every failure mode: restore succeeds, restore returns `false`, restore throws, fan writes unavailable entirely, and a failure stopping the timer itself is caught rather than bubbling up.
+- Full Release build: 0 errors, 0 warnings.
+- Full Release test suite: 895/895 passed (see Current Validation Status below for the post-#146 count).
+
+**Not yet done / explicitly still open:**
+- The reporter has not yet confirmed v3.8.2 resolves the stuck-fan/failed-standby behavior on their physical `88D2` hardware.
+- The GPU-temperature-source root cause remains unfixed pending a second corroborating report (ideally with the full diagnostics zip, not just the session log).
+- Per explicit instruction, this fix was **not** rolled into a new installer/portable build for this round — see Current Validation Status.
+
 ## Minor Improvements (Code-Quality / Reliability Polish)
 
 These are small, hardware-independent cleanups verified by build + the full test suite. They do **not** touch any fan/thermal/EC control path and carry no behavior risk; they ride along with the hotfix because they are zero-risk and thematically aligned with its telemetry-reliability/diagnosability focus.
@@ -69,15 +98,15 @@ These items were already pending hardware validation in v3.8.1 and are out of sc
 
 ## Current Validation Status
 
-- `dotnet build OmenCoreApp.Tests.csproj -c Release`: passed, 0 errors.
-- `dotnet test OmenCoreApp.Tests.csproj -c Release`: passed, 895/895.
-- `dotnet build OmenCoreApp.csproj -c Release`: passed, 0 errors.
-- Smoke launch of the built `OmenCore.exe` on this (non-OMEN) dev machine: ran 18+ seconds responsive, clean exit, no exceptions logged.
+- `dotnet build OmenCoreApp.csproj -c Release`: passed, 0 errors, 0 warnings.
+- `dotnet test OmenCoreApp.Tests.csproj -c Release`: passed, 900/900 (895 from the BUG-3820-001 hang fix and minor improvements, plus 5 new `FanServiceSuspendTests` added for BUG-3820-004).
+- Smoke launch of the built `OmenCore.exe` on this (non-OMEN) dev machine: ran 18+ seconds responsive, clean exit, no exceptions logged. (Pre-dates the BUG-3820-004 fix; see artifact note below.)
 - Version metadata bumped to `3.8.2` across `VERSION.txt`, `OmenCoreApp`, `OmenCore.Avalonia`, `OmenCore.Linux`, `OmenCore.HardwareWorker` project files, the installer script (`OmenCoreInstaller.iss`), the wizard-image generator default, and the Avalonia version fallback string.
-- Windows artifacts built successfully with `build-installer.ps1`: `OmenCoreSetup-3.8.2.exe` and `OmenCore-3.8.2-win-x64.zip`.
-- Linux artifact built successfully with `build-linux-package.ps1 -SkipBinaryVersionCheck`: `OmenCore-3.8.2-linux-x64.zip`, `.sha256`, and `version.json`. Binary execution smoke was skipped because this run was on Windows, not Linux/WSL (`binaryExecutionSkipped: true` in the verification manifest) — per the release gate, that smoke test and all physical hardware acceptance criteria above remain pending before tagging `v3.8.2`.
-- Artifact SHA256 (also recorded in `artifacts/SHA256SUMS-3.8.2.txt`):
-  - `F6FEAB2DDB13E1E70470C7665A414F41E219A96E56E35F0C43C9AB3F595EA86E  OmenCoreSetup-3.8.2.exe`
-  - `A61D81D36CFF0839A9E74DCC5C31337318BA258A5F43C5F4C2E9AC5BF6D2E895  OmenCore-3.8.2-win-x64.zip`
-  - `B37C02B0FDA17743A95094685D8EDAD182EAB50FF98BA0711093B166FDCB2EBC  OmenCore-3.8.2-linux-x64.zip`
-- No claim is made that this fix has been validated on physical OMEN hardware; this development environment is not HP hardware. The reporter's confirmation is the actual acceptance criterion for BUG-3820-001.
+- **Artifact note — important:** the Windows/Linux artifacts and SHA256 hashes below were built *before* the BUG-3820-004 fix (fans-stuck-at-max / failed-standby / BIOS thermal shutdown) was implemented. Per explicit instruction, installers were **not** rebuilt after that fix while still waiting on pre-release feedback for the BUG-3820-001 hang fix — the source code on this branch is ahead of these binaries. Do not publish these specific artifacts as containing the BUG-3820-004 fix; they must be rebuilt before any tag/release that is meant to include it.
+  - Windows artifacts built with `build-installer.ps1`: `OmenCoreSetup-3.8.2.exe` and `OmenCore-3.8.2-win-x64.zip`.
+  - Linux artifact built with `build-linux-package.ps1 -SkipBinaryVersionCheck`: `OmenCore-3.8.2-linux-x64.zip`, `.sha256`, and `version.json`. Binary execution smoke was skipped because this run was on Windows, not Linux/WSL (`binaryExecutionSkipped: true` in the verification manifest).
+  - Artifact SHA256 (also recorded in `artifacts/SHA256SUMS-3.8.2.txt`):
+    - `F6FEAB2DDB13E1E70470C7665A414F41E219A96E56E35F0C43C9AB3F595EA86E  OmenCoreSetup-3.8.2.exe`
+    - `A61D81D36CFF0839A9E74DCC5C31337318BA258A5F43C5F4C2E9AC5BF6D2E895  OmenCore-3.8.2-win-x64.zip`
+    - `B37C02B0FDA17743A95094685D8EDAD182EAB50FF98BA0711093B166FDCB2EBC  OmenCore-3.8.2-linux-x64.zip`
+- No claim is made that either fix has been validated on physical OMEN hardware; this development environment is not HP hardware. Reporter confirmation is the actual acceptance criterion for both BUG-3820-001 and BUG-3820-004.

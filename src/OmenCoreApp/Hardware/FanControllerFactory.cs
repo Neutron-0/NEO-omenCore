@@ -22,6 +22,14 @@ namespace OmenCore.Hardware
         /// </summary>
         bool IsHoldActive => false;
 
+        /// <summary>
+        /// Stop any backend-owned keepalive/Max-mode reassertion timer immediately.
+        /// Backends without such a timer (OGH, EC, fallback) get this safe no-op by default.
+        /// Callers (notably suspend handling) must be able to silence proactive fan writes
+        /// unconditionally, without depending on a separate restore-auto-control call succeeding.
+        /// </summary>
+        void StopCountdownExtension() { }
+
         bool ApplyPreset(FanPreset preset);
         bool ApplyCustomCurve(IEnumerable<FanCurvePoint> curve);
         bool SetFanSpeed(int percent);
@@ -769,6 +777,7 @@ namespace OmenCore.Hardware
         public string Status => _controller.Status;
         public string Backend => "WMI BIOS";
         public bool IsHoldActive => _controller.CountdownExtensionEnabled;
+        public void StopCountdownExtension() => _controller.StopCountdownExtension();
         
         /// <summary>
         /// Check if WMI commands are ineffective on this model.

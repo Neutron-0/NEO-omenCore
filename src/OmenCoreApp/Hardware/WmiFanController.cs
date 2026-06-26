@@ -899,6 +899,25 @@ namespace OmenCore.Hardware
         /// </summary>
         public bool RestoreAutoControl()
         {
+            // Stop the Max-mode keepalive/reassertion timer unconditionally and first, before
+            // anything below can short-circuit or throw. This timer is a pure in-memory
+            // System.Threading.Timer with no WMI/hardware I/O of its own, so stopping it here
+            // is always safe regardless of IsAvailable or what happens later in this method.
+            // Previously this only happened as a side effect reached partway through a
+            // successful reset sequence below — so the early "!IsAvailable" return just above
+            // (transient WMI unavailability is plausible, not just a hard failure) skipped it
+            // entirely, and any exception from ResetFromMaxMode() would have too. That gap is
+            // the suspected root cause of GitHub #146: fans observed stuck at max speed during
+            // ordinary use (not just suspend), independent of actual temperature.
+            try
+            {
+                StopCountdownExtension();
+            }
+            catch (Exception ex)
+            {
+                _logging?.Warn($"Failed to stop fan countdown extension while restoring auto control: {ex.Message}");
+            }
+
             if (!IsAvailable)
             {
                 return false;
@@ -927,8 +946,8 @@ namespace OmenCore.Hardware
                     _logging?.Debug("Skipping reset sequence (already in automatic mode)");
                 }
 
-                // Stop countdown extension so we don't keep re-applying fan settings
-                StopCountdownExtension();
+                // Countdown extension was already stopped unconditionally at the top of this
+                // method (see comment above); no need to repeat it here.
 
                 // Clear debounce window — we do NOT want to filter RPM reads during this
                 // transition; the reset sequence already ensures a clean state.
