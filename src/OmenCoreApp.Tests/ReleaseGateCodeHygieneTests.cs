@@ -130,7 +130,7 @@ namespace OmenCoreApp.Tests
             "RgbManager.cs:164",
             "RgbManager.cs:186",
             "RgbManager.cs:208",
-            "StorageOptimizer.cs:147",
+            "StorageOptimizer.cs:148", // shifted from :147 by an added `using` line; pre-existing bare catch in DetectSSD(), not introduced by the last-access-timestamp verification fix
         };
         // Resolve src/OmenCoreApp relative to the test assembly's output directory.
         // The test binary sits at src/OmenCoreApp.Tests/bin/<cfg>/<tfm>/

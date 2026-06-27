@@ -7,6 +7,7 @@ using System.Management;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using Microsoft.Win32;
+using OmenCore.Services.SystemOptimizer;
 
 namespace OmenCore.Services.SystemOptimizer.Optimizations
 {
@@ -499,9 +500,6 @@ namespace OmenCore.Services.SystemOptimizer.Optimizations
             try
             {
                 // Read the registry directly rather than parsing `fsutil behavior query` text output.
-                // `fsutil behavior set disablelastaccess <0-3>` stores the mode in the low 2 bits and
-                // ORs in 0x80000000 to mark it explicitly configured, so the stored DWORD after a
-                // successful "disable" apply is 0x80000001, not 1 - mask off the explicit-flag bit.
                 using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\FileSystem");
                 var value = key?.GetValue("NtfsDisableLastAccessUpdate");
                 if (value == null)
@@ -509,8 +507,7 @@ namespace OmenCore.Services.SystemOptimizer.Optimizations
                     return false;
                 }
 
-                var mode = (int)value & 0x3;
-                return mode == 1 || mode == 2; // 1=disabled, 2=system-managed disabled
+                return NtfsBehaviorFlags.IsLastAccessDisabled((int)value);
             }
             catch
             {

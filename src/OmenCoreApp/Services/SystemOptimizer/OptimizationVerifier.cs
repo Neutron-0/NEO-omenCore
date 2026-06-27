@@ -426,12 +426,7 @@ namespace OmenCore.Services.SystemOptimizer
                     return false;
                 }
 
-                // `fsutil behavior set disablelastaccess <0-3>` stores the mode in the low 2 bits
-                // and ORs in 0x80000000 to mark it as explicitly configured (vs. system default).
-                // Comparing the raw DWORD to 1 misses the explicitly-set case (0x80000001), which is
-                // exactly what fsutil writes - so this always reported "disabled" as false even right
-                // after a successful apply. Mask off the explicit-flag bit before comparing.
-                return ((int)value & 0x3) == 1;
+                return NtfsBehaviorFlags.IsLastAccessDisabled((int)value);
             }
             catch
             {
