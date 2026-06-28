@@ -6,7 +6,7 @@
 
 ### Lightweight local control for HP OMEN and Victus gaming laptops
 
-[![Version](https://img.shields.io/badge/version-3.8.1-red.svg?style=for-the-badge)](docs/CHANGELOG_v3.8.1.md)
+[![Version](https://img.shields.io/badge/version-3.8.2-red.svg?style=for-the-badge)](docs/CHANGELOG_v3.8.2.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg?style=for-the-badge)](https://dotnet.microsoft.com/download/dotnet/8.0)
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/9WhJdabGk8)
