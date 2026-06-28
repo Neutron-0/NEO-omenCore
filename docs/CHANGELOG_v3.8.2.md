@@ -133,7 +133,7 @@ These items were already pending hardware validation in v3.8.1 and are out of sc
 - GitHub #141 (OMEN 16-ap0xxx key routing / shipped-artifact provenance) — needs physical `8D26` key-event capture.
 - GitHub #142 (HyperX OMEN MAX 16 `8E9A` identity) — needs full diagnostic evidence before any exact-identity entry is added.
 - GitHub #143 (Victus 15 `8DCD` fan/thermal regression) — needs a bounded, abortable physical load test.
-- BUG-3810-005 (Discord fan-spike-at-idle reports) — diagnostics-only change shipped in 3.8.1; needs an affected user's diagnostic export before any activation-timing change is considered.
+- BUG-3810-005 (Discord fan-spike-at-idle reports) — diagnostics-only change shipped in 3.8.1. A first full session log (OMEN Transcend 14 `8E41`, 2026-06-27) was reviewed during this v3.8.2 cycle: the activation-to-release timeline shows a sustained multi-second decay under active max-fan cooling, not an instant single-sample bounce, which leans toward real (if brief) thermal excursions rather than a sensor glitch. No activation-timing change was made — see the full write-up in [3.8.1-BUG-REPORTS.md](3.8.1-BUG-REPORTS.md). Still needs diagnostics-zip-level raw per-poll evidence before any behavior change is considered.
 - PERF-3810-001 resource/responsiveness scenario matrix — needs physical OMEN/Victus hardware to measure against budget.
 - AMD GPU OC startup-restore — still manual-only by design; not revisited in this patch.
 
@@ -146,6 +146,7 @@ These items were already pending hardware validation in v3.8.1 and are out of sc
 ## Current Validation Status
 
 - `dotnet build OmenCoreApp.csproj -c Release`: passed, 0 errors, 0 warnings.
+- All 5 projects in `OmenCore.sln` (`OmenCoreApp`, `OmenCoreApp.Tests`, `OmenCore.HardwareWorker`, `OmenCore.Linux`, `OmenCore.Avalonia`) build clean in Release with 0 warnings as of this patch — the last 2 remaining `CS1998` warnings (test-only, no behavior change) were cleared alongside the `FanService.MonitorLoop` fix above.
 - `dotnet test OmenCoreApp.Tests.csproj -c Release`: passed, 911/911 (895 from the BUG-3820-001 hang fix and minor improvements, plus 5 new `FanServiceSuspendTests` for BUG-3820-004, plus 11 new tests added afterward for `PowerAutomationServiceApplyCurrentProfileTests`/`NtfsBehaviorFlagsTests` covering the two BUG-3820-005 fixes. The diagnostics-export wiring fix for #145 added no new tests of its own).
 - Smoke launch of the built `OmenCore.exe` on this (non-OMEN) dev machine: ran 18+ seconds responsive, clean exit, no exceptions logged. (Pre-dates the BUG-3820-004 fix and everything after it; see artifact note below.)
 - Version metadata bumped to `3.8.2` across `VERSION.txt`, `OmenCoreApp`, `OmenCore.Avalonia`, `OmenCore.Linux`, `OmenCore.HardwareWorker` project files, the installer script (`OmenCoreInstaller.iss`), the wizard-image generator default, and the Avalonia version fallback string.
