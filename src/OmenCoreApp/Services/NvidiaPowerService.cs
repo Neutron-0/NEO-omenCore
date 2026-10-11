@@ -73,6 +73,14 @@ namespace OmenCore.Services
             return write();
         }
 
+        /// <summary>
+        /// The HP mode byte that means "Performance" depends on the firmware's thermal policy: V0 firmware uses the legacy
+        /// value (0x01), V1 and newer use 0x31 (the same value the rest of OmenCore sends on those boards). 4.4.5 always sent
+        /// the legacy value, inherited from the Prophecy fork; bobshmo's standalone 1.2.0 switched to choosing by policy.
+        /// </summary>
+        internal static HpWmiBios.FanMode HpPerformanceModeFor(HpWmiBios.ThermalPolicyVersion policy) =>
+            policy == HpWmiBios.ThermalPolicyVersion.V0 ? HpWmiBios.FanMode.LegacyPerformance : HpWmiBios.FanMode.Performance;
+
         private IDisposable BeforeCurrentPower()
         {
             if (!_isVictus.Value) return NoLease.Instance;
@@ -92,8 +100,9 @@ namespace OmenCore.Services
                 using var hp = new HpWmiBios(_logging);
                 if (!hp.IsAvailable)
                     throw new InvalidOperationException("HP WMI is unavailable (" + hp.Status + "). CURRENT was not sent.");
-                if (!hp.SetFanMode(HpWmiBios.FanMode.LegacyPerformance))
-                    throw new InvalidOperationException("HP performance mode was refused. CURRENT was not sent.");
+                var hpMode = HpPerformanceModeFor(hp.ThermalPolicy);
+                if (!hp.SetFanMode(hpMode))
+                    throw new InvalidOperationException($"HP performance mode ({hpMode}) was refused. CURRENT was not sent.");
 
                 // Changing the HP mode can drop Max; give it back through the fan service (which owns its release).
                 if (maxPreset != null && (!_fans!.ApplyPreset(maxPreset, immediate: true) || hp.GetFanMax() != true))
