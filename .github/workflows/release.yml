@@ -13,10 +13,10 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
 
@@ -54,7 +54,7 @@ jobs:
           }
 
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-artifacts
           path: |
@@ -67,10 +67,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
 
@@ -99,7 +99,7 @@ jobs:
           fi
 
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-artifacts
           path: |
@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Read VERSION
         id: version
@@ -126,13 +126,13 @@ jobs:
           echo "value=$version" >> "$GITHUB_OUTPUT"
 
       - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-artifacts
           path: artifacts
 
       - name: Download Linux artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux-artifacts
           path: artifacts
@@ -154,8 +154,46 @@ jobs:
           echo "win_setup=$win_setup_hash" >> "$GITHUB_OUTPUT"
           echo "linux_zip=$linux_zip_hash" >> "$GITHUB_OUTPUT"
 
+      - name: Write release notes
+        # The template, then this version's changelog (CRLF removed, title and roadmap line dropped), then the SHA256
+        # table the updater reads. The changelog is skipped if the repo has none for this version.
+        id: notes
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.value }}"
+          notes="$RUNNER_TEMP/release-notes.md"
+          cat > "$notes" <<'NOTES'
+          ## OmenCore ${{ github.ref_name }}
+
+          ### Downloads
+          - **Windows Installer**: `OmenCoreSetup-${{ steps.version.outputs.value }}.exe` (recommended)
+          - **Windows Portable**: `OmenCore-${{ steps.version.outputs.value }}-win-x64.zip`
+          - **Linux (CLI + Avalonia GUI)**: `OmenCore-${{ steps.version.outputs.value }}-linux-x64.zip`
+
+          ### System Requirements
+          - **Windows**: Windows 10/11 (x64), .NET 8 runtime is bundled in shipped artifacts
+          - **Linux**: x64, kernel modules: `ec_sys` (write_support=1), `hp-wmi`
+          - HP OMEN or Victus gaming laptop
+
+          NOTES
+          changelog="docs/CHANGELOG_v$version.md"
+          if [ -f "$changelog" ]; then
+            echo "## What's new in $version" >> "$notes"
+            echo >> "$notes"
+            tr -d '\r' < "$changelog" | tail -n +2 | grep -v '^\*\*Roadmap:\*\*' | sed '/./,$!d' >> "$notes"
+            echo >> "$notes"
+          fi
+          cat >> "$notes" <<'NOTES'
+          ### SHA256 (computed by this workflow from the exact files attached above)
+          | Artifact | SHA256 |
+          |---|---|
+          | `OmenCoreSetup-${{ steps.version.outputs.value }}.exe` | `${{ steps.hashes.outputs.win_setup }}` |
+          | `OmenCore-${{ steps.version.outputs.value }}-win-x64.zip` | `${{ steps.hashes.outputs.win_zip }}` |
+          | `OmenCore-${{ steps.version.outputs.value }}-linux-x64.zip` | `${{ steps.hashes.outputs.linux_zip }}` |
+          NOTES
+
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             artifacts/OmenCore-${{ steps.version.outputs.value }}-win-x64.zip
@@ -164,24 +202,6 @@ jobs:
             artifacts/OmenCoreSetup-${{ steps.version.outputs.value }}.exe.sha256
             artifacts/OmenCore-${{ steps.version.outputs.value }}-linux-x64.zip
             artifacts/OmenCore-${{ steps.version.outputs.value }}-linux-x64.zip.sha256
-          body: |
-            ## OmenCore ${{ github.ref_name }}
-
-            ### Downloads
-            - **Windows Installer**: `OmenCoreSetup-${{ steps.version.outputs.value }}.exe` (recommended)
-            - **Windows Portable**: `OmenCore-${{ steps.version.outputs.value }}-win-x64.zip`
-            - **Linux (CLI + Avalonia GUI)**: `OmenCore-${{ steps.version.outputs.value }}-linux-x64.zip`
-
-            ### System Requirements
-            - **Windows**: Windows 10/11 (x64), .NET 8 runtime is bundled in shipped artifacts
-            - **Linux**: x64, kernel modules: `ec_sys` (write_support=1), `hp-wmi`
-            - HP OMEN or Victus gaming laptop
-
-            ### SHA256 (computed by this workflow from the exact files attached above)
-            | Artifact | SHA256 |
-            |---|---|
-            | `OmenCoreSetup-${{ steps.version.outputs.value }}.exe` | `${{ steps.hashes.outputs.win_setup }}` |
-            | `OmenCore-${{ steps.version.outputs.value }}-win-x64.zip` | `${{ steps.hashes.outputs.win_zip }}` |
-            | `OmenCore-${{ steps.version.outputs.value }}-linux-x64.zip` | `${{ steps.hashes.outputs.linux_zip }}` |
+          body_path: ${{ runner.temp }}/release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

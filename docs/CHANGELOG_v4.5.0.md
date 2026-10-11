@@ -15,6 +15,15 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
   V0 firmware keeps the legacy value. The write is still never sent if the preparation fails. Found by comparing with
   bobshmo's standalone Prophecy Power Unlocker 1.2.0. *Pending hardware confirmation.* Test: `NvidiaPowerServiceTests`.
 
+## Release and CI (no change to the shipped program)
+
+- **Release notes keep the changelog.** Release Build now writes the notes from the template, the version's changelog,
+  and the SHA256 table the updater reads, instead of overwriting them with the template alone.
+- **Linux QA tag job no longer creates a release.** It failed on every tag ("Resource not accessible by integration")
+  and would have raced Release Build over the same release body. Release Build is the only publisher now.
+- **CI actions moved off Node 20** (checkout, setup-dotnet, upload/download-artifact, softprops, Pages). Checked on
+  the first CI run after the change (*pending*); the tag path (Release Build) only runs on the next release tag.
+
 ## Contributors
 
 - **bobshmo**: the V0/V1+ performance-mode finding (standalone Prophecy Power Unlocker 1.2.0).

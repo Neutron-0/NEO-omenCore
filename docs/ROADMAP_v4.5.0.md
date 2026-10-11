@@ -86,6 +86,8 @@ export first; none of those are started without one.
 - Keep GPU load polling cheap (done in 4.4.5); look for the next per-poll cost in the same export.
 
 ### G. Release and project hygiene
+Status: the first three items below are done in the workflows (see `docs/CHANGELOG_v4.5.0.md`, "Release and CI"). The
+tag path is unverified until the next release tag.
 - **Linux QA workflow:** its tag job fails with "Resource not accessible by integration" on every tag because it lacks
   `contents: write`; the real release comes from Release Build, so it is only a red mark. Fix the permission or drop the job.
 - **Release notes:** the Release Build workflow overwrites the notes with its template (downloads and SHA256 table). Have

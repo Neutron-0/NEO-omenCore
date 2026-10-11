@@ -14,12 +14,12 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
     
     - name: Setup .NET 8
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: '8.0.x'
     
@@ -146,54 +146,28 @@ jobs:
         cat "${ARTIFACT_DIR}.checksums"
     
     - name: Upload Linux Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: linux-x64-cli
         path: dist/OmenCore-*-linux-x64.tar.gz
         retention-days: 30
     
     - name: Upload Checksums
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: linux-checksums
         path: dist/OmenCore-*-linux-x64.checksums
         retention-days: 30
     
-    - name: Create Release (on tag)
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          dist/OmenCore-*-linux-x64.tar.gz
-          dist/OmenCore-*-linux-x64.checksums
-        body: |
-          ## Linux Artifacts for ${{ github.ref_name }}
-          
-          ### Installation
-          ```bash
-          wget https://github.com/theantipopau/omencore/releases/download/${{ github.ref_name }}/OmenCore-*-linux-x64.tar.gz
-          wget https://github.com/theantipopau/omencore/releases/download/${{ github.ref_name }}/OmenCore-*-linux-x64.checksums
-          sha256sum -c OmenCore-*-linux-x64.checksums
-          tar -xzf OmenCore-*-linux-x64.tar.gz
-          sudo ./OmenCore-*/omencore-cli status
-          ```
-          
-          ### Testing Guide
-          See [LINUX_QA_TESTING.md](https://github.com/theantipopau/omencore/blob/main/docs/LINUX_QA_TESTING.md)
-        draft: false
-        prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   run-unit-tests:
     runs-on: ubuntu-latest
     name: Run Unit Tests
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     
     - name: Setup .NET 8
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: '8.0.x'
     
@@ -210,7 +184,7 @@ jobs:
     
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: test-results
         path: '**/*.trx'
@@ -220,10 +194,10 @@ jobs:
     name: Code Quality Checks
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     
     - name: Setup .NET 8
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: '8.0.x'
     
