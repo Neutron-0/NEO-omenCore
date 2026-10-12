@@ -15,16 +15,20 @@ corrected items from real reports, before adding more on top. What each one is w
 
 | Item | Waiting on | Who |
 |---|---|---|
-| 8BD4 single-zone keyboard (#212) | the RGB payload probe result (which numbered step, if any, lit it) | VoRtam4 |
+| 8BD4 single-zone keyboard (#212) | nothing: the probe result arrived 2026-10-12 and points at colour offset 1, see 3K.11. Next is a build to retest | VoRtam4 |
+| 88D1 OMEN 15-en1xxx (#228, new) | an entry from the export (3K.12), then Guided Fan Verification with the RGB check | korokhidup |
 | Factory fan curve, 8D87 (#189) | a real run in Performance mode vs firmware Auto, and the IR step-down guess checked | mbilykov |
-| 8E9F keyboard route (#224) | whether the Lighting page does anything on Darfon `0D62:30BF` | JeanHX5 |
+| 8E9F keyboard route (#224) | **Answered 2026-10-11:** the light bar works, the keyboard RGB does not. Next step is a 30BF probe, see 3K.5 | JeanHX5 |
 | 8E9A board and keyboard route (#142) | Lighting page result and the keyboard's HID ids | Keith1341 |
-| 8A13 board, MUX (#225) | enabling MUX in a build, then a reversible test | Dsedan15 |
-| 8E35 latency and SMU table (#222) | confirmation of the faster response; a PM-table dump for the 8940HX | reporter |
+| 8A13 board, MUX (#225) | enabling MUX in a build, then a reversible test. Guided Fan Verification passed 6/6 (82/100) on 4.4.5, so the entry can be promoted, see 3K.6 | Dsedan15 |
+| 8E35 latency and SMU table (#222) | confirmation of the faster response; a PM-table dump for the 8940HX. The three files posted on 2026-10-11 are `config.json` copies (two are byte-identical), not diagnostics exports, so the SMU table and the stuck-fan state are still missing, see 3K.4 | nyn1fe |
 | 8DD0 temperature source (#221) | an answer to what looks wrong (ACPI zone vs Tctl) | reporter |
 | NVIDIA power unlock | the first run through OmenCore on a real laptop (start with a Victus) | timmyy123, bobshmo, testers |
 | Updater relaunch | one real update from 4.4.5 to the next release | any |
 | Auto-hidden taskbar fix | a machine with the taskbar set to auto-hide | any |
+| 8BC2 board entry (#227, new) | export received 2026-10-12; build the entry, then the reporter's Lighting and fan result, see 3K.2 | ZycoJiun |
+| 8BD4 second owner (#226, new) | a log taken at the moment the fans "max at 70 and stick"; the calibration findings are already in, see 3K.1 | WilliamMillerDave |
+| Transcend 14 random hibernate (Discord, new) | version, a diagnostics export, and the Windows power events around a hibernate, see 3K.8 | BluSleeperOP |
 
 ## 2. Already on main for the next release
 
@@ -56,8 +60,8 @@ export first; none of those are started without one.
   that has stalled, or a test rig.
 
 ### B. RGB
-- 8BD4 (#212): build the fix from the probe result (data). If none of the five layouts lights it, try a different
-  command, not more layouts.
+- 8BD4 (#212): the probe result is in (3K.11): step 2, colour directly after the count byte, is the one that lights it. Build the
+  single-zone payload from that (WP-14), also for 8BC2, and retest on the 8BD4 owner before calling it confirmed.
 - Validate the Darfon `0D62:30BF` route on 8E9F and 8E9A; if it works, mark the PID verified in `DojoKeyboardMcu`.
 - Linux per-key RGB for the 2025 MAX boards (#179, #151, #87): port the Dojo backend to hidraw from the Windows code and
   mbilykov's write-up. Only worth doing with a named tester (mbilykov offered).
@@ -68,7 +72,7 @@ export first; none of those are started without one.
 - Read-only **HP WMI scan** (thermal policy, Extreme/Unleashed support flags) as a diagnostics line. Lowest-risk idea
   from bobshmo's 1.2.0.
 - **PCF Max** (HP-side power cap): evaluate after the scan, behind the same opt-in and safety checks as MAX/CURRENT.
-  Only with an owner willing to test; HP caps are exactly where firmware surprises live.
+  Only with an owner willing to test; HP caps are exactly where firmware surprises live. Discord findings on this are in 3K.7.
 - MUX test for 8A13 (#225): enable it in a build and post the exact steps; reversible from OmenCore or the BIOS.
 - 8D87 EC GPU power unlock stays off until an owner can validate the EC writes.
 - Extend the same read-only scan to HP's CPU+GPU power budget (`0x29`), GPU power (`0x22`) and graphics mode (`0x52`).
@@ -90,7 +94,8 @@ export first; none of those are started without one.
 
 ### E. Sensors and temperature authority
 - Per-board CPU temperature source (#221): AMD boards where the ACPI zone lags (8DD0 showed 56 C against Tctl 71-93 C).
-  Needs the reporter's HWiNFO comparison before changing the default for every AMD board (data).
+  Needs the reporter's HWiNFO comparison before changing the default for every AMD board (data). A second board shows the same
+  freeze flag (#228, 88D1: CPU "frozen" at 47 C for 22 readings, GPU at 45 C for 74 readings; see 3K.12).
 - Record which boards' BIOS CPU index (`0x23` index 1) is not the CPU (8E9A reads a constant ~28 C; it fits the Ambient
   index from #189) and prefer the worker sensor there. The OMEN MAX model override already does.
 
@@ -139,10 +144,199 @@ tag path is unverified until the next release tag.
   cut overhead, so this must not undo it), and make sure the overlay never takes clicks (Ohman's 1.3.0 notes list a fix for exactly that).
 - **"Firmware holds the fans" label** (Ohman 1.3.1). Say "firmware is holding fans on its own curve" instead of showing a
   curve as active. `FanService` already detects the stuck-high case; this changes the wording only.
+- **TPP calibration scan (bobshmo's Prophecy Power Unlocker 1.2.2): not planned for 4.5.0.** It targets laptops that do not advertise
+  default and maximum TPP bounds (the Barcik82 case in K.7). It tests every whole-watt target in a chosen interval (default 100 to
+  180 W) by applying it to HP's PCF controller and checking the readback, then restores the original snapshot. That is a write loop on
+  the firmware side, its own notes say no live calibration has been run, and it does not prove electrical or thermal safety. OmenCore
+  keeps PCF and TPP read only until an owner has validated single writes (3C). Revisit only after that, behind the same opt-in as
+  MAX and CURRENT, and never from the panel without a confirmation that names the interval.
 - **Power gain, CPU+GPU budget `0x29`** (Ohman: 0 to +15 W on the Dynamic Boost budget). Not started. Only after the read-only
   scan has a captured response from a board we can test.
 
-### J. Research log
+### K. Field evidence from the 4.4.5 reports (2026-10-11 and 12)
+Everything below was read from the attachments (exports, logs, screenshots) unless it says otherwise. *Confirmed* means seen
+in the evidence; every fix is still *to do* and needs a test.
+
+**K.1 Calibration wizard on level-only boards, and "stuck at 2000 RPM" (#226, board 8BD4; also #227, 8BC2)**
+- Evidence: on the 8BD4 the RPM source is **Estimated** (the log says "Fan RPM readback returned null"). Every RPM the wizard
+  shows is the fan *level* read back times 100. The CPU fan reads back level 20 for every step from 20% to 100%, and the
+  100% step "passes" at 2000 RPM. The GPU fan reads back 25 to 29 when asked for 33 and 44 (60% and 80%, both "fail") and
+  only the 100% step, which uses Max, reaches 3090 (range 2800 to 5700). So "balanced fans stuck at 2000 RPM" is level 20
+  (the V1 hint level) turned into a number, not a measured speed.
+- Fix: (a) when the RPM source is Estimated, the wizard says it cannot measure RPM on this board and does not build a
+  duty-to-RPM map (or labels the map "level only"); (b) a stable, repeated, clamped readback below the request is a firmware
+  ceiling at any step, not only at 100% (`FanVerificationService` already does this at 100%: the 8BC2 log shows "settled at
+  firmware ceiling level 44/55"); (c) show "estimated" in the results table, as the main screen already does.
+- Answer for the reporter: the 2000 figure is an estimate. Say so in the #226 reply when this is fixed.
+
+**K.2 8BC2 gets its own board entry (#227, Victus 16-r0xxx Intel)**
+- Today it resolves by model name to the 8BBE entry ("Low" confidence in the export). Measured: i7-13700HX, RTX 4060, BIOS
+  F.31, thermal policy V1, **2 fans**, max fan level 55, level readback works (20/20), RPM readback null, keyboard topology
+  `OneZoneWithNumpad (0x04)`, ACPI zone `TZ00_0` frozen near 28 C while the CPU is at 82 to 96 C.
+- Entry: `ProductId = "8BC2"`, `SupportsRpmReadback = false` (8BBE does not set it, so the card says "Supported"), curves and
+  GPU boost off, `UserVerified = false`, Notes citing #227. Add a test.
+- Keyboard: no database match, so the V2 engine finds nothing and falls back to the V1 path. That path still declares **4**
+  zones in the colour table (`SetColorTable: ZoneCount=4` in the log) for a keyboard that reports one: the 4.4.1 zone-count fix
+  only reaches `WmiBiosBackend`. The reporter's saved config also holds an observation "Keyboard zones changed" (WMI BIOS,
+  `#00FF66`, 2026-08-10), so colour may already work here. Do not guess: add the keyboard entry and ask for a Lighting result.
+- Cross-check: Ohman's 1.1.1 notes list 8BC2 as verified for its basic controls (documentation only, not our evidence).
+- Confirmed safe behaviour: thermal protection fired at 92 C and 96 C ("forcing fans to 100%") and released at 70 to 76 C.
+
+**K.3 The capability card contradicts the live probes (8BD4 and 8BC2 screenshots)**
+- 8BD4 shows "Real fan RPM readback: Supported" and "4-zone keyboard RGB: Supported" while the log says RPM readback is null and
+  the keyboard topology is one zone. 8BC2 shows "Real fan RPM readback: Supported" and "Power limit (PL1/PL2): Supported" while
+  the log says RPM is null and the PL1/PL2 MSR read returned 0 W / 0 W; it also shows "Custom fan curves: Not supported" next
+  to "Independent CPU/GPU fan curves: Supported".
+- Fix: where a live probe disagrees with the database, the card shows the probe ("Estimated", "not readable on this board"),
+  and the database default for `SupportsRpmReadback` stops being true for boards whose export shows null. Test per case.
+
+**K.4 Watchdog failsafe can hold fans high for minutes (#222, board 8E35) (hypothesis from code, not yet confirmed)**
+- The reporter's three "exports" are config files, so the stuck state itself is not captured. What the code does:
+  `HardwareWatchdogService` sets fans to 90% when monitoring looks frozen and releases only after readings stay at or below
+  `FailsafeSafeReleaseTempC` (65 C) for 15 s, re-asserting every 15 s. A CPU that settles at 66 to 75 C after a spike (the
+  reporter switched Windows boost to "Efficient Enabled") never reaches that, and changing a preset clears the failsafe, which
+  matches "it recovered when I tweaked the fan settings".
+- Needed first: a real diagnostics export taken while stuck, and the `WATCHDOG` lines from the log. If they show the failsafe,
+  release when readings are fresh and below the thermal-protection ramp (90 C) minus a margin for 15 s, since `FanService`'s own
+  protection covers anything hotter. Also find why monitoring went stale for more than 90 s twice.
+- Separate, same reporter: UI stutter (about 3 FPS) when scrolling or dragging curve points. Direct EC would not change that, it
+  is UI-thread work. Ask for the `runtime-performance.txt` from a real export; profile the curve editor's drag path (see F).
+
+**K.5 8E9F keyboard (#224)**
+- Result: the light bar works, the keyboard RGB does not. The Dojo route to Darfon `0D62:30BF` is therefore not enough as it
+  stands. Mark the route "tried, no effect" in the keyboard database notes, keep the light bar, and write a 30BF probe in the
+  style of the 8BD4 RGB payload probe (one change per step, each logged) before touching the route again. Evidence needed from
+  JeanHX5: which numbered step, if any, moves the keys.
+- The same comment asks for fan curves in percent instead of RPM. OmenCore's curves are already percent based; they are off on
+  this board because RPM cannot be verified. Candidate: allow level-based curves where level readback verifies, labelled
+  "estimated". Needs an owner willing to run it.
+- The screenshot shows the SMU line "this CPU's SMU power table layout has not been identified". Add the 8E9F's CPU to the PM-table
+  list in 3D and ask for `tools/SmuProbe --pmtable` output, as the message itself says.
+
+**K.6 Smaller items**
+- 8A13 (#225): Guided Fan Verification passed 6/6 on 4.4.5 (82/100, RPM estimated) and the RGB pattern visibly changed the
+  keyboard. Promote the fan and RGB flags in the entry, keep MUX off. The final "white" shows as pink, so ask for a photo; it may
+  need a per-board colour balance.
+- Guided Fan Verification on a hot machine (8BC2, CPU 96 C at under 30% load): the thermal emergency fired during the CPU 60% step
+  and the step then "failed". Mark such a step "interrupted by thermal protection" and re-run it after a cool-down, and wait for
+  temperatures below 85 C before starting.
+- #226 also reports fans "max at 70 C and stuck". Nothing in the posted logs shows it (OmenCore's protection runs at 90 and 95 C),
+  so it may be the BIOS curve. Unconfirmed: ask for a log taken at that moment.
+- #227 shows ThrottleStop detected (the existing conflict check) and a failed TCC-offset write (PawnIO MSR read fail). Not new.
+
+**K.7 NVIDIA power unlock: Discord findings (bobshmo, Barcik82; 2026-10-11 and 12)**
+All of this is single-laptop evidence from bobshmo's own machine unless stated. None of it is confirmed through OmenCore.
+- **Out-of-range values reset the plan.** In his 1.2.0, PCF Max is a Max/Default toggle locked to the detected GPU's range;
+  setting a value below the stock default or above NVIDIA's stock max made the power plan fall back to Balanced with cTGP and
+  PPAB off. Check that the panel's MAX and CURRENT inputs are clamped to the same range (stock default to NVIDIA stock max),
+  refuse anything outside it before any write, and add a test.
+- **TPP (Total Platform Power)** appears in his Victus tab: stock 125 W combined, max 180 W on his machine. His finding: the
+  unlock does not hold unless TPP is above the requested power state; once TPP allows it, PCF can be raised and the unlock works.
+  Add TPP, if it can be read, to the read-only HP WMI scan in 3C and to the panel's status text. It may be the same budget as
+  Ohman's `0x29`; that is unverified. Read only until an owner has tested a write.
+- **"If CURRENT won't stick, re-toggle the HP state and unlock."** Put that in the panel's help text. The Victus guard already
+  sets the HP performance mode before a CURRENT write, so check whether a re-toggle adds anything.
+- **Barcik82 (not a Victus, stock 115 W, the tool expected 140 W):** bobshmo's reading is that this laptop is locked like his was,
+  and that PPAB must not be disabled. Barcik82's measurement shows why: with PPAB off the GPU fell from 115 W to 90 to 100 W and
+  the CPU rose to 130 W boost and 90 W sustained, so the adapter is already the limit. The panel should say "do not disable PPAB"
+  and show the stock max it read next to the value it expected, so a mismatch like 115 W against 140 W is explained, not just an error.
+- **RTX 5050 is untested** (bobshmo). List it as untested in the GPU support text. After any NVIDIA driver release, the unlock
+  needs a re-check ("assuming HP or NVIDIA doesn't catch up"), and the panel should say a driver update may undo it.
+- Unchanged: his auto resolver ships NVFlashB. OmenCore still does not bundle it (licence unclear, see the *Will not do* list).
+
+**K.8 OMEN Transcend 14: random hibernate (Discord, BluSleeperOP; no export yet)**
+- The post says the app makes the laptop hibernate at random, that it runs much cooler than it used to, and that the laptop is
+  "still undetected as an official HP model". The Windows database has no entries for the Transcend 14 boards (8C58 for 2024, 8E41
+  for 2025); only the Linux code names them. So the detection complaint is expected, and the entries need an export.
+- Code check: OmenCore never calls a hibernate or sleep API. It does switch power plans (`PowerPlanService`, and the optimiser's
+  `powercfg /setactive`), pauses monitoring on suspend, and re-asserts fan state. Any link is therefore indirect and
+  *unconfirmed*: a plan switch with different sleep or hibernate timers, a Modern Standby wake loop that ends in hibernate, or fan
+  and thermal state on resume. Ohman's 1.2 notes mention a battery fan fix on the 2025 Transcend 14 (documentation only).
+- Needed: OmenCore version, a diagnostics export (it carries `resume-recovery.txt` and the session sentinel), and the Windows
+  evidence: Kernel-Power events 41 and 42 around the hibernate, `powercfg /sleepstudy`, and `powercfg /requests`.
+- Plan: add the 8C58 and 8E41 entries only from an export. Add the last Kernel-Power sleep and hibernate transitions, with their
+  reasons, to the diagnostics export, so the next report of this kind carries the cause.
+
+**K.9 Guided Fan Verification and the idle fan floor, on more boards (found in the full GitHub audit, 2026-10-12)**
+- **#207 (88F8), 4.4.1 retest: 5/6.** At 100% the CPU fan settles at level 43/55 (78%) after Max and the direct `SetFanLevel(55)`;
+  the GPU fan on the same run settles at 46/55 and passes as `FirmwareCeiling`. `FanVerificationService.IsFirmwareCeilingPlateau`
+  (line 885) needs 80% of the expected level, so the CPU fan fails by 2 points. Idea: judge a plateau against the best level
+  any fan reached in the same run (43 is 93% of 46), and keep the existing rule that a board whose Max never rose past the 60% step
+  still fails (88F8 had that before). Tests go in `FanVerificationCeilingTests`.
+- **#218 (878A), 4.4.1 retest: 1/6.** The 30% and 60% steps end in about 50 ms as "RPM=0 ... FAIL" because the per-fan write is
+  refused: `WMI fan control failed for fan 0, level 16` (and level 33, and fan 1). At 100% Max moves only the GPU fan (about 5200
+  estimated); the CPU fan reaches level 22 to 23. Ohman's 1.1 notes say its 878A fix was EC fan control through PawnIO
+  (documentation only), so an EC path for 878A and the sibling 878C is a candidate, with an owner test first. Keyboard: the
+  reporter sees a single bright-red backlight, which matches the "Normal" topology and the 4.4.1 backlight-only gating.
+- **#217 (88EE): 6/6 on 4.4.1 (68/100).** New question from the reporter: the fans never stop at idle (about 2000 RPM, original
+  OGH stopped them) and no preset changes it. #226 shows the same 2000 figure and #143 (8DCD) reports a fan that "drops below 2000
+  and stays". On V1 boards the RPM is the level times 100, so 2000 is level 20. OmenCore sends `SetFanLevel(20, 20)` as a "V1
+  krpm hint" when handing back from Performance or Max (`WmiFanController` around lines 526 to 538, 1164 to 1168 and 1224;
+  `HpWmiBios` line 1237). Hypothesis, *unconfirmed*: on boards whose firmware Auto would stop the fans, that hint may hold them
+  at level 20. Needs an owner who can hear or measure the fans after Restore Auto and after quitting OmenCore.
+- **#211 (8BBE), stuck fans: two exports from 2026-10-04 (4.4.1).** Telemetry shows about 5800 and 6100 estimated RPM at CPU 27.9 C
+  and 3% load while the reporter switched Balanced and Quiet; the log shows the keepalive re-asserting Cool every 30 s. The export
+  records no Max flag, fan mode or level readback ("LastMaxModeExternalResetDetails: No external Max-mode reset detected"), so the
+  cause is still open. Needs the export additions in WP-04.
+
+**K.10 Reporter threads waiting on something from us (maintainer-owned unless noted)**
+- #215 (88F7): RazrV33 agreed on 2026-10-03 to test undervolt; the maintainer offered a flagged test build (Test Apply auto-reverts
+  after 30 s). Not delivered yet.
+- #181 and #123 (8D41, RTX 5090/5080): waiting on the OGH A/B run (Run A without Gaming Hub, Run B after it set a profile, exports
+  named A and B). #123's Linux part is kernel-side (`platform_profile_victus_s_set_ec()`), so the reply points upstream.
+- #219 (Linux 8D2F): Nova-8056 asked on 2026-10-05, unanswered: how to write and where to send a kernel board-ID patch, whether
+  the out-of-tree drivers they found (`saikiranworks/hp-omen-dkms`, `yunusemreyl/hp-wmi-extended`) are safe, and what to check.
+  There is no `platform_profile`, no `hp_wmi` lines in `dmesg`, and a CLI screenshot. See WP-09.
+- #179: mbilykov will test a Linux per-key RGB build when one exists.
+- Waiting on reporters' exports: #201 (8EDC needs its own entry), #143 (fan drop on 8DCD), #133 (UI performance, wants
+  `runtime-performance.txt` from 4.4.x), #158 (8A44 verification pass), #145 (8D40 Battery Care and whether the profile survives a
+  relaunch), #103 (Ryzen AI 9 HX 375 Curve Optimizer, export after Apply), #195 (8E35 rerun expected to read 6/6, then
+  `UserVerified`), #221 (the reporter has not said what looks wrong).
+
+**K.11 8BD4 RGB payload probe result (#212, VoRtam4, 4.4.5, 2026-10-12)**
+- Evidence (observed by the reporter, three runs, same each time; log extract `OmenCore_8BD4_v4.4.5_RGB_payload_probe_relevant_logs.txt`).
+  Firmware topology `OneZoneWithNumpad (0x04)`, backend WMI BIOS ColorTable, BIOS F.29. Per probe step:
+
+  | Step | Layout sent (pure red) | Keyboard | Readback at offset 25 |
+  |---|---|---|---|
+  | 1 | count 1, colour at 25 (what 4.4.1 sends) | did not light | `#000000` |
+  | 2 | count 1, colour at offset 1 | **turned red** | `#FF0000` |
+  | 3 | count 0, colour at 25 | stayed red | `#FF0000` |
+  | 4 | count 1, colour at 1 and 25 | stayed red | `#FF0000` |
+  | 5 | count 1, colour at 25 plus a 0xFF fourth byte | turned off | `#000000` |
+
+- Reading it (inference, not yet confirmed by a fix): steps 1 and 5 carry black at offset 1 and the keyboard is dark; steps 2 and 4
+  carry red at offset 1 and it is red. Step 3 has black at offset 1 but stayed red, which fits the firmware ignoring a count of 0
+  and keeping the previous state. So on this board the single colour is read from offset 1, and the firmware reports it back at
+  offset 25. The reporter also could not say whether steps 3 and 4 re-lit it or only kept step 2's red; the readbacks are the
+  better evidence than the eyes here.
+- Same keyboard topology as 8BC2 (#227). Both should get the one-zone payload (WP-14, WP-07). The four-zone payload is unchanged.
+- Not known: whether brightness and effects on this board use other commands, and whether numpad keys are part of the single zone.
+  Ask the reporter, after the build, to set a colour on the Lighting page, change brightness, and say what moves.
+- Reply to draft (not posted): thank them; say step 2 is the layout; say a build follows; say it is not fixed until they confirm.
+
+**K.12 New board 88D1, OMEN 15-en1xxx (#228, korokhidup, 4.4.5, 2026-10-12)**
+- Evidence (export read): BIOS F.30, Ryzen 5 5600H (CezanneBarcelo, PawnIO active), RTX 3060 Laptop, SKU 3D3E7PA#UUF. There is no
+  `88D1` entry. Both the capability and keyboard lookups fall back to the model-name pattern `15-en` and land on the 8787 entry
+  (`OMEN 15-en0038ur`, #120), confidence Low. Firmware: thermal policy V1, software fan control supported, two fans, max level 55,
+  fan level readback works (42 and 40 at start-up), RPM is **Estimated**. Keyboard topology `FourZoneWithoutNumpad (0x02)`; the
+  WMI ColorTable path initialised and wrote without error, but no one has seen the keys change.
+- Adapter read: shipping 200 W, connected rating reads 0 W, firmware verdict "meets requirement". Treat the 0 W as unknown, not
+  as a weak adapter (the low-wattage logic already declines to act on it).
+- The log shows sensor-freeze warnings on a laptop that was in use: CPU frozen at 47 C for 22 readings with load swing 52%, GPU
+  frozen at 45 C for 74 readings (recovered after 126 s) and again for 180 s. The GPU one is plausibly the dGPU sleeping, which
+  would be a false positive. Not investigated. Same family as #221 (3E) and the sensor-identity work in WP-19.
+- What to do: add an `88D1` entry (WP-07): V1, `FanZoneCount = 2`, max level 55, `SupportsRpmReadback = false` until a physical
+  source appears, curves on, `RequiredCpuVendor = AMD`, keyboard `FourZoneTkl`-style entry matching what the 8787 entry uses,
+  `UserVerified = false`, Notes cite #228. Do not enable undervolt or MUX from this export. Then ask for Guided Fan Verification
+  with the RGB check on that build.
+- Cheap hardening this exposes: the "Matched by model name" path logs at INFO. Make the notice in the app say the profile was
+  borrowed from another board (it already says "Inferred"); no behaviour change.
+- The RGB control path snapshot printed "Keyboard lighting service unavailable" although the log shows the V2 engine active. The
+  snapshot runs before the Lighting page starts the service (the file says providers start lazily). Reword it to say "not started
+  yet" (WP-04 or WP-05, text only).
+
+### L. Research log
 - 2026-10-11. **Ohman** (`P4R1H/ohman`, [repo](https://github.com/P4R1H/ohman), [releases](https://github.com/P4R1H/ohman/releases)):
   releases 1.0.6 (15 Sep) to 1.3.1 (10 Oct). Taken from the README and releases page through a summarising fetch, not checked
   against the source. Read the 1.3.1 changelog directly before quoting it in public.
@@ -161,3 +355,278 @@ tag path is unverified until the next release tag.
 - The Needs-field-confirmation list is rewritten for whatever 4.5.0 adds.
 - Every new item in sections 3A, 3D and 3H has a test, or is labelled *implemented, pending confirmation* in the changelog.
 - Anything in 3I that does not ship is listed as moved to 4.6, not dropped silently.
+- 3K.7 and 3K.8 add no unproven writes: the NVIDIA items are range checks, text and read-only status, and the hibernate item is
+  diagnostics until an export shows a cause.
+- Every item in 3K ends as a fix with a test, a corrective reply on the issue, or an honest "still unconfirmed"; K.4 is not
+  fixed until a real export shows the failsafe.
+
+## 5. Agent brief: how to work through this roadmap
+
+Read first: `CLAUDE.md` (rules, layout, hard-won facts), this file, `docs/CHANGELOG_v4.5.0.md` (running notes). Then take work
+packages (section 6) in phase order. Do not start a package marked *needs data* without the data.
+
+**Non-negotiable rules (from `CLAUDE.md`, repeated because they decide most reviews)**
+- Evidence gate: label every claim *confirmed* (a reporter saw it on real hardware) or *implemented, pending confirmation*.
+  Unproven hardware features stay off by default. New board entries use `UserVerified = false` and cite the issue in `Notes`.
+- A fix comes with a test, ideally one that fails on the old code. Hardware is behind interfaces (`IHpWmiBios`, `IEcAccess`,
+  `IMsrAccess`); never touch real hardware from tests.
+- Any code that turns the firmware Max flag on must release it through `HpWmiBios.ReleaseMaxAndHandBackToBios()`;
+  `src/OmenCoreApp.Tests/FirmwareMaxPairingGateTests.cs` fails the build otherwise (it lists the files allowed to call `SetFanMax(true)`).
+- Typed catches only: `ReleaseGateCodeHygieneTests` keeps a line-number baseline for bare `catch`.
+- Commits go to `main` in small focused commits that cite the issue. **Authored as Matthew Hurley (theantipopau), with no
+  `Co-Authored-By` trailer and no AI mention anywhere** (commits, PRs, GitHub comments). Push only after the suite is green.
+- Never tag, release, close an issue, or post on GitHub or Discord without the maintainer's go-ahead. Draft replies into a scratch
+  file; do not post them. Never add or enable usage-billed Cloudflare products (Durable Objects, Browser Rendering).
+- Licences: Ohman, OmenCtl, victus-control and omen-fan-control are GPL-3. Use their *documented behaviour* only, never their
+  code, key maps or tables. The NVIDIA backend is used with its authors' permission (see `THIRD-PARTY-NOTICES.md`).
+
+**Commands** (Windows, Git Bash or PowerShell; repo root `E:\OmenCore\omencore`)
+```
+dotnet build OmenCore.sln                                   # must stay at 0 warnings, 0 errors
+dotnet test src/OmenCoreApp.Tests/OmenCoreApp.Tests.csproj --filter "FullyQualifiedName~<Name>"
+dotnet test src/OmenCore.Linux.Tests/OmenCore.Linux.Tests.csproj
+dotnet test OmenCore.sln                                    # full suite, about 7 minutes, run in the background before every push
+```
+Last full run before this cycle: 1861 App tests and 66 Linux tests passing. Keep the count from falling.
+
+**Package template.** Each package below has: *Goal*, *Evidence* (issue or file), *Where* (files, verified to exist on 2026-10-12),
+*Do*, *Tests*, *Done when*, and *Gate* (what stops it being merged early). Status values: `todo`, `needs data`, `blocked`, `done`.
+
+## 6. Work packages
+
+### Phase 1: no hardware needed, evidence already in hand
+
+**WP-01 Hotkey retry that ends in a message** (`todo`)
+- Goal: a hotkey that fails to register at startup is retried for a bounded time and then reported, instead of silently dropped.
+- Evidence: 4.4.5 test machine, three hotkeys never registered and no result was logged. Code: `RetryPendingHotkeys()` runs only
+  from `Initialize` (`src/OmenCoreApp/Services/HotkeyService.cs` lines 104 to 119 and 176 onward); a failed key is queued at line 302.
+- Do: retry on a timer (for example every 5 s, at most 12 times) and on window activation; after the last attempt log one `Warn`
+  naming the key and action ("Ctrl+Shift+O is held by another app") and expose it in `HotkeyService`'s status object (the one
+  with `PendingCount` and `PendingBindings`, near line 87) so the Settings page can show it. Make the Win32 call injectable
+  (a `Func<IntPtr,int,uint,uint,bool>` field defaulting to the P/Invoke) so a test can force failures.
+- Tests: `src/OmenCoreApp.Tests/Services/HotkeyServiceTests.cs`: all-fail then give-up with one warning; fail-twice then succeed
+  clears the pending list; retry stops after `Dispose`.
+- Done when: no queued key is ever left unreported; the log shows the final outcome per key.
+
+**WP-02 Ohman in conflict detection** (`todo`)
+- Goal: warn when Ohman is running, like OMEN Gaming Hub, because both write fan state.
+- Where: `src/OmenCore.Core/Services/ConflictDetectionService.cs` (entries are keyed dictionary items with `ProcessNames`; copy the
+  `OmenHub` entry at line 49). No test for this service exists yet: add `src/OmenCoreApp.Tests/Services/ConflictDetectionServiceTests.cs`.
+- Do: add an `Ohman` entry. The download is `Ohman.exe`; confirm the process name on a running copy before merging, and say in the
+  description that two controllers writing fan state will fight.
+- Tests: a fake process list containing `Ohman` produces the conflict; one without it does not.
+
+**WP-03 Linux: competing fan writers** (`todo`)
+- Goal: warn when another tool that writes `pwm1_enable` is active.
+- Where: `src/OmenCore.Linux/Commands/DiagnoseCommand.cs` (the `FanWriter` field, about line 109, and the report lines near 805 and
+  912); `src/OmenCore.Linux/Daemon/OmenCoreDaemon.cs` (lock acquire near line 89); `src/OmenCore.Linux/Hardware/WriterLock.cs`.
+- Do: scan `/proc/*/comm` (no external process) for `victus-fan`, `victus-backend`, `omen-fan-control`, `omenctld`; list hits in
+  `diagnose` under "Other fan writers" and log one warning at daemon start. Do not stop or kill anything.
+- Tests: `src/OmenCore.Linux.Tests/Hardware/`: a scanner that takes an injected list of process names.
+
+**WP-04 Diagnostics export additions** (`todo`)
+- Goal: the next stuck-fan, hibernate or throttling report carries its own cause.
+- Evidence: #211 (no Max flag or mode readback in the export), K.8 (no sleep or hibernate reasons), #222 (no stuck-state data).
+- Where: `src/OmenCoreApp/Services/Diagnostics/DiagnosticExportService.cs` (follow the existing `AppendMemoryBreakdown` pattern and
+  its test `MemoryBreakdownTests`; snapshot tests are in `src/OmenCoreApp.Tests/Services/DiagnosticExportSnapshotTests.cs`).
+- Do, three new sections, each read-only and wrapped so a failure writes one line, not an exception:
+  1. `[Fan Firmware State]`: `GetFanMax()`, fan mode readback, CPU and GPU level readback, thermal policy, RPM source, and whether
+     the watchdog failsafe is active (`HardwareWatchdogService` exposes the flag; add a getter if needed).
+  2. `[Power Transitions]`: the last 20 Kernel-Power sleep, resume and hibernate events with their reasons (event IDs 41, 42, 107,
+     506 and 507; read through the event log API, no `powercfg` process).
+  3. `[CPU Throttle]`: reserved line for WP-13 ("not available" until that lands).
+- Tests: each section renders with a fake source and with a throwing source.
+
+**WP-05 Capability card tells the truth** (`todo`)
+- Goal: where a live probe disagrees with the database, the card shows the probe.
+- Evidence: K.3. `ModelCapabilities.SupportsRpmReadback` defaults to `true` (`src/OmenCore.Core/Hardware/ModelCapabilityDatabase.cs`
+  line 70) so every entry that does not set it claims real RPM; the card is `src/OmenCoreApp/Views/DiagnosticsView.xaml` (line 344).
+- Do: pass the live RPM source (`Estimated`, physical, none) and the PL1/PL2 readback result into the card's view model; show
+  "Estimated from fan level" and "not readable on this board" instead of "Supported". Do not flip the database default blindly:
+  list every entry that relies on it first (a count and the boards go in the commit message), and set `false` explicitly only for
+  boards whose export shows null (8BBE, 8BD4, 8BC2 at least).
+- Tests: `ModelCapabilityDatabaseTests`: those boards report `SupportsRpmReadback == false`; a view-model test for the probe-wins rule.
+
+**WP-06 Calibration and Guided Fan Verification honesty** (`todo`)
+- Goal: stop reporting estimates and interrupted steps as measurements or failures.
+- Evidence: K.1 and K.9 (#226, #227, #207, #218), K.6 (thermal interruption on 8BC2).
+- Where: `src/OmenCore.Core/Services/FanCalibration/FanCalibrationService.cs` (tests `FanCalibrationServiceSafetyTests.cs`);
+  `src/OmenCore.Core/Services/FanVerificationService.cs` (`IsFirmwareCeilingPlateau` line 885, ceiling use near line 434; tests
+  `FanVerificationCeilingTests.cs`, `FanVerificationServiceTests.cs`); `src/OmenCoreApp/ViewModels/FanDiagnosticsViewModel.cs`
+  (the per-step loop at lines 335 to 365).
+- Do, four separate commits:
+  1. When the RPM source is `Estimated`, calibration says "RPM cannot be measured on this board" and does not store a duty-to-RPM
+     map as if measured (store it flagged `LevelOnly`, or skip). Label the results table "estimated".
+  2. A stable, repeated readback below the request is a firmware ceiling at any step, not only at 100%.
+  3. `IsFirmwareCeilingPlateau` also passes a level within 90% of the best level another fan reached in the same run (88F8: 43 vs 46).
+     The 60%-step rule (a board whose Max never rises past the 60% level still fails) stays and keeps its test.
+  4. If thermal protection fires during a step, mark it "interrupted by thermal protection", do not count it as a failure, and
+     offer a re-run after a cool-down (below 85 C). Also wait for that temperature before starting a run.
+  Also: when a per-fan level write is refused (878A: `WMI fan control failed for fan N, level L`), say "the firmware refused level L"
+  rather than "Physical RPM unavailable" (`FanVerificationService.cs` line 60 produces that text for `RpmSource.Unknown`).
+- Tests: one per commit; reuse the fake `IHpWmiBios` used in `FanVerificationCeilingTests`.
+- Done when: re-running the #226 and #207 scenarios in tests gives "level-only" and "pass (ceiling)".
+
+**WP-07 Board entries and promotions** (`todo`; all `UserVerified = false` unless a reporter has confirmed)
+- 8BC2 (#227): own entry, `ProductId = "8BC2"`, `ModelName = "HP Victus 16-r0xxx Intel"`, family Victus, V1, `FanZoneCount = 2`,
+  max level 55, `SupportsRpmReadback = false`, curves, GPU boost, undervolt off, `RequiredCpuVendor = Intel`. Notes cite #227
+  (BIOS F.31, i7-13700HX, RTX 4060). Keyboard: add a `KeyboardModelDatabase` entry for 8BC2 (topology `OneZoneWithNumpad`, WMI
+  colour table, `UserVerified = false`) and make the V1 path send the topology's zone count, not a fixed 4
+  (`HpWmiBios.MapLightingTypeToZoneCount`, line 1822). `HpWmiBios.SetColorTable` (line 2062) defaults `zoneCount` to 4, and three
+  callers do not pass it: the V1 path at `KeyboardLightingService.cs` line 546, and the restore and scaled-colour paths in
+  `WmiBiosBackend.cs` lines 213 and 372. Only line 133 of `WmiBiosBackend.cs` passes the topology count. That is why the 8BC2 log shows
+  `SetColorTable: ZoneCount=4` on a one-zone keyboard.
+  Tests: `ModelCapabilityDatabaseTests`, `KeyboardModelDatabaseTests`, `KeyboardLightingTopologyTests`.
+- 8A13 (#225): fans, WMI GPU power and the RGB pattern are confirmed by the reporter (Guided Fan Verification 6/6, 82/100; zones
+  visibly changed). Update the Notes and set the verified flags only for those; MUX stays off. Ask for a photo of the "white"
+  that shows pink before any colour-balance work.
+- 8BD4: a second owner (#226) confirms the board, BIOS F.32, Ryzen 7 7840HS; add to the Notes only.
+- 8EDC (#201), 8E41 and 8C58 (Transcend 14: #157, #149, #99, #76, and K.8): entries only from an export; do not guess.
+- Where for all: `src/OmenCore.Core/Hardware/ModelCapabilityDatabase.cs` (8BBE entry at line 2208 is the nearest model),
+  `src/OmenCore.Core/Services/KeyboardLighting/KeyboardModelDatabase.cs`.
+
+**WP-08 NVIDIA power panel hardening** (`todo`)
+- Goal: the panel cannot send out-of-range values, and it explains what it read. Evidence: K.7.
+- Where: `src/OmenCoreApp/ViewModels/NvidiaPowerViewModel.cs`, `src/OmenCoreApp/Services/NvidiaPowerService.cs` (`Assess()` returns
+  `Status` with `LiveCurrentW`, `LiveMaxW`, `Targets`), `src/OmenCore.NvidiaPower/**` (internal; `InternalsVisibleTo` already set).
+- Do: (1) clamp and validate MAX and CURRENT to the stock-default to NVIDIA-stock-max range before any write, with the refusal text
+  shown; (2) show "stock max read: X W, expected: Y W" and a short explanation when they differ (the 115 W against 140 W case);
+  (3) text: do not disable PPAB, the adapter limits CPU+GPU together, a driver update may undo the unlock, RTX 5050 untested, "if CURRENT
+  will not stick, re-toggle the HP state and unlock again"; (4) read TPP if the backend exposes it (read only).
+- Tests: `NvidiaPowerServiceTests` for the range clamp; a view-model test for the mismatch text.
+- Gate: no new write path. If TPP cannot be read without a new write, leave it out and say so.
+
+**WP-09 Linux kernel-side guide and the #219 reply** (`todo`)
+- Goal: one document that answers the repeating Linux question ("my board has no `platform_profile`").
+- Evidence: #219, #99, #84, #76, #28, #127, #26, #60, #123; K.10; the third-party README claim about upstream commit `46be1453`.
+- Where: new `docs/LINUX_KERNEL_BOARD_SUPPORT.md`, linked from `docs/LINUX_INSTALL_GUIDE.md`.
+- Do: explain why OmenCore cannot route around the kernel allowlist; how to submit a board-ID patch (find the maintainers with
+  `scripts/get_maintainer.pl` on the `hp-wmi` source in the kernel tree, post to the platform-driver-x86 list, include the board name
+  from `/sys/class/dmi/id/board_name`, kernel version, and what works and fails); a safety checklist for out-of-tree drivers (does it
+  write the EC directly, does it list your board, does it have a revert, is it GPL and maintained; EC-writing drivers have caused
+  faults on the MAX family, see #60). Verify the `46be1453` commit on kernel.org before citing it.
+- Done when: the doc exists and a reply to #219 is drafted into a scratch file for the maintainer to post.
+
+### Phase 2: behaviour changes, each opt-in or off by default
+
+**WP-10 Max auto-return** (`todo`)
+- Goal: optional return from Max to Auto after a cool-down or timer. Evidence: Ohman's rule (3A). Default off.
+- Do: setting with three modes (off, cool-down: CPU and chassis under 60 C for 2 minutes, timer: 15, 30 or 60 minutes). Implement
+  in `FanService` next to where the Max preset is applied; the release calls `ReleaseMaxAndHandBackToBios()` through the existing
+  path and never `SetFanMax(false)` directly. Put the setting in `FeaturePreferences` and show it in Settings (`SettingsViewModel`).
+- Tests: `FanServiceSuspendTests`-style fake clock; the cool-down resets if temperature rises; the timer survives a preset
+  re-apply; `FirmwareMaxPairingGateTests` still green.
+- Gate: pending hardware confirmation label in the changelog.
+
+**WP-11 Watchdog failsafe release** (`needs data`, then `todo`)
+- Goal: the 90% failsafe cannot hold fans high indefinitely on a warm machine. Evidence: K.4 (hypothesis from code).
+- Where: `src/OmenCore.Core/Services/HardwareWatchdogService.cs` (`FailsafeSafeReleaseTempC = 65`, `FailsafeSafeReleaseSeconds = 15`,
+  `FreezeThresholdSeconds = 90`; tests `HardwareWatchdogServiceTests.cs`).
+- Do: first confirm from a real #222 export (`WATCHDOG` lines). Then release when readings are fresh and below the thermal-protection
+  ramp (90 C) minus a margin for 15 s; keep 65 C as the quick path. Also find why monitoring went stale twice in 90 s.
+- Tests: a warm-idle scenario at 70 C releases; a real 85 C scenario does not.
+
+**WP-12 Fan-stall guard** (`needs data`)
+- Goal: a fan reading 0 RPM while commanded above zero forces Max and warns. Only where the RPM source is physical
+  (`RpmSource` in `FanVerificationService.cs`); never on `Estimated` or `Unknown`. Where: `FanService` monitor loop or
+  `HardwareWatchdogService`. Gate: needs an export from a board that has stalled, or a rig; release through the shared Max helper.
+
+**WP-13 CPU throttle reason, Intel first** (`todo`)
+- Goal: log why the CPU is throttled. Where: `src/OmenCore.Core/Hardware/IMsrAccess.cs`, `PawnIOMsrAccess.cs`;
+  `EdpThrottlingMitigationService.cs` already reads MSRs for a related purpose, so reuse its access pattern.
+- Do: read IA32_THERM_STATUS (`0x19C`) bits for thermal, PROCHOT and power-limit status; confirm the bit positions against the
+  Intel SDM before coding and cite the section in a comment. Write the result into WP-04's `[CPU Throttle]` section. Read only.
+  AMD stays "not available" until its registers are researched.
+- Tests: decode a fake MSR value to the expected flags.
+
+### Phase 3: needs reporter data (do not start without it)
+
+**WP-14 Keyboard probes** (`ready for the 8BD4 part; the rest needs data`)
+- 8BD4 (#212): the probe result is in, so this part is no longer waiting. In `HpWmiBios.SetColorTable` (line 2062), when the
+  topology maps to one zone (`MapLightingTypeToZoneCount`, line 1822, returns 1), build `t[0] = 1` and put R, G, B at offsets 1 to 3,
+  not at 25. Leave the four-zone layout untouched (8A13 and 8787 verify it). Keep the verify step reading offset 25, because the
+  firmware reports a single-zone write there (K.11). Tests: payload bytes for zone count 1 and 4 in `HpWmiBiosTests` or the
+  nearest existing colour-table test file; `KeyboardLightingTopologyTests` for the 8BD4 and 8BC2 mapping. Do not delete
+  `ColorTableProbe`; retire it after the 8BD4 owner confirms on a build. Status wording: "implemented, pending 8BD4 retest".
+- 8E9F (#224) and 8E9A (#142): the Darfon 30BF route did nothing on 8E9F (light bar works). Write a 30BF probe in the style of
+  `ColorTableProbe` (one change per step, each logged with the device response), surfaced from `KeyboardDiagnosticsViewModel`.
+  Mark the route "tried, no effect" in the notes and keep the light bar. Do not mark `0D62:30BF` verified in `DojoKeyboardMcu`.
+
+**WP-15 878A fan control** (`needs data`): per-fan level writes are refused (K.9). Candidate: EC path through PawnIO for 878A and 878C.
+Needs the board's EC register map from a source we may use and an owner test; keep it off by default.
+
+**WP-16 V1 idle fan floor** (`needs data`): K.9. Investigate whether `SetFanLevel(20, 20)` after a hand-back keeps fans from
+stopping. Needs an owner who can hear or measure the fans after Restore Auto and after quitting. If confirmed, skip the hint on boards
+whose Auto stops the fans (evidence per board), with a test.
+
+**WP-17 8E35 and AMD SMU** (`needs data`): a real diagnostics export from #222 (the three posted files are `config.json`); PM-table
+dumps for Ryzen 9 8940HX, Ryzen 7 260 (#223) and the 8E9F CPU via `tools/SmuProbe --pmtable`; UI stutter profile (curve editor drag
+path) from `runtime-performance.txt`.
+
+**WP-18 Transcend 14** (`needs data`): Windows entries for 8C58 and 8E41 and the hibernate report (K.8) wait for an export.
+
+### Phase 4: engineering foundations (promised in `docs/V4.4.1_IMPLEMENTATION_STATUS.md`)
+
+**WP-19 Foundations** (`todo`, large; do not mix with behaviour changes)
+- Fan write lease coordinator (brief item P0.2, "revisit as the lease coordinator in 4.5"): one owner for fan writes across
+  verification, cleaning, calibration, NVIDIA guard (`HeldLease` in `NvidiaPowerService` is the newest example). Must not hold a lock
+  across `Task.Delay` verification; design first in a short doc, then implement behind tests.
+- Trace and replay harness (P1.2): a fake `IHpWmiBios` that replays scrubbed traces from diagnostics exports, so a reporter's export
+  becomes a regression test. Highest leverage for this project; start with the 8BD4, 8BC2 and 88F8 exports in this audit.
+- Sensor identity record (P1.1): record which sensor feeds CPU temperature and why, stably across sessions (two boards now show a
+  frozen ~28 C ACPI or BIOS CPU reading: 8E9A and 8BC2).
+- Asymmetric temperature filter (P1.3): behind an off-by-default flag only.
+- Shared capability resolver (P1.5): UI, tray and CLI still read separate flags.
+
+**WP-20 Release hygiene remainder** (`todo`): Linux package suspend hook; `CLAUDE.md` update (it still names 4.4.1 as current and
+lists 4.4.1 open threads); decisions for the maintainer on PR #147 and code signing; verify the new workflows on the first CI run.
+
+## 7. Open-issue index (74 open issues and 1 open PR on 2026-10-12)
+
+Every open item is listed once. "Owner reply last" means the maintainer answered last and the reporter has not responded.
+
+**Active, in packages above**
+| Issue | Board or topic | Where it is covered | State |
+|---|---|---|---|
+| #228 | 88D1 OMEN 15-en1xxx | WP-07, K.12 | new, export read, no reply yet |
+| #227 | 8BC2 Victus 16-r0xxx | WP-07, WP-14, K.2 | new, export read, no reply yet |
+| #226 | 8BD4 calibration, "stuck at 2000" | WP-06, K.1 | new, no reply yet |
+| #225 | 8A13 | WP-07 | reporter replied 2026-10-11 (6/6 pass) |
+| #224 | 8E9F | WP-14, K.5 | reporter replied: keyboard no, light bar yes |
+| #223 | 8EEC (Ryzen 7 260) | WP-17 | owner reply last; needs a 4.4.5 export with PawnIO |
+| #222 | 8E35 | WP-11, WP-17, K.4 | reporter replied; files were config copies |
+| #221 | 8DD0 temperature | section 3E | owner asked a question; no answer |
+| #219 | Linux 8D2F | WP-09, K.10 | reporter replied 2026-10-05, unanswered |
+| #218 | 878A | WP-06, WP-15, K.9 | reporter replied (1/6 on 4.4.1) |
+| #217 | 88EE | WP-16, K.9 | reporter replied (6/6, idle fan question) |
+| #215 | 88F7 | K.10 | undervolt test build promised |
+| #212 | 8BD4 RGB | WP-14, K.11 | probe result posted 2026-10-12; owner has not replied |
+| #211 | 8BBE stuck fans | WP-04, K.9 | reporter replied with exports |
+| #207 | 88F8 | WP-06, K.9 | reporter replied (5/6) |
+| #195 | 8E35 | K.10 | reporter replied; rerun expected 6/6 |
+| #189 | 8D87 factory curve | section 1 | waiting on mbilykov's run |
+| #179, #151, #87 | Linux per-key RGB, 8D87 and 8D41 | section 3B | tester volunteered (#179) |
+| #142 | 8E9A | section 1 | waiting on Lighting and HID ids |
+
+**Waiting on a reporter's export or test (owner reply last)**
+#201 (8EDC), #158 and #159 (8A44), #145 (8D40), #143 (8DCD), #133 (UI performance), #130 and #171 (8E10), #103 (Ryzen AI 9 HX 375 undervolt),
+#181 (8D41, OGH A/B), #163 (8BCA), #155 and #184 (8C2F Victus 15), #149 and #157 (Transcend 14, 8C58 and 8E41), #146 and #132 (88D2),
+#134 (8A18), #128 (e0xxx), #66 (8A26), #54 (8D87), #14 (16-b0xxx per-key keyboard, likely Primax `0461:4E9B`), #177 (16-wf0032TX), #180
+(startup and config).
+
+**Linux, kernel-side limits (answer with WP-09)**
+#219, #99, #84, #76, #28, #127, #126, #26, #60, #123. GUI blank window on Wayland and X11: #118, #114 (older, no new evidence).
+
+**Fixed and shipped, candidates for the maintainer to close after checking the release**
+#115 and #172 (8BBE entry), #205 (8C2D entry), #214 (`thermal.cpu_sensor` override), #220 (stuck fans after verification, fixed in 4.4.1),
+#192 (updater SHA256 parsing), #185 (8E35 recognised), #173 (RAM Smart Clean), #46 and #16 and #12 and #111 and #48 (old, answered in the
+2.x and 3.x line). Closing is the maintainer's call; verify each against the shipped release first.
+
+**Declined or already exists**
+#122 (headset support: a different driver family), #34 (battery saver: it is Power Automation), #131 (OMEN desktops: fan writes disabled by
+a safety gate until the protocol is validated), #147 (PR: the 4.4.0 log-buffering part shipped; invite a resubmission of the tray and
+uptime parts and close).
+
+**Not on GitHub**
+Discord: bobshmo (NVIDIA unlock, WP-08), BluSleeperOP (Transcend 14 hibernate, WP-18 and K.8). Reddit: MENTRAUZ (8BB3 export,
+undervolt specifics, section 3B and 3D).
