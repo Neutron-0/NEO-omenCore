@@ -362,9 +362,26 @@ All of this is single-laptop evidence from bobshmo's own machine unless stated. 
   8E9F failure is not "30BF speaks another dialect". Hypotheses (unconfirmed): the 8E9F keyboard sits on a different interface
   (`MI_00` or `MI_03` against `MI_01`), or the route needs a different init for that board. Check which interface
   `DojoKeyboardMcu` opens and write the 30BF probe (WP-14) to try each interface, one change per step, logged.
-- Not known: which effects work, brightness, per-key versus zones. Ask. This is the first reporter confirmation for the Dojo route
-  on a 30BF, so record 8E9A as user-confirmed for colour only; the board entry stays unverified for fans (estimated RPM) and MUX.
-- Reply to draft (not posted): thank them; record it; ask which effects and brightness work; say 8E9A is marked colour-confirmed.
+- Replied 2026-10-13 (thanks; asked which effects work, brightness, per-key). Keith1341 answered the same evening with a new export
+  (`omencore-diagnostics-2026-10-13-182151.zip`), read 2026-10-14:
+  - Works: solid colour (`[DojoPerKey] Uniform fill via mi_03: accepted`), brightness 100 by re-scaling the displayed picture, and the
+    on-board device effects Confetti and Raindrop (`installed and confirmed by readback`). MCU is on `mi_03`, LampArray on `mi_04`
+    (120 lamps). So 30BF colour and device effects are now reporter-observed on 8E9A.
+  - Scene Quick Select Wave/Rainbow do nothing on the keyboard: `RgbSceneService` sends `effect:wave` / spectrum to the third-party
+    providers only (the log shows Logitech G713 failing and "no available providers support this effect"), and Heat Wave arrives as a
+    uniform fill. The HP keyboard's own effects (`DojoKeyboardMcu.Effect.Wave`/`Rainbow`, offered on the Device Lighting page) are not
+    reachable from scenes. Work: route scene effects to the V2 keyboard engine's effect path when it is active (WP-14 neighbour).
+  - Per-key colours: no per-key write appears in the log, so this was not exercised; the layout is still `UNVERIFIED` (12 of 120 lamps
+    have no HID usage). Ask what the per-key editor showed and whether Apply was pressed.
+  - "Lights Off" scene: MCU refused brightness 0x0C with no host-painted picture, then fell back to WMI BIOS ColorTable (which
+    succeeded). A running device effect cannot be dimmed on this hardware, by the log's own words.
+  - Quick Profile back to Balanced at startup: by design today. The log says "Restored last performance mode: Performance" then
+    "Startup performance restore is disabled - skipping automatic reapply" (`ShouldRunStartupHardwareRestore(Performance)`, off by
+    default as a safety choice). The mode is remembered but not re-sent to firmware, and the UI then shows Balanced. Candidate fix: make
+    the label say "saved: Performance, not applied" (the #199 `MarkSavedModeNotAppliedAtStartup` work) and tell the user where the
+    switch is. Check the settings label is findable.
+  - Third fan: Keith1341 says HP added it for the PCH. Still no control path or RPM for it; record as reporter statement.
+- Replied 2026-10-14 (effects, scenes gap, startup label, per-key question, verification request).
 
 ### L. Research log
 - 2026-10-11. **Ohman** (`P4R1H/ohman`, [repo](https://github.com/P4R1H/ohman), [releases](https://github.com/P4R1H/ohman/releases)):
@@ -639,7 +656,7 @@ Every open item is listed once. "Owner reply last" means the maintainer answered
 | #189 | 8D87 factory curve | section 1 | waiting on mbilykov's run |
 | #179, #151, #87 | Linux per-key RGB, 8D87 and 8D41 | section 3B | tester volunteered (#179) |
 | #229 | 88ED Victus 16-e0xxx | WP-07, K.13 | new, export read, no reply yet |
-| #142 | 8E9A | WP-14, K.14 | reporter confirmed keyboard control works 2026-10-13; unanswered |
+| #142 | 8E9A | WP-14, K.14 | replied 2026-10-13; reporter answered with effects/startup questions, new reply drafted 2026-10-14 |
 
 **Waiting on a reporter's export or test (owner reply last)**
 #201 (8EDC), #158 and #159 (8A44), #145 (8D40), #143 (8DCD), #133 (UI performance), #130 and #171 (8E10), #103 (Ryzen AI 9 HX 375 undervolt),
