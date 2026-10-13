@@ -19,7 +19,8 @@ corrected items from real reports, before adding more on top. What each one is w
 | 88D1 OMEN 15-en1xxx (#228, new) | an entry from the export (3K.12), then Guided Fan Verification with the RGB check | korokhidup |
 | Factory fan curve, 8D87 (#189) | a real run in Performance mode vs firmware Auto, and the IR step-down guess checked | mbilykov |
 | 8E9F keyboard route (#224) | **Answered 2026-10-11:** the light bar works, the keyboard RGB does not. Next step is a 30BF probe, see 3K.5 | JeanHX5 |
-| 8E9A board and keyboard route (#142) | Lighting page result and the keyboard's HID ids | Keith1341 |
+| 8E9A keyboard route (#142) | nothing for the keyboard: Keith1341 confirmed 2026-10-13 that lights work (3K.14). Needs a Guided Fan Verification and which effects work | Keith1341 |
+| 88ED Victus 16-e0xxx (#229, new) | an answer from the maintainer: the entry exists, the notice is about verification (3K.13) | PRIMUS626 |
 | 8A13 board, MUX (#225) | enabling MUX in a build, then a reversible test. Guided Fan Verification passed 6/6 (82/100) on 4.4.5, so the entry can be promoted, see 3K.6 | Dsedan15 |
 | 8E35 latency and SMU table (#222) | confirmation of the faster response; a PM-table dump for the 8940HX. The three files posted on 2026-10-11 are `config.json` copies (two are byte-identical), not diagnostics exports, so the SMU table and the stuck-fan state are still missing, see 3K.4 | nyn1fe |
 | 8DD0 temperature source (#221) | an answer to what looks wrong (ACPI zone vs Tctl) | reporter |
@@ -62,7 +63,8 @@ export first; none of those are started without one.
 ### B. RGB
 - 8BD4 (#212): the probe result is in (3K.11): step 2, colour directly after the count byte, is the one that lights it. Build the
   single-zone payload from that (WP-14), also for 8BC2, and retest on the 8BD4 owner before calling it confirmed.
-- Validate the Darfon `0D62:30BF` route on 8E9F and 8E9A; if it works, mark the PID verified in `DojoKeyboardMcu`.
+- Darfon `0D62:30BF`: works on 8E9A (#142, reporter-confirmed 2026-10-13), does nothing on 8E9F (#224, light bar only). See 3K.14 for
+  the difference. Mark it verified for 8E9A only, not as a PID.
 - Linux per-key RGB for the 2025 MAX boards (#179, #151, #87): port the Dojo backend to hidraw from the Windows code and
   mbilykov's write-up. Only worth doing with a named tester (mbilykov offered).
 - Check the 8BB3 keyboard entry: the keyboard database calls `8BB3` the OMEN 30L desktop, while an older report calls it
@@ -336,6 +338,34 @@ All of this is single-laptop evidence from bobshmo's own machine unless stated. 
   snapshot runs before the Lighting page starts the service (the file says providers start lazily). Reword it to say "not started
   yet" (WP-04 or WP-05, text only).
 
+**K.13 Board 88ED, Victus 16-e0xxx, "model request" although an entry exists (#229, PRIMUS626, 4.4.5, 2026-10-13)**
+- Evidence (export read; the issue text is a screenshot and a zip only): BIOS F.27, Ryzen 7 5800H (CezanneBarcelo), RTX 3050 Ti. `88ED`
+  already resolves by exact ProductId (Medium confidence, from #209), so what the reporter sees is the "not yet verified" notice,
+  not a missing board. Firmware: thermal policy **V0**, software fan control **false**, 2 fans, max level 55; fan RPM readback and
+  CPU temperature readback both return null, and all four `0x23` temperature indices read 0. RPM is Estimated. Keyboard topology
+  `Normal (0x00)`: backlight only, colour control not offered, which is correct for the entry (it borrows 88EC's keyboard row through
+  a model-name match, Low confidence).
+- CPU temperature came from the LibreHardwareMonitor fallback because the WMI/ACPI value was rejected (49.1 C against 51.0 C). The log
+  has about 15 "CPU temperature appears frozen" warnings over a day, held for 22 to 107 readings at 43 to 61 C with 1 to 24% load.
+  Same shape as #221 and #228. Third board with this pattern; treat it as one problem (sensor identity, WP-19), not per-board.
+- What to do: reply that the entry exists and what the notice means; add an exact `KeyboardModelDatabase` row for `88ED`
+  (backlight only, `UserVerified = false`) so it stops matching by name (WP-07); ask for Guided Fan Verification, noting that V0
+  firmware without software fan control may only offer the firmware modes, so the expected result is limited. Check what the Fan
+  page shows on a V0, no-software-control board (WP-05), because the reporter's first impression is that the app "does not support" it.
+- Extra: a "Quiet" preset was applied at 22:22 and "Fan max mode: disabled" at 09:52 the next day. No fan fault is reported.
+
+**K.14 8E9A keyboard works through the Darfon 30BF route; 8E9F does not (#142, Keith1341, 2026-10-13)**
+- Evidence (reporter's words, with HID ids): "I can confirm that I am able to control the lights through Omen Core." Hardware ids
+  include `VID_0D62&PID_30BF` with `MI_01` and `MI_02&Col05`, plus a Microsoft `VID_045E` keyboard collection.
+- Compare 8E9F (#224): same `0D62:30BF`, but its list shows `MI_00`, `MI_02&Col03` and `MI_03`, and the keyboard did not respond
+  while the light bar did. Same VID/PID, different board, different result, so the route works on at least one 30BF device and the
+  8E9F failure is not "30BF speaks another dialect". Hypotheses (unconfirmed): the 8E9F keyboard sits on a different interface
+  (`MI_00` or `MI_03` against `MI_01`), or the route needs a different init for that board. Check which interface
+  `DojoKeyboardMcu` opens and write the 30BF probe (WP-14) to try each interface, one change per step, logged.
+- Not known: which effects work, brightness, per-key versus zones. Ask. This is the first reporter confirmation for the Dojo route
+  on a 30BF, so record 8E9A as user-confirmed for colour only; the board entry stays unverified for fans (estimated RPM) and MUX.
+- Reply to draft (not posted): thank them; record it; ask which effects and brightness work; say 8E9A is marked colour-confirmed.
+
 ### L. Research log
 - 2026-10-11. **Ohman** (`P4R1H/ohman`, [repo](https://github.com/P4R1H/ohman), [releases](https://github.com/P4R1H/ohman/releases)):
   releases 1.0.6 (15 Sep) to 1.3.1 (10 Oct). Taken from the README and releases page through a summarising fetch, not checked
@@ -550,7 +580,9 @@ Last full run before this cycle: 1861 App tests and 66 Linux tests passing. Keep
   `ColorTableProbe`; retire it after the 8BD4 owner confirms on a build. Status wording: "implemented, pending 8BD4 retest".
 - 8E9F (#224) and 8E9A (#142): the Darfon 30BF route did nothing on 8E9F (light bar works). Write a 30BF probe in the style of
   `ColorTableProbe` (one change per step, each logged with the device response), surfaced from `KeyboardDiagnosticsViewModel`.
-  Mark the route "tried, no effect" in the notes and keep the light bar. Do not mark `0D62:30BF` verified in `DojoKeyboardMcu`.
+  Mark the route "tried, no effect" on 8E9F in its notes and keep the light bar. The same route is reporter-confirmed on 8E9A
+  (3K.14), so record `0D62:30BF` as working for colour on 8E9A only, and keep it unverified in `DojoKeyboardMcu` as a PID. The probe
+  should compare the interfaces the two boards expose (`MI_01` on 8E9A; `MI_00` and `MI_03` on 8E9F).
 
 **WP-15 878A fan control** (`needs data`): per-fan level writes are refused (K.9). Candidate: EC path through PawnIO for 878A and 878C.
 Needs the board's EC register map from a source we may use and an owner test; keep it off by default.
@@ -581,7 +613,7 @@ path) from `runtime-performance.txt`.
 **WP-20 Release hygiene remainder** (`todo`): Linux package suspend hook; `CLAUDE.md` update (it still names 4.4.1 as current and
 lists 4.4.1 open threads); decisions for the maintainer on PR #147 and code signing; verify the new workflows on the first CI run.
 
-## 7. Open-issue index (74 open issues and 1 open PR on 2026-10-12)
+## 7. Open-issue index (75 open issues and 1 open PR on 2026-10-12)
 
 Every open item is listed once. "Owner reply last" means the maintainer answered last and the reporter has not responded.
 
@@ -606,7 +638,8 @@ Every open item is listed once. "Owner reply last" means the maintainer answered
 | #195 | 8E35 | K.10 | reporter replied; rerun expected 6/6 |
 | #189 | 8D87 factory curve | section 1 | waiting on mbilykov's run |
 | #179, #151, #87 | Linux per-key RGB, 8D87 and 8D41 | section 3B | tester volunteered (#179) |
-| #142 | 8E9A | section 1 | waiting on Lighting and HID ids |
+| #229 | 88ED Victus 16-e0xxx | WP-07, K.13 | new, export read, no reply yet |
+| #142 | 8E9A | WP-14, K.14 | reporter confirmed keyboard control works 2026-10-13; unanswered |
 
 **Waiting on a reporter's export or test (owner reply last)**
 #201 (8EDC), #158 and #159 (8A44), #145 (8D40), #143 (8DCD), #133 (UI performance), #130 and #171 (8E10), #103 (Ryzen AI 9 HX 375 undervolt),
