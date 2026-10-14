@@ -129,6 +129,9 @@ tag path is unverified until the next release tag.
   runs from `Initialize`) and then drops it with no final log. Retry for a bounded time, then log and surface "Ctrl+Shift+O
   is held by another app". Test with a fake register failure. This is the cause of the three silent failures on the 4.4.5
   test machine (not a new bug).
+- **OMEN key can open the OSD (user request, 2026-10-14, WP-21).** Settings already lets the OMEN key run an action
+  (`OmenKeyActionOptions` in `SettingsViewModel.cs`: quick popup, window, performance, fan mode, max cooling, external app, nothing),
+  but none of them is the OSD. The OSD is only reachable from its own hotkey (default Ctrl+Shift+F12). Add a "ToggleOsd" action.
 - **Ohman in conflict detection.** Add it to `ConflictDetectionService`, modelled on the OGH entry. The download is
   `Ohman.exe`, so confirm the process name on a running copy before adding it.
 - **Linux: competing fan writers.** `omencore-cli diagnose` and the daemon's start-up log warn when a known fan service is
@@ -520,6 +523,10 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-14.7 tray GPU Power submenu: Extended item (when supported) and correct tick (#142)
 - [ ] WP-14.8 per-key paint/Apply and box-select reproduced from a log after one Apply (#142, needs data)
 - [ ] WP-14.6 startup-restore label says "saved, not applied" and the setting is findable (#142)
+- [ ] WP-21.1 `OmenKeyAction.ToggleOsd`: enum, `LoadSettings` mapping, `ExecuteAction` case, `ToggleOsdRequested` event
+- [ ] WP-21.2 `MainViewModel` handler calls `_osdService?.Toggle()`; "ToggleOsd" added to `OmenKeyActionOptions`
+- [ ] WP-21.3 tests: string maps to the action, the action raises only `ToggleOsdRequested`; unknown string still falls back to quick popup
+- [ ] WP-21.4 OSD disabled in settings: key press does nothing visible, one log line says why
 - [ ] WP-15 878A fan control (needs data)
 - [ ] WP-16 V1 idle fan floor (needs data)
 - [ ] WP-17 8E35 and AMD SMU (needs data)
@@ -718,6 +725,18 @@ dumps for Ryzen 9 8940HX, Ryzen 7 260 (#223) and the 8E9F CPU via `tools/SmuProb
 path) from `runtime-performance.txt`.
 
 **WP-18 Transcend 14** (`needs data`): Windows entries for 8C58 and 8E41 and the hibernate report (K.8) wait for an export.
+
+**WP-21 OMEN key opens the OSD** (`ready`, small, user request 2026-10-14)
+- Goal: the OMEN key can be set to show and hide the OSD overlay, the way it can already be set to open the quick popup.
+- Code: `OmenKeyAction` enum and `ExecuteAction` switch (`src/OmenCore.Core/Services/OmenKeyService.cs` around lines 680 to 710, enum
+  at 1138), string mapping in `LoadSettings` (around line 750; unknown strings fall back to quick popup), options list
+  `SettingsViewModel.OmenKeyActionOptions` (line 1423), handlers in `MainViewModel` (line 4084 is the quick popup one; `_osdService`
+  is field line 86). `OsdService.Toggle()` already exists and `Show()` only acts when `Osd.Enabled` is true.
+- Work: add `ToggleOsd`, an event `ToggleOsdRequested`, a `MainViewModel` handler that calls `_osdService?.Toggle()`, and the settings
+  entry. When the OSD is switched off in settings, log that once instead of silently doing nothing.
+- Needs no hardware evidence beyond the OMEN key already being detected on the board; status wording: "implemented, pending a user test".
+  The Settings option label should be readable ("Show/hide OSD"), checking how the other entries are labelled.
+- Tests: mapping and event tests next to the existing OMEN key tests in `HotkeyAndMonitoringTests.cs`.
 
 ### Phase 4: engineering foundations (promised in `docs/V4.4.1_IMPLEMENTATION_STATUS.md`)
 
