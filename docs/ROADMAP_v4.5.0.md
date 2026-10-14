@@ -437,7 +437,98 @@ dotnet test OmenCore.sln                                    # full suite, about 
 Last full run before this cycle: 1861 App tests and 66 Linux tests passing. Keep the count from falling.
 
 **Package template.** Each package below has: *Goal*, *Evidence* (issue or file), *Where* (files, verified to exist on 2026-10-12),
-*Do*, *Tests*, *Done when*, and *Gate* (what stops it being merged early). Status values: `todo`, `needs data`, `blocked`, `done`.
+*Do*, *Tests*, *Done when*, and *Gate* (what stops it being merged early). Status values: `todo`, `needs data`, `blocked`, `done`. Progress is ticked in section 5A.
+
+## 5A. Tick sheet
+
+The working agent edits this list as it goes. Tick `[x]` only when the item is finished **and verified** (the named test passes; build
+has 0 warnings). After the box write the short commit hash, for example `[x] (a1b2c3d)`. Something blocked or skipped stays `[ ]`
+with a one-line reason after it. Do not tick a *needs data* item without the data. Update the package status in section 6 in the same
+commit. Before every push: tick the row, run the full suite, then update the "Suite" line at the bottom.
+
+**Setup (first commit)**
+- [ ] Versions set to 4.5.0: `VERSION.txt`, `installer/OmenCoreInstaller.iss` `MyAppVersion`, `<Version>`/AssemblyVersion/FileVersion in the Avalonia, Cli and Core csproj files (Desktop csproj stays on 3.6.3)
+- [ ] `docs/CHANGELOG_v4.5.0.md` header and "Type:" line current
+- [ ] Baseline suite run recorded below
+
+**Phase 1: no hardware needed**
+- [ ] WP-01 Hotkey retry: Win32 call injectable
+- [ ] WP-01 retry timer plus on window activation, bounded (about 5 s, 12 tries)
+- [ ] WP-01 one `Warn` per failed key at the end, status object exposes it, Settings shows it
+- [ ] WP-01 tests: all-fail, fail-then-succeed, stops after Dispose
+- [ ] WP-02 `Ohman` entry in `ConflictDetectionService` (process name confirmed on a running copy)
+- [ ] WP-02 new `ConflictDetectionServiceTests` (present and absent)
+- [ ] WP-03 Linux fan-writer scan (`/proc/*/comm`, injected list) and `diagnose` "Other fan writers"
+- [ ] WP-03 daemon start warning, nothing is stopped or killed
+- [ ] WP-03 Linux test for the scanner
+- [ ] WP-04 `[Fan Firmware State]` section
+- [ ] WP-04 `[Power Transitions]` section (event IDs 41, 42, 107, 506, 507, no `powercfg`)
+- [ ] WP-04 `[CPU Throttle]` placeholder line
+- [ ] WP-04 tests: fake source and throwing source for each section
+- [ ] WP-05 live RPM source and PL1/PL2 result passed into the capability card
+- [ ] WP-05 card wording: "Estimated from fan level" / "not readable on this board"
+- [ ] WP-05 list of entries relying on the `SupportsRpmReadback` default in the commit message
+- [ ] WP-05 `SupportsRpmReadback = false` set for 8BBE, 8BD4, 8BC2 with tests
+- [ ] WP-06.1 calibration says RPM cannot be measured when the source is Estimated; table labelled estimated
+- [ ] WP-06.2 repeated stable readback below request counts as a firmware ceiling at any step
+- [ ] WP-06.3 `IsFirmwareCeilingPlateau` 90% rule (88F8 case); the 60%-step rule and its test kept
+- [ ] WP-06.4 thermal interruption marked, not failed; cool-down wait below 85 C before a run
+- [ ] WP-06.5 refused per-fan write says "firmware refused level L" (878A)
+- [ ] WP-06 scenario tests for #226 and #207 give "level-only" and "pass (ceiling)"
+- [ ] WP-07 8BC2 capability entry (V1, 2 fans, max 55, no RPM readback, curves/GPU boost/undervolt off, Intel) and test
+- [ ] WP-07 8BC2 `KeyboardModelDatabase` entry (`OneZoneWithNumpad`) and test
+- [ ] WP-07 88D1 entry (#228) and test
+- [ ] WP-07 88ED exact `KeyboardModelDatabase` row (#229) and test
+- [ ] WP-07 8A13 Notes and verified flags for the confirmed parts only (MUX stays off)
+- [ ] WP-07 8BD4 Notes: second owner (#226)
+- [ ] WP-07 8E9A Notes: keyboard colour confirmed through 30BF (#142)
+- [ ] WP-07 callers of `SetColorTable` that omit `zoneCount` (`KeyboardLightingService.cs:546`, `WmiBiosBackend.cs:213, 372`) pass the topology count
+- [ ] WP-08 write clamp for MAX/CURRENT with refusal text
+- [ ] WP-08 "stock max read X W, expected Y W" explanation
+- [ ] WP-08 panel text (do not disable PPAB, driver update may undo, RTX 5050 untested, re-toggle hint)
+- [ ] WP-08 TPP read-only, or left out with a note
+- [ ] WP-08 tests: range clamp, mismatch text
+- [ ] WP-09 `docs/LINUX_KERNEL_BOARD_SUPPORT.md` written, linked from the install guide, `46be1453` verified on kernel.org
+- [ ] WP-09 #219 reply drafted into a scratch file
+
+**Phase 2: behaviour changes, off by default**
+- [ ] WP-10 Max auto-return setting (off / cool-down / timer) through `ReleaseMaxAndHandBackToBios()`
+- [ ] WP-10 tests with fake clock; `FirmwareMaxPairingGateTests` green
+- [ ] WP-11 confirm from a real #222 export first (needs data)
+- [ ] WP-11 failsafe release fix and tests (70 C releases, 85 C does not)
+- [ ] WP-12 fan-stall guard (needs data; physical RPM source only)
+- [ ] WP-13 IA32_THERM_STATUS bits confirmed against the Intel SDM, decoder and test, result in `[CPU Throttle]`
+
+**Phase 3: needs reporter data**
+- [ ] WP-14.1 `SetColorTable` one-zone layout (`t[0]=1`, RGB at offsets 1 to 3, verify reads offset 25)
+- [ ] WP-14.2 tests: payload bytes for zone count 1 and 4; 8BD4 and 8BC2 topology mapping
+- [ ] WP-14.3 changelog says "implemented, pending 8BD4 retest"; build offered to the 8BD4 owner (draft only)
+- [ ] WP-14.4 30BF probe comparing interfaces (needs the maintainer's go-ahead on design)
+- [ ] WP-14.5 scene Wave/Rainbow reach the V2 keyboard engine (3K.14)
+- [ ] WP-14.6 startup-restore label says "saved, not applied" and the setting is findable (#142)
+- [ ] WP-15 878A fan control (needs data)
+- [ ] WP-16 V1 idle fan floor (needs data)
+- [ ] WP-17 8E35 and AMD SMU (needs data)
+- [ ] WP-18 Transcend 14 entries (needs data)
+
+**Phase 4: foundations (separate commits from behaviour changes)**
+- [ ] WP-19 fan write lease coordinator: design doc, then implementation
+- [ ] WP-19 trace and replay harness with the 8BD4, 8BC2, 88F8 exports
+- [ ] WP-19 sensor identity record (frozen CPU reading on 8E9A, 8BC2, 8DD0, 88D1, 88ED)
+- [ ] WP-19 asymmetric temperature filter behind an off flag
+- [ ] WP-19 shared capability resolver
+
+**Housekeeping and release (maintainer owns the last block)**
+- [ ] WP-20 Linux package suspend hook
+- [ ] WP-20 `CLAUDE.md` updated (version and open threads)
+- [ ] Section 4 "What counts as done" reviewed line by line
+- [ ] Replies drafted for every issue a shipped item touches; "Needs field confirmation" list rewritten
+- [ ] Full suite green, 0 warnings, count not lower than the baseline
+- [ ] Maintainer: PR #147 and code signing decisions
+- [ ] Maintainer: tag `v4.5.0`, check the release notes step, record SHA256, update README and website
+- [ ] Maintainer: close issues earmarked "close on ship"
+
+**Suite line:** baseline (4.4.5, 2026-10-12): 1864 passing, Windows. Last run: _not yet run this cycle_.
 
 ## 6. Work packages
 
