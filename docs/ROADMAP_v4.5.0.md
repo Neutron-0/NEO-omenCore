@@ -279,6 +279,12 @@ All of this is single-laptop evidence from bobshmo's own machine unless stated. 
   krpm hint" when handing back from Performance or Max (`WmiFanController` around lines 526 to 538, 1164 to 1168 and 1224;
   `HpWmiBios` line 1237). Hypothesis, *unconfirmed*: on boards whose firmware Auto would stop the fans, that hint may hold them
   at level 20. Needs an owner who can hear or measure the fans after Restore Auto and after quitting OmenCore.
+- **New report 2026-10-15 (no issue number yet, board not given):** a user says the fans sit at about 2300 RPM at all times, even in
+  Eco or Quiet, and that OMEN Gaming Hub drops the fans to 0 when heat and load are low. That is the fourth report of the same
+  symptom (#217, #226, #143). 2300 is level 23 on a V1 board (level x 100), close to the level 20 hint above but not equal, so the
+  hint cannot be the whole story and may not be the cause at all. Unknowns to ask for: board ID, the Windows power plan, whether
+  the fans stop when OmenCore is closed (Restore Auto, then quit), and whether they stop with OmenCore never started since boot.
+  If they stop with OmenCore closed, we are holding a floor; if not, the BIOS Auto curve on that board never stops them.
 - **#211 (8BBE), stuck fans: two exports from 2026-10-04 (4.4.1).** Telemetry shows about 5800 and 6100 estimated RPM at CPU 27.9 C
   and 3% load while the reporter switched Balanced and Quiet; the log shows the keepalive re-asserting Cool every 30 s. The export
   records no Max flag, fan mode or level readback ("LastMaxModeExternalResetDetails: No external Max-mode reset detected"), so the
@@ -529,6 +535,8 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-21.4 OSD disabled in settings: key press does nothing visible, one log line says why
 - [ ] WP-15 878A fan control (needs data)
 - [ ] WP-16 V1 idle fan floor (needs data)
+- [ ] WP-16.1 ask the reporters (#217, #226, #143, new 2026-10-15) for the stop-with-OmenCore-closed A/B; record the result per board
+- [ ] WP-16.2 if OmenCore holds the floor: skip the level 20 hint and keepalive on those boards, opt-in "allow fans to stop at idle", tests
 - [ ] WP-17 8E35 and AMD SMU (needs data)
 - [ ] WP-18 Transcend 14 entries (needs data)
 
@@ -719,6 +727,10 @@ Needs the board's EC register map from a source we may use and an owner test; ke
 **WP-16 V1 idle fan floor** (`needs data`): K.9. Investigate whether `SetFanLevel(20, 20)` after a hand-back keeps fans from
 stopping. Needs an owner who can hear or measure the fans after Restore Auto and after quitting. If confirmed, skip the hint on boards
 whose Auto stops the fans (evidence per board), with a test.
+Add a user-facing option "Allow fans to stop at idle" (off by default) only if the A/B above shows OmenCore is what holds the floor. It
+would hand fans back to the BIOS without the level 20 hint and without the keepalive re-asserting a level while CPU and chassis are cool
+and load is low, and would re-engage the normal curve above a threshold. Never write level 0 ourselves as a "stop" command: boards that
+refuse or misread it (K.9 878A) would be worse off. Implemented, pending hardware confirmation.
 
 **WP-17 8E35 and AMD SMU** (`needs data`): a real diagnostics export from #222 (the three posted files are `config.json`); PM-table
 dumps for Ryzen 9 8940HX, Ryzen 7 260 (#223) and the 8E9F CPU via `tools/SmuProbe --pmtable`; UI stutter profile (curve editor drag
