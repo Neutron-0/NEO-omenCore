@@ -382,6 +382,18 @@ All of this is single-laptop evidence from bobshmo's own machine unless stated. 
     switch is. Check the settings label is findable.
   - Third fan: Keith1341 says HP added it for the PCH. Still no control path or RPM for it; record as reporter statement.
 - Replied 2026-10-14 (effects, scenes gap, startup label, per-key question, verification request).
+- Keith1341 third post (2026-10-14 01:18 UTC): Guided Fan Verification 6/6 passed, 81/100, RPM source Estimated (all `[evidence: Level]`),
+  RGB pattern shown, physical confirmation by the reporter not stated. Found the startup-restore switch. New:
+  - Per-key paint does nothing: Paint selected, pick colour, click a key, Apply, nothing visible; box-drag selection also fails. The
+    export read on 2026-10-14 pre-dates the attempt (no `[KeyboardMap] Apply:` line, which `KeyboardMapViewModel.ApplyAsync` always logs),
+    so the cause is unknown. Ask for the log after one Apply and a screenshot of the editor. Suspects, unconfirmed: layout is
+    `UNVERIFIED` (12 of 120 lamps without a HID usage), selection not reaching `PaintSelection`, or LampArray reports accepted with no
+    visible change. Box-drag is a separate editor bug to reproduce.
+  - Tray GPU Power submenu has only Minimum, Medium and Maximum (`TrayIconService.cs` lines 425 to 429, labels at 808 to 812), while
+    the Custom profile offers Extended (`SystemControlViewModel.GpuPowerBoostLevels`). The tray's `_currentGpuPowerLevel` defaults to
+    "Medium", and `SetGpuPowerLevel("Extended")` matches no item, so a reporter on Extended sees Medium. Code-confirmed gap; fix
+    in WP-14 neighbour: add an Extended item shown only when the board supports it, and tick the right item. Test the label/tick logic.
+
 
 ### L. Research log
 - 2026-10-11. **Ohman** (`P4R1H/ohman`, [repo](https://github.com/P4R1H/ohman), [releases](https://github.com/P4R1H/ohman/releases)):
@@ -505,6 +517,8 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-14.3 changelog says "implemented, pending 8BD4 retest"; build offered to the 8BD4 owner (draft only)
 - [ ] WP-14.4 30BF probe comparing interfaces (needs the maintainer's go-ahead on design)
 - [ ] WP-14.5 scene Wave/Rainbow reach the V2 keyboard engine (3K.14)
+- [ ] WP-14.7 tray GPU Power submenu: Extended item (when supported) and correct tick (#142)
+- [ ] WP-14.8 per-key paint/Apply and box-select reproduced from a log after one Apply (#142, needs data)
 - [ ] WP-14.6 startup-restore label says "saved, not applied" and the setting is findable (#142)
 - [ ] WP-15 878A fan control (needs data)
 - [ ] WP-16 V1 idle fan floor (needs data)
