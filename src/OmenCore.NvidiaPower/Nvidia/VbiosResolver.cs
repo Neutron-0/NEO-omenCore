@@ -256,7 +256,7 @@ namespace NvpwrControlBlackwell
                 string exe = FindNvflash();
                 if (String.IsNullOrEmpty(exe))
                 {
-                    message = "nvflash64.exe was not found. Select a .rom file manually.";
+                    message = "nvflash64.exe (or nvflashb.exe on RTX 50 cards) was not found. Select a .rom file manually. Apply CURRENT does not need it.";
                     return false;
                 }
 
@@ -438,24 +438,32 @@ namespace NvpwrControlBlackwell
             return BitConverter.ToUInt32(b, off);
         }
 
-        private static string FindNvflash()
+        // nvflash64.exe is the classic name; Blackwell (RTX 50) cards use nvflashb.exe (Prophecy standalone 1.2.0 notes).
+        // Neither is shipped here: we only find a copy the user supplied.
+        internal static readonly string[] NvflashFileNames = { "nvflash64.exe", "nvflashb.exe" };
+
+        internal static string FindNvflash(string baseDirectory, string pathVariable, Func<string, bool> fileExists)
         {
             List<string> candidates = new List<string>();
-            candidates.Add(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "nvflash64.exe"));
-            candidates.Add(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "nvflash64.exe"));
-            candidates.Add(@"C:\NVFlash\nvflash64.exe");
-            candidates.Add(@"C:\nvflash\nvflash64.exe");
-
-            string path = Environment.GetEnvironmentVariable("PATH") ?? "";
-            foreach (string d in path.Split(';'))
+            foreach (string name in NvflashFileNames)
             {
-                if (!String.IsNullOrWhiteSpace(d)) candidates.Add(Path.Combine(d.Trim(), "nvflash64.exe"));
+                candidates.Add(Path.Combine(baseDirectory, "tools", name));
+                candidates.Add(Path.Combine(baseDirectory, name));
+                candidates.Add(@"C:\NVFlash\" + name);
+                candidates.Add(@"C:\nvflash\" + name);
+                foreach (string d in pathVariable.Split(';'))
+                {
+                    if (!String.IsNullOrWhiteSpace(d)) candidates.Add(Path.Combine(d.Trim(), name));
+                }
             }
 
             foreach (string c in candidates)
-                try { if (File.Exists(c)) return Path.GetFullPath(c); } catch { }
+                try { if (fileExists(c)) return Path.GetFullPath(c); } catch (ArgumentException) { } catch (NotSupportedException) { }
             return null;
         }
+
+        private static string FindNvflash() =>
+            FindNvflash(AppDomain.CurrentDomain.BaseDirectory, Environment.GetEnvironmentVariable("PATH") ?? "", File.Exists);
 
         private static void SaveCache(string profileId, string vbiosVersion, string deviceKey, VbiosResolution r)
         {

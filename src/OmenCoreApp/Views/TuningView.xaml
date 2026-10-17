@@ -917,7 +917,7 @@
                         </StackPanel>
                         <WrapPanel>
                             <Button Content="1. Resolve VBIOS" Command="{Binding SystemControl.NvidiaPower.ResolveVbiosCommand}" Style="{StaticResource ModernButton}" Padding="16,8" Margin="0,0,8,4"
-                                    ToolTip="Reads the VBIOS power table. Needs nvflash64.exe next to OmenCore.exe, or use 'From file'."/>
+                                    ToolTip="Reads the VBIOS power table. Needs nvflash64.exe (nvflashb.exe on RTX 50 cards) next to OmenCore.exe, or use 'From file'. Apply CURRENT does not need it."/>
                             <Button Content="From file..." Command="{Binding SystemControl.NvidiaPower.ResolveVbiosFromFileCommand}" Style="{StaticResource ModernButton}" Padding="16,8" Margin="0,0,8,4"/>
                             <Button Content="Apply MAX (restart)" Command="{Binding SystemControl.NvidiaPower.ApplyMaxCommand}" Style="{StaticResource ModernButton}" Padding="16,8" Margin="0,0,8,4"/>
                             <Button Content="Apply CURRENT" Command="{Binding SystemControl.NvidiaPower.ApplyCurrentCommand}" Style="{StaticResource ModernButton}" Padding="16,8" Margin="0,0,8,4"/>
