@@ -535,6 +535,10 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-21.4 OSD disabled in settings: key press does nothing visible, one log line says why
 - [ ] WP-15 878A fan control (needs data)
 - [ ] WP-16 V1 idle fan floor (needs data)
+- [ ] WP-22.1 ask the reporter (via bobshmo) for the `NVIDIA power:` log lines and the panel status text; record board and GPU
+- [ ] WP-22.2 confirm with bobshmo in writing that 1.2.x code may be used before copying anything
+- [ ] WP-22.3 `FindNvflash` also finds `nvflashb.exe`; clear message when none is found; tests
+- [ ] WP-22.4 CURRENT fault from WP-22.1 reproduced from the log and fixed, or recorded as unconfirmed
 - [ ] WP-16.1 ask the reporters (#217, #226, #143, new 2026-10-15) for the stop-with-OmenCore-closed A/B; record the result per board
 - [ ] WP-16.2 if OmenCore holds the floor: skip the level 20 hint and keepalive on those boards, opt-in "allow fans to stop at idle", tests
 - [ ] WP-17 8E35 and AMD SMU (needs data)
@@ -749,6 +753,26 @@ path) from `runtime-performance.txt`.
 - Needs no hardware evidence beyond the OMEN key already being detected on the board; status wording: "implemented, pending a user test".
   The Settings option label should be readable ("Show/hide OSD"), checking how the other entries are labelled.
 - Tests: mapping and event tests next to the existing OMEN key tests in `HotkeyAndMonitoringTests.cs`.
+
+**WP-22 NVIDIA power unlock: catch up with the Prophecy standalone 1.2.x** (`needs data` for CURRENT, `ready` for the nvflash lookup; request 2026-10-17)
+- Request (Discord, from bobshmo, 2026-10-17): "Apply current does not work and user is still prompted for nvflash, current build fixes this."
+  No GitHub issue mentions the unlock yet (searched romOverride, Resolve VBIOS, CURRENT, Prophecy, nvflash). Which user and board is unknown.
+- What our code does: the nvflash prompt comes only from the **Resolve VBIOS** step. `VbiosResolver.FindNvflash` (line 441) looks for
+  `nvflash64.exe` only (tools folder, next to the exe, `C:\NVFlash`, PATH); the tooltip in `TuningView.xaml` line 920 says the same.
+  bobshmo's standalone 1.2.0 notes say Blackwell cards use a bundled **nvflashb.exe**, detected automatically, and that the ROM-dump launch
+  was fixed to run with a hidden console. Our dump launch already passes `createNoWindow = true`, so the second part may already hold.
+- Backend `SetCurrent` (`PowerBackend.cs` line 441) does **not** need the VBIOS or nvflash: it needs the driver transport trusted
+  (`CurrentWritesReady`), a consistent policy, GPU idle (under 30%), and live MAX readable. So "Apply CURRENT does not work" is a separate
+  fault from the nvflash prompt. Cause unconfirmed: needs the OmenCore log lines starting `NVIDIA power:` and `NVIDIA power panel:` and the
+  panel status text (it says why CURRENT is "not ready").
+- Work, in order: (1) ask the reporter for the log and panel text; (2) add `nvflashb.exe` to `FindNvflash` and use the exact arguments
+  bobshmo's notes document, if they differ; (3) show a clear message when no nvflash is found, saying CURRENT can still work without it;
+  (4) re-read the 1.2.1 to 1.2.5 notes for fixes that touch MAX or CURRENT only. Tests next to `NvidiaPowerServiceTests`.
+- Do **not** bundle nvflash. bobshmo's own 1.2.0 notes say the NVFlashB upstream README says MIT while its LICENSE file is GPLv3, so no
+  blanket licence is claimed. We detect a copy the user supplies, as now. Not in 4.5.0: Backup ROM, Import ROM and Flash (physical flashing,
+  unconfirmed), the PCF/TPP controls and calibration (see 3I; PCF stays read only), the GPU-cap tester.
+- Permission: the 4.4.5 integration was "with permission". The permission for pulling in 1.2.x code should be confirmed with bobshmo
+  before copying anything new; the standalone repo has no licence file, so ask in writing. Status wording: "implemented, pending hardware".
 
 ### Phase 4: engineering foundations (promised in `docs/V4.4.1_IMPLEMENTATION_STATUS.md`)
 
