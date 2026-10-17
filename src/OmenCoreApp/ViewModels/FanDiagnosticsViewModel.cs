@@ -331,6 +331,8 @@ namespace OmenCore.ViewModels
                 for (int levelIndex = 0; levelIndex < testLevels.Length; levelIndex++)
                 {
                     var targetPercent = testLevels[levelIndex];
+                    var stepResults = new System.Collections.Generic.List<FanApplyResult>();
+                    var stepRows = new System.Collections.Generic.List<int>(); // index in `results` of each stepResults entry
                     
                     for (int fanIndex = 0; fanIndex < fanNames.Length; fanIndex++)
                     {
@@ -346,6 +348,8 @@ namespace OmenCore.ViewModels
                             // is judged consistently with the single-fan diagnostic.
                             var passed = result.VerificationPassed;
                             var evidence = string.IsNullOrWhiteSpace(result.VerificationEvidence) ? "None" : result.VerificationEvidence;
+                            stepResults.Add(result);
+                            stepRows.Add(results.Count);
                             results.Add((fanName, targetPercent, passed, result.RpmDisplay, result.DeviationPercent, result.VerificationScore, result.ScoreRating, evidence));
                             sourcesSeen.Add(result.RpmSource);
                             
@@ -364,6 +368,20 @@ namespace OmenCore.ViewModels
                         }
                     }
                     
+                    // A fan held by the same firmware ceiling as its sibling passes with that evidence (#207).
+                    if (FanVerificationService.ReconcileCeilingAcrossFans(stepResults) > 0)
+                    {
+                        for (int i = 0; i < stepResults.Count; i++)
+                        {
+                            var row = results[stepRows[i]];
+                            if (!row.passed && stepResults[i].VerificationPassed)
+                            {
+                                results[stepRows[i]] = (row.Item1, row.Item2, true, row.Item4, row.Item5, row.Item6, row.Item7, stepResults[i].VerificationEvidence);
+                                _logging.Info($"[GuidedDiagnostic] {row.Item1} at {row.Item2}% re-judged as firmware ceiling (settled within 90% of the other fan's best level)");
+                            }
+                        }
+                    }
+
                     GuidedTestProgress = ((levelIndex + 1) * 100) / testLevels.Length;
                 }
 

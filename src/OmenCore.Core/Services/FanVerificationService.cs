@@ -893,6 +893,38 @@ namespace OmenCore.Services
             return result.ActualLevelAfter * 100 >= result.ExpectedLevel * 80;
         }
 
+        /// <summary>
+        /// After every fan has been tried at the same 100% step: a fan that settled within 90% of the best level another fan
+        /// reached there is held by the same firmware ceiling, not failing. 88F8 (#207): the CPU fan settled at 43/55 while the GPU
+        /// fan reached 46/55 and passed. The best level must itself be a real ceiling (at least 80% of the expected level), so two
+        /// fans both stuck low (88F8's Max stuck at the 60% level) still fail. Returns how many results were upgraded.
+        /// </summary>
+        public static int ReconcileCeilingAcrossFans(IReadOnlyList<FanApplyResult> stepResults)
+        {
+            var best = 0;
+            foreach (var r in stepResults)
+            {
+                if (r.VerificationPassed && r.RequestedPercent >= 100 && r.ExpectedLevel > 0 &&
+                    r.ActualLevelAfter * 100 >= r.ExpectedLevel * 80)
+                    best = Math.Max(best, r.ActualLevelAfter);
+            }
+            if (best == 0) return 0;
+
+            var upgraded = 0;
+            foreach (var r in stepResults)
+            {
+                if (r.VerificationPassed || r.RequestedPercent < 100 || r.ActualLevelAfter <= 0) continue;
+                if (IsPhysicalRpmSource(r.RpmSource) && r.ActualRpmAfter <= 0) continue;
+                if (r.ActualLevelAfter * 100 < best * 90) continue;
+
+                r.VerificationPassed = true;
+                r.VerificationEvidence = "FirmwareCeiling";
+                r.ErrorMessage = null;
+                upgraded++;
+            }
+            return upgraded;
+        }
+
         private static string DetermineVerificationEvidence(bool rpmMatched, bool levelMatched)
         {
             if (rpmMatched && levelMatched) return "RPM+Level";

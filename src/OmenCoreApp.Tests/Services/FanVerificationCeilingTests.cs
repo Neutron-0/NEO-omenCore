@@ -49,5 +49,68 @@ namespace OmenCoreApp.Tests.Services
             r.ActualRpmAfter = 0;
             FanVerificationService.IsFirmwareCeilingPlateau(r).Should().BeFalse();
         }
+
+        private static FanApplyResult Step(int actual, bool passed, int expected = 55) =>
+            new()
+            {
+                RequestedPercent = 100, ExpectedLevel = expected, ActualLevelAfter = actual, RpmSource = RpmSource.Estimated,
+                ActualRpmAfter = actual * 100, VerificationPassed = passed, VerificationEvidence = passed ? "FirmwareCeiling" : "None"
+            };
+
+        [Fact]
+        public void Reconcile_88F8_CpuFanAt43_PassesBesideTheGpuFanAt46()
+        {
+            // #207: CPU fan settled at 43/55 (78%) after Max and a direct write; the GPU fan reached 46/55 and passed.
+            var cpu = Step(43, passed: false);
+            var gpu = Step(46, passed: true);
+
+            FanVerificationService.ReconcileCeilingAcrossFans(new[] { cpu, gpu }).Should().Be(1);
+
+            cpu.VerificationPassed.Should().BeTrue();
+            cpu.VerificationEvidence.Should().Be("FirmwareCeiling");
+        }
+
+        [Fact]
+        public void Reconcile_BothFansStuckLow_StillFail()
+        {
+            // 88F8 before the fix: Max never rose past the 60% step's level on either fan.
+            var a = Step(33, passed: false);
+            var b = Step(33, passed: false);
+
+            FanVerificationService.ReconcileCeilingAcrossFans(new[] { a, b }).Should().Be(0);
+
+            a.VerificationPassed.Should().BeFalse();
+            b.VerificationPassed.Should().BeFalse();
+        }
+
+        [Fact]
+        public void Reconcile_AFanFarBelowItsSibling_StillFails()
+        {
+            var low = Step(30, passed: false);
+            var high = Step(48, passed: true);
+
+            FanVerificationService.ReconcileCeilingAcrossFans(new[] { low, high }).Should().Be(0);
+            low.VerificationPassed.Should().BeFalse();
+        }
+
+        [Fact]
+        public void Reconcile_PhysicalTachometerAtZero_IsNotUpgraded()
+        {
+            var stalled = Step(43, passed: false);
+            stalled.RpmSource = RpmSource.EcDirect;
+            stalled.ActualRpmAfter = 0;
+            var ok = Step(46, passed: true);
+
+            FanVerificationService.ReconcileCeilingAcrossFans(new[] { stalled, ok }).Should().Be(0);
+        }
+
+        [Fact]
+        public void Reconcile_NeverTouchesStepsBelowOneHundredPercent()
+        {
+            var a = Step(20, passed: false); a.RequestedPercent = 60;
+            var b = Step(21, passed: true); b.RequestedPercent = 60;
+
+            FanVerificationService.ReconcileCeilingAcrossFans(new[] { a, b }).Should().Be(0);
+        }
     }
 }
