@@ -594,7 +594,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-19 fan write lease coordinator: design doc, then implementation
 - [x] (this commit) WP-19 design note `docs/DESIGN_FAN_WRITE_LEASE.md` (lease coordinator and trace-replay plan); implementation waits for the maintainer's go-ahead on step 1 and on keeping scrubbed traces as test data
 - [ ] WP-19 trace and replay harness with the 8BD4, 8BC2, 88F8 exports
-- [ ] WP-19 sensor identity record (frozen CPU reading on 8E9A, 8BC2, 8DD0, 88D1, 88ED)
+- [ ] WP-19 sensor identity record (frozen CPU reading on 8E9A, 8BC2, 8DD0, 88D1, 88ED) — started, not done: a one-time warning when the BIOS CPU and GPU readings are identical for 30 reads (`6604a54`, #157, observation only); the stable per-board record of which sensor feeds CPU temperature is still to do
 - [ ] WP-19 asymmetric temperature filter behind an off flag
 - [ ] WP-19 shared capability resolver
 
