@@ -468,17 +468,17 @@ with a one-line reason after it. Do not tick a *needs data* item without the dat
 commit. Before every push: tick the row, run the full suite, then update the "Suite" line at the bottom.
 
 **Setup (first commit)**
-- [ ] Versions set to 4.5.0: `VERSION.txt`, `installer/OmenCoreInstaller.iss` `MyAppVersion`, `<Version>`/AssemblyVersion/FileVersion in the Avalonia, Cli and Core csproj files (Desktop csproj stays on 3.6.3)
-- [ ] `docs/CHANGELOG_v4.5.0.md` header and "Type:" line current
-- [ ] Baseline suite run recorded below
+- [x] (b628391) Versions set to 4.5.0: `VERSION.txt`, `installer/OmenCoreInstaller.iss` `MyAppVersion`, `<Version>`/AssemblyVersion/FileVersion in the Avalonia, Cli and Core csproj files (Desktop csproj stays on 3.6.3)
+- [x] (this commit) `docs/CHANGELOG_v4.5.0.md` header and "Type:" line current
+- [x] (b628391) Baseline suite run recorded below
 
 **Phase 1: no hardware needed**
-- [ ] WP-01 Hotkey retry: Win32 call injectable
-- [ ] WP-01 retry timer plus on window activation, bounded (about 5 s, 12 tries)
-- [ ] WP-01 one `Warn` per failed key at the end, status object exposes it, Settings shows it
-- [ ] WP-01 tests: all-fail, fail-then-succeed, stops after Dispose
-- [ ] WP-02 `Ohman` entry in `ConflictDetectionService` (process name confirmed on a running copy)
-- [ ] WP-02 new `ConflictDetectionServiceTests` (present and absent)
+- [x] (4234cc9) WP-01 Hotkey retry: Win32 call injectable
+- [ ] WP-01 retry timer plus on window activation, bounded (about 5 s, 12 tries) — timer, 12 tries 5 s apart, done (4234cc9); retry on window activation not done
+- [ ] WP-01 one `Warn` per failed key at the end, status object exposes it, Settings shows it — Warn and diagnostics snapshot done (4234cc9); Settings display of failed keys not done
+- [x] (4234cc9) WP-01 tests: all-fail, fail-then-succeed, stops after Dispose
+- [ ] WP-02 `Ohman` entry in `ConflictDetectionService` (process name confirmed on a running copy) — entry added (0386d18) with the process name from the download file name; not checked on a running copy
+- [x] (0386d18) WP-02 new `ConflictDetectionServiceTests` (present and absent) — table entry only; the scan itself is not unit-testable without a refactor
 - [ ] WP-03 Linux fan-writer scan (`/proc/*/comm`, injected list) and `diagnose` "Other fan writers"
 - [ ] WP-03 daemon start warning, nothing is stopped or killed
 - [ ] WP-03 Linux test for the scanner
@@ -521,23 +521,23 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-13 IA32_THERM_STATUS bits confirmed against the Intel SDM, decoder and test, result in `[CPU Throttle]`
 
 **Phase 3: needs reporter data**
-- [ ] WP-14.1 `SetColorTable` one-zone layout (`t[0]=1`, RGB at offsets 1 to 3, verify reads offset 25)
-- [ ] WP-14.2 tests: payload bytes for zone count 1 and 4; 8BD4 and 8BC2 topology mapping
+- [x] (08465e2) WP-14.1 `SetColorTable` one-zone layout (`t[0]=1`, RGB at offsets 1 to 3, verify reads offset 25)
+- [x] (08465e2) WP-14.2 tests: payload bytes for zone count 1 and 4; 8BD4 and 8BC2 topology mapping
 - [ ] WP-14.3 changelog says "implemented, pending 8BD4 retest"; build offered to the 8BD4 owner (draft only)
 - [ ] WP-14.4 30BF probe comparing interfaces (needs the maintainer's go-ahead on design)
 - [ ] WP-14.5 scene Wave/Rainbow reach the V2 keyboard engine (3K.14)
-- [ ] WP-14.7 tray GPU Power submenu: Extended item (when supported) and correct tick (#142)
+- [x] (2b86584) WP-14.7 tray GPU Power submenu: Extended item — item always shown, like the Tuning page list; not per-board gated (when supported) and correct tick (#142)
 - [ ] WP-14.8 per-key paint/Apply and box-select reproduced from a log after one Apply (#142, needs data)
-- [ ] WP-14.6 startup-restore label says "saved, not applied" and the setting is findable (#142)
-- [ ] WP-21.1 `OmenKeyAction.ToggleOsd`: enum, `LoadSettings` mapping, `ExecuteAction` case, `ToggleOsdRequested` event
-- [ ] WP-21.2 `MainViewModel` handler calls `_osdService?.Toggle()`; "ToggleOsd" added to `OmenKeyActionOptions`
-- [ ] WP-21.3 tests: string maps to the action, the action raises only `ToggleOsdRequested`; unknown string still falls back to quick popup
-- [ ] WP-21.4 OSD disabled in settings: key press does nothing visible, one log line says why
+- [ ] WP-14.6 startup-restore label says "saved, not applied" and the setting is findable (#142) — main status label already says "Default" for a saved mode that was not applied; the tray Quick Profile popup still highlights Balanced, needs the saved-not-applied flag threaded through the tray snapshot
+- [x] (db96eec) WP-21.1 `OmenKeyAction.ToggleOsd`: enum, `LoadSettings` mapping, `ExecuteAction` case, `ToggleOsdRequested` event
+- [x] (db96eec) WP-21.2 `MainViewModel` handler calls `_osdService?.Toggle()`; "ToggleOsd" added to `OmenKeyActionOptions`
+- [x] (db96eec) WP-21.3 tests: string maps to the action, the action raises only `ToggleOsdRequested`; unknown string still falls back to quick popup
+- [x] (db96eec) WP-21.4 OSD disabled in settings: key press does nothing visible, one log line says why
 - [ ] WP-15 878A fan control (needs data)
 - [ ] WP-16 V1 idle fan floor (needs data)
 - [ ] WP-22.1 ask the reporter (via bobshmo) for the `NVIDIA power:` log lines and the panel status text; record board and GPU
 - [ ] WP-22.2 confirm with bobshmo in writing that 1.2.x code may be used before copying anything
-- [ ] WP-22.3 `FindNvflash` also finds `nvflashb.exe`; clear message when none is found; tests
+- [x] (bab4f61) WP-22.3 `FindNvflash` also finds `nvflashb.exe`; clear message when none is found; tests
 - [ ] WP-22.4 CURRENT fault from WP-22.1 reproduced from the log and fixed, or recorded as unconfirmed
 - [ ] WP-16.1 ask the reporters (#217, #226, #143, new 2026-10-15) for the stop-with-OmenCore-closed A/B; record the result per board
 - [ ] WP-16.2 if OmenCore holds the floor: skip the level 20 hint and keepalive on those boards, opt-in "allow fans to stop at idle", tests
@@ -561,7 +561,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] Maintainer: tag `v4.5.0`, check the release notes step, record SHA256, update README and website
 - [ ] Maintainer: close issues earmarked "close on ship"
 
-**Suite line:** baseline (4.4.5, 2026-10-12): 1864 passing, Windows. Last run: _not yet run this cycle_.
+**Suite line:** baseline (4.4.5, 2026-10-12): 1864 passing, Windows. Cycle baseline (2026-10-17, versions at 4.5.0): 1864 App + 66 Linux passing. Last full run (2026-10-17, after WP-01, WP-02, WP-14.1, WP-14.7, WP-21, WP-22.3): 1882 App + 66 Linux passing, 0 warnings.
 
 ## 6. Work packages
 
