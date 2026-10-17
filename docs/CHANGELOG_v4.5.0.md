@@ -7,6 +7,12 @@
 Nothing below is called confirmed unless a reporter has verified it on real hardware. Items marked
 *pending* are implemented and tested in software only.
 
+## Changed
+
+- **Bundled PawnIO driver installer updated from 2.0.1 to 2.2.0.** It upgrades in place from 2.1.0, fixes BSODs on Windows 10
+  RS5/19H1/19H2, and returns a reboot-required code in silent mode. Same signer as before. *Pending: the installer's
+  upgrade and `-install -silent` behaviour has not been run on a clean machine.*
+
 ## Fixed
 
 - **NVIDIA power unlock: the HP performance mode is chosen by firmware policy.** Before a CURRENT write on a Victus
