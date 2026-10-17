@@ -557,6 +557,8 @@ namespace OmenCore.Hardware
             return LoadSwing(loadMin, loadMax) >= FreezeLoadVarianceThresholdPercent;
         }
 
+        private readonly SensorAliasTracker _biosTempAlias = new();
+
         private void UpdateReadings()
         {
             if (_disposed) return;
@@ -578,6 +580,11 @@ namespace OmenCore.Hardware
                     if (temps.HasValue)
                     {
                         var (cpuTemp, gpuTemp) = temps.Value;
+                        if (_biosTempAlias.Observe(cpuTemp, gpuTemp))
+                        {
+                            _logging?.Warn($"BIOS temperature: CPU and GPU have returned the same value ({cpuTemp:F1}°C) for {SensorAliasTracker.ReportAfterReads} reads in a row. " +
+                                           "On this board one thermal zone may answer both indices, so the two readings may not be independent (#157).");
+                        }
                         var cpuFreezeThreshold = (_cachedCpuLoad < 20 && _cachedCpuPowerWatts <= 15)
                             ? IdleConsecutiveIdenticalTempReads
                             : MaxConsecutiveIdenticalTempReads;
