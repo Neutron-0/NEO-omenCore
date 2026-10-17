@@ -482,7 +482,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-03 Linux fan-writer scan (`/proc/*/comm`, injected list) and `diagnose` "Other fan writers"
 - [ ] WP-03 daemon start warning, nothing is stopped or killed
 - [ ] WP-03 Linux test for the scanner
-- [ ] WP-04 `[Fan Firmware State]` section
+- [x] (c27bd2f) WP-04 `[Fan Firmware State]` section — Max flag, level readback, thermal policy, fan count; fan-mode readback and watchdog-failsafe flag not included (no getter exists yet)
 - [ ] WP-04 `[Power Transitions]` section (event IDs 41, 42, 107, 506, 507, no `powercfg`)
 - [ ] WP-04 `[CPU Throttle]` placeholder line
 - [ ] WP-04 tests: fake source and throwing source for each section
