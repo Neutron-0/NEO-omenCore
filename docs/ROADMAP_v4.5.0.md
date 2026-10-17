@@ -517,8 +517,8 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 
 **Phase 1: no hardware needed**
 - [x] (4234cc9) WP-01 Hotkey retry: Win32 call injectable
-- [ ] WP-01 retry timer plus on window activation, bounded (about 5 s, 12 tries) — timer, 12 tries 5 s apart, done (4234cc9); retry on window activation not done
-- [ ] WP-01 one `Warn` per failed key at the end, status object exposes it, Settings shows it — Warn and diagnostics snapshot done (4234cc9); Settings display of failed keys not done
+- [x] (1b581fa) WP-01 retry timer plus on window activation, bounded (about 5 s, 12 tries) — done: timer (4234cc9) and retry on activation, at most once a minute (1b581fa); Settings lists the blocked keys (1b581fa)
+- [x] (1b581fa) WP-01 one `Warn` per failed key at the end, status object exposes it, Settings shows it — done: timer (4234cc9) and retry on activation, at most once a minute (1b581fa); Settings lists the blocked keys (1b581fa)
 - [x] (4234cc9) WP-01 tests: all-fail, fail-then-succeed, stops after Dispose
 - [ ] WP-02 `Ohman` entry in `ConflictDetectionService` (process name confirmed on a running copy) — entry added (0386d18) with the process name from the download file name; not checked on a running copy
 - [x] (0386d18) WP-02 new `ConflictDetectionServiceTests` (present and absent) — table entry only; the scan itself is not unit-testable without a refactor
@@ -574,7 +574,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [x] (be14d99) WP-14.5 scene Wave/Rainbow reach the V2 keyboard engine (3K.14) — Wave, Spectrum (as the device colour cycle) and Breathing scenes go to the keyboard's own effect engine; static scenes unchanged; the engine's Rainbow palette is not used, so a Spectrum scene shows the scene's colour cycling rather than a fixed rainbow
 - [x] (2b86584) WP-14.7 tray GPU Power submenu: Extended item — item always shown, like the Tuning page list; not per-board gated (when supported) and correct tick (#142)
 - [ ] WP-14.8 per-key paint/Apply and box-select reproduced from a log after one Apply (#142, needs data)
-- [ ] WP-14.6 startup-restore label says "saved, not applied" and the setting is findable (#142) — main status label already says "Default" for a saved mode that was not applied; the tray Quick Profile popup still highlights Balanced, needs the saved-not-applied flag threaded through the tray snapshot
+- [x] (e67c343) WP-14.6 startup-restore label says "saved, not applied" and the setting is findable (#142) — the tray performance header now reads "Firmware default" when the window says Default (checkmarks still map Default to Balanced); the Settings startup-restore options already exist
 - [x] (db96eec) WP-21.1 `OmenKeyAction.ToggleOsd`: enum, `LoadSettings` mapping, `ExecuteAction` case, `ToggleOsdRequested` event
 - [x] (db96eec) WP-21.2 `MainViewModel` handler calls `_osdService?.Toggle()`; "ToggleOsd" added to `OmenKeyActionOptions`
 - [x] (db96eec) WP-21.3 tests: string maps to the action, the action raises only `ToggleOsdRequested`; unknown string still falls back to quick popup
@@ -613,7 +613,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 
 ### Phase 1: no hardware needed, evidence already in hand
 
-**WP-01 Hotkey retry that ends in a message** (`todo`)
+**WP-01 Hotkey retry that ends in a message** (`done`)
 - Goal: a hotkey that fails to register at startup is retried for a bounded time and then reported, instead of silently dropped.
 - Evidence: 4.4.5 test machine, three hotkeys never registered and no result was logged. Code: `RetryPendingHotkeys()` runs only
   from `Initialize` (`src/OmenCoreApp/Services/HotkeyService.cs` lines 104 to 119 and 176 onward); a failed key is queued at line 302.
