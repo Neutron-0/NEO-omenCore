@@ -1513,6 +1513,10 @@
                                           AutomationProperties.Name="Only enable hotkeys when window is focused"/>
                         </Grid>
 
+                        <TextBlock Text="{Binding HotkeyFailureText}" FontSize="12" Margin="0,0,0,12" TextWrapping="Wrap"
+                                   Foreground="{StaticResource WarningBrush}"
+                                   Visibility="{Binding HotkeyHasFailures, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
                         <!-- Experimental Firmware Fn+P Profile Cycle -->
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>

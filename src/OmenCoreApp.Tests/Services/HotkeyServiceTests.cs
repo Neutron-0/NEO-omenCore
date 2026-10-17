@@ -10,6 +10,45 @@ namespace OmenCoreApp.Tests.Services
     public class HotkeyServiceTests
     {
         [Fact]
+        public void BlockedHotkey_IsTriedAgainOnActivation_ButNotMoreOftenThanOncePerMinute()
+        {
+            using var logging = new LoggingService();
+            var attempts = 0;
+            var service = new HotkeyService(logging, (_, _, _, _) => { attempts++; return false; }, (_, _) => true);
+            service.Initialize(new System.IntPtr(1));
+            service.RegisterHotkey(HotkeyAction.ToggleWindow, ModifierKeys.Control | ModifierKeys.Shift, Key.O);
+            for (var i = 0; i < HotkeyService.HotkeyRetryMaxTries; i++) service.RetryPendingHotkeysOnce();
+            service.GetDiagnosticSnapshot().FailedCount.Should().Be(1);
+            var afterGiveUp = attempts;
+            var t0 = new System.DateTime(2026, 10, 17, 12, 0, 0, System.DateTimeKind.Utc);
+
+            service.RetryFailedHotkeys(t0);
+            attempts.Should().Be(afterGiveUp + 1, "activation gives a blocked key another try");
+
+            service.RetryFailedHotkeys(t0.AddSeconds(30));
+            attempts.Should().Be(afterGiveUp + 1, "but not again within a minute");
+        }
+
+        [Fact]
+        public void DescribeFailedHotkeys_NamesTheBlockedKeys_AndIsEmptyWhenAllWork()
+        {
+            using var logging = new LoggingService();
+            var ok = false;
+            var service = new HotkeyService(logging, (_, _, _, _) => ok, (_, _) => true);
+            service.Initialize(new System.IntPtr(1));
+            service.DescribeFailedHotkeys().Should().BeEmpty();
+
+            service.RegisterHotkey(HotkeyAction.ToggleWindow, ModifierKeys.Control | ModifierKeys.Shift, Key.O);
+            for (var i = 0; i < HotkeyService.HotkeyRetryMaxTries; i++) service.RetryPendingHotkeysOnce();
+
+            service.DescribeFailedHotkeys().Should().Contain("Held by another app").And.Contain("ToggleWindow");
+
+            ok = true;
+            service.RetryFailedHotkeys(new System.DateTime(2026, 10, 17, 13, 0, 0, System.DateTimeKind.Utc));
+            service.DescribeFailedHotkeys().Should().BeEmpty("the other app let go");
+        }
+
+        [Fact]
         public void FailedHotkey_IsRetriedThenReportedOnce_WhenAnotherAppHoldsIt()
         {
             using var logging = new LoggingService();

@@ -339,6 +339,7 @@ namespace OmenCore.ViewModels
                         _fanCleaningService, _biosUpdateService, profileExportService, diagnosticsExportService,
                         _wmiBios, _omenKeyService, _osdService, _hardwareMonitoringService, _pollingCoordinator,
                         _powerAutomationService, _fanService, _resumeRecoveryDiagnostics, DetectedCapabilities);
+                    _settings.HotkeyFailureProvider = () => _hotkeyService.DescribeFailedHotkeys();
 
                     // Navigate to Bloatware Manager tab when requested from Settings
                     _settings.NavigateToBloatwareRequested += OnBloatwareNavigationRequested;
@@ -4477,6 +4478,8 @@ namespace OmenCore.ViewModels
 
         private void OnMainWindowActivated(object? sender, EventArgs e)
         {
+            _hotkeyService.RetryFailedHotkeys();
+
             if (!_windowFocusedHotkeysMode || _windowHotkeysActive)
             {
                 return;

@@ -209,6 +209,30 @@ namespace OmenCore.Services
             }
         }
 
+        private DateTime _lastFailedRetryUtc = DateTime.MinValue;
+        internal static readonly TimeSpan FailedRetryMinGap = TimeSpan.FromSeconds(60);
+
+        /// <summary>
+        /// Gives keys that were abandoned (held by another app) another bounded round of tries. Meant for window activation: the
+        /// other app may have been closed since. Rate limited so a key that stays blocked does not restart the timer on every focus.
+        /// </summary>
+        public void RetryFailedHotkeys(DateTime? nowUtc = null)
+        {
+            var now = nowUtc ?? DateTime.UtcNow;
+            if (_failedHotkeys.Count == 0 || now - _lastFailedRetryUtc < FailedRetryMinGap) return;
+
+            _lastFailedRetryUtc = now;
+            _logging.Info($"Hotkey retry on activation: trying {_failedHotkeys.Count} previously blocked hotkey(s) again");
+            foreach (var binding in _failedHotkeys.ToList())
+                RegisterHotkey(binding.Action, binding.Modifiers, binding.Key);
+        }
+
+        /// <summary>Plain-text list of hotkeys another app is holding, for Settings. Empty when there are none.</summary>
+        public string DescribeFailedHotkeys() =>
+            _failedHotkeys.Count == 0
+                ? string.Empty
+                : "Held by another app, not working: " + string.Join(", ", _failedHotkeys.Select(b => $"{b.DisplayString} ({b.Action})"));
+
         private void StartHotkeyRetryTimer()
         {
             if (_hotkeyRetryTimer != null) return;

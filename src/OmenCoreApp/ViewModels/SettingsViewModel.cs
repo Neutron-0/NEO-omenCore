@@ -1027,6 +1027,13 @@ namespace OmenCore.ViewModels
         /// shortcuts from interfering with other applications (e.g. Ctrl+Shift+F in games).
         /// This setting is enabled by default.
         /// </summary>
+        /// <summary>Supplied by the main view model: lists hotkeys another app is holding (empty when all work).</summary>
+        public Func<string>? HotkeyFailureProvider { get; set; }
+
+        public string HotkeyFailureText => HotkeyFailureProvider?.Invoke() ?? string.Empty;
+
+        public bool HotkeyHasFailures => HotkeyFailureText.Length > 0;
+
         public bool HotkeysWindowFocused
         {
             get => _hotkeysWindowFocused;
