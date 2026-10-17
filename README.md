@@ -275,12 +275,15 @@ Older release notes ([v3.8.0](docs/CHANGELOG_v3.8.0.md) and earlier) are kept in
 
 ## Current Development Focus
 
+**v4.5.0 is in development** (no 4.4.6). It is a follow-up to 4.4.5 built from the reports that came in after it: board entries for 8BC2, 88D1, 8F21 and an exact 88ED row; the one-zone keyboard colour layout for 8BD4 and 8BC2; hotkeys that report when another app holds them; optional Max fan auto-return; new fan-firmware, power-transition and CPU-throttle sections in the diagnostics export; and an experimental, off-by-default setting for fans that stay near 2000 RPM. Everything hardware-facing is *implemented, pending confirmation* until an owner tests it. The plan and the tick sheet are in [docs/ROADMAP_v4.5.0.md](docs/ROADMAP_v4.5.0.md); the running list is [docs/CHANGELOG_v4.5.0.md](docs/CHANGELOG_v4.5.0.md).
+
 **v4.4.5 is released and is waiting on field confirmation.** Most of what it adds was built from reporters' exports and from fork and research contributions, and has run only in software tests so far. The "Needs field confirmation" list in [docs/CHANGELOG_v4.4.5.md](docs/CHANGELOG_v4.4.5.md) says exactly what to try on which board.
 
 **Still open:** the 8BD4 single-zone keyboard ([#212](https://github.com/theantipopau/omencore/issues/212), waiting on the RGB probe result), the 8E35 AMD power table ([#222](https://github.com/theantipopau/omencore/issues/222), needs a PM-table dump), per-key RGB on Linux for the 2025 MAX boards ([#179](https://github.com/theantipopau/omencore/issues/179)), and the OMEN Transcend 16 (`8BB3`).
 
 The active work is tracked in:
 
+- [docs/CHANGELOG_v4.5.0.md](docs/CHANGELOG_v4.5.0.md) / [docs/ROADMAP_v4.5.0.md](docs/ROADMAP_v4.5.0.md) - the cycle in development.
 - [docs/CHANGELOG_v4.4.5.md](docs/CHANGELOG_v4.4.5.md) - the current release notes.
 - [docs/ROADMAP_v4.4.5.md](docs/ROADMAP_v4.4.5.md) - the full scope, investigations, and evidence trails for this cycle.
 - [docs/CHANGELOG_v4.4.1.md](docs/CHANGELOG_v4.4.1.md) / [docs/ROADMAP_v4.4.1.md](docs/ROADMAP_v4.4.1.md) - the previous cycle.

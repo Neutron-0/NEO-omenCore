@@ -86,6 +86,23 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
   The release uses the same path as choosing Auto yourself. There is no chassis sensor, so the hotter of CPU and GPU decides.
   *Implemented, pending hardware confirmation.* Tests: `MaxAutoReturnPolicyTests`, `FanServiceSuspendTests`.
 
+## Needs field confirmation
+
+Everything below runs only in software tests so far. Each line says who can confirm it and what to try.
+
+| Change | Board or owner | What to try |
+|---|---|---|
+| One-zone keyboard colour layout | 8BD4 (#212), 8BC2 (#227) | Set a colour on the Lighting page; say if the whole keyboard changes to it. Attach the newest log if not. |
+| "Do not pin a fan level when returning to Auto" (Settings, off by default, restart) | V1 boards whose fans sit near 2000 RPM: 8BC2 (#227), 8BD4 (#226), 88EE (#217), 8DCD (#143) | Turn it on, pick Extreme or Performance, load the CPU, and say whether the fans follow the temperature. |
+| Max fan auto-return (Off, Cooldown, Timer) | Any board with working Max | Pick Cooldown, run Max, let the laptop idle under 60 C for 2 minutes, and say if fans return to Auto. |
+| Scenes use the keyboard's own effects | 8E9A (#142) | Apply a Wave or Spectrum scene; say if the keyboard animates. |
+| Fan within 90% of its sibling counts as a firmware ceiling | 88F8 (#207) | Run Guided Fan Verification; the CPU fan at 100% should pass. |
+| Resolve VBIOS finds `nvflashb.exe` | RTX 50 laptops using the NVIDIA power unlock | Put `nvflashb.exe` next to OmenCore.exe and press Resolve VBIOS. |
+| OMEN key can show or hide the OSD | Any board with a working OMEN key | Set the OMEN key action to ToggleOsd and press the key. |
+| Hotkeys held by another app are retried and listed | Anyone with a hotkey another app holds | Hold a hotkey in another app, start OmenCore, and check Settings names it. |
+| Tray GPU Power Extended item | Boards that use Extended (#142) | Pick Extended in the Custom profile and check the tray ticks it. |
+| New board entries (8BC2, 88D1, 8F21, 8E41 two fans, exact 88ED row) | #227, #228, #230, #157, #229 | Run Guided Fan Verification and say what changes on the keyboard when a colour is set. |
+
 ## Release and CI (no change to the shipped program)
 
 - **Release notes keep the changelog.** Release Build now writes the notes from the template, the version's changelog,

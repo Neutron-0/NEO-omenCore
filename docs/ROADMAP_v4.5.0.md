@@ -451,6 +451,13 @@ All of this is single-laptop evidence from bobshmo's own machine unless stated. 
 - 2026-10-11. **Ohman** (`P4R1H/ohman`, [repo](https://github.com/P4R1H/ohman), [releases](https://github.com/P4R1H/ohman/releases)):
   releases 1.0.6 (15 Sep) to 1.3.1 (10 Oct). Taken from the README and releases page through a summarising fetch, not checked
   against the source. Read the 1.3.1 changelog directly before quoting it in public.
+- 2026-10-17. **Ohman 1.3.2** (released the same day; release notes read directly, documentation only): (a) "keyboard zones in the
+  wrong place on the Transcend 14 and OMEN 16 8E35: the app now takes the zone order from HP's own lighting driver" (their #87). That
+  fits our #157 export, where the Transcend 14 reports a four-zone layout; ask the owner whether colours land where the Lighting page
+  shows them, and look at our zone order for 8E41 and 8E35 if not. (b) "Fan control lost for a session when one EC read timed out at
+  start; it's asked again before giving up": check whether our start-up probe gives up on one failed read. (c) 8BA9 is "verified by
+  its owners" there (our #199 is still open; their statement is not our evidence). (d) The download is `Ohman.exe`, which is the
+  process name the conflict list uses (WP-02); still not seen on a running copy.
 - **OmenCtl** ([yunusemreyl/Omen-Control-App](https://github.com/yunusemreyl/Omen-Control-App), GPL-3.0) and
   **victus-control** ([Batuhan4/victus-control](https://github.com/Batuhan4/victus-control), GPL-3.0), and
   **omen-fan-control** ([arfelious/omen-fan-control](https://github.com/arfelious/omen-fan-control), GPL-3.0): README-level
@@ -602,7 +609,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [x] (this commit) WP-20 Linux package suspend hook — copied into the zip by `build-linux-package.ps1` (snippet dry-run on Windows; the Linux build itself runs in CI on the next tag, unverified until then)
 - [x] (this commit) WP-20 `CLAUDE.md` updated (version and open threads)
 - [ ] Section 4 "What counts as done" reviewed line by line
-- [ ] Replies drafted for every issue a shipped item touches; "Needs field confirmation" list rewritten
+- [ ] Replies drafted for every issue a shipped item touches; "Needs field confirmation" list rewritten — list written for what exists so far (`docs/CHANGELOG_v4.5.0.md`); to be re-checked at release; drafts still unposted: #226, #217, #143 and the Discord fan report
 - [ ] Full suite green, 0 warnings, count not lower than the baseline
 - [ ] Maintainer: PR #147 and code signing decisions
 - [ ] Maintainer: tag `v4.5.0`, check the release notes step, record SHA256, update README and website
