@@ -518,7 +518,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-11 confirm from a real #222 export first (needs data)
 - [ ] WP-11 failsafe release fix and tests (70 C releases, 85 C does not)
 - [ ] WP-12 fan-stall guard (needs data; physical RPM source only)
-- [ ] WP-13 IA32_THERM_STATUS bits confirmed against the Intel SDM, decoder and test, result in `[CPU Throttle]`
+- [x] (62d39fb) WP-13 IA32_THERM_STATUS bits confirmed against the Intel SDM, decoder and test, result in `[CPU Throttle]` — bits 0, 6, 8, 10 cross-checked against Linux msr-index.h, not the SDM itself (SDM section number unchecked, noted in the code comment); the read goes through the Tuning page's existing MSR handle, so it shows "not available" until that page has opened it
 
 **Phase 3: needs reporter data**
 - [x] (08465e2) WP-14.1 `SetColorTable` one-zone layout (`t[0]=1`, RGB at offsets 1 to 3, verify reads offset 25)
@@ -702,7 +702,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
   (`RpmSource` in `FanVerificationService.cs`); never on `Estimated` or `Unknown`. Where: `FanService` monitor loop or
   `HardwareWatchdogService`. Gate: needs an export from a board that has stalled, or a rig; release through the shared Max helper.
 
-**WP-13 CPU throttle reason, Intel first** (`todo`)
+**WP-13 CPU throttle reason, Intel first** (`done`, SDM section not checked)
 - Goal: log why the CPU is throttled. Where: `src/OmenCore.Core/Hardware/IMsrAccess.cs`, `PawnIOMsrAccess.cs`;
   `EdpThrottlingMitigationService.cs` already reads MSRs for a related purpose, so reuse its access pattern.
 - Do: read IA32_THERM_STATUS (`0x19C`) bits for thermal, PROCHOT and power-limit status; confirm the bit positions against the

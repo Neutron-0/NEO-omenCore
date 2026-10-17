@@ -61,7 +61,8 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
 
 - **Diagnostics export: three new sections for stuck-fan and wake reports.** `[Fan Firmware State]` (Max flag, fan level readback,
   thermal policy, fan count), `[Power Transitions]` (the last 20 sleep, resume and standby events with their reasons from the
-  Windows event log) and a reserved `[CPU Throttle]` line. Each is read-only and a failing read writes one line. Reports like
+  Windows event log) and `[CPU Throttle]` (Intel only: whether the CPU reports thermal or power-limit throttling right now, read from
+  IA32_THERM_STATUS through the Tuning page's MSR handle; AMD and a closed Tuning page read "not available"). Each is read-only and a failing read writes one line. Reports like
   #211 had none of this, so their cause stayed open. Test: `FanFirmwareStateTests`.
 
 - **Optional Max fan auto-return (off by default).** Settings, next to "Link fan to performance mode": Off keeps Max until you change it,
