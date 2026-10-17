@@ -1423,7 +1423,7 @@ namespace OmenCore.ViewModels
         public string[] OmenKeyActionOptions => new[]
         {
             "ShowQuickPopup", "ShowWindow", "ToggleFanMode", "TogglePerformanceMode",
-            "CyclePerformance", "CycleFanMode", "ToggleMaxCooling", "LaunchExternalApp", "DoNothing"
+            "CyclePerformance", "CycleFanMode", "ToggleMaxCooling", "ToggleOsd", "LaunchExternalApp", "DoNothing"
         };
 
         public bool OmenKeyLaunchesApp => OmenKeyAction == "LaunchExternalApp";

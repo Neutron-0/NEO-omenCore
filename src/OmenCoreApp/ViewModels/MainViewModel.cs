@@ -1583,6 +1583,7 @@ namespace OmenCore.ViewModels
             _omenKeyService.CycleFanModeRequested += OnHotkeyToggleFanMode;
             _omenKeyService.ToggleMaxCoolingRequested += OnOmenKeyToggleMaxCooling;
             _omenKeyService.ShowQuickPopupRequested += OnOmenKeyShowQuickPopup;
+            _omenKeyService.ToggleOsdRequested += (_, _) => _osdService?.Toggle();
             
             // Subscribe to service events for UI synchronization (e.g., power automation changes)
             _fanService!.PresetApplied += OnFanPresetApplied;

@@ -219,6 +219,8 @@ namespace OmenCore.Services
         {
             if (_isVisible)
                 Hide();
+            else if (!_config.Config.Osd.Enabled)
+                _logging.Info("OSD: Toggle ignored because the OSD is turned off in Settings");
             else
                 Show();
         }

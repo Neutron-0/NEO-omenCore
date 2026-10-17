@@ -165,6 +165,11 @@ namespace OmenCore.Services
         public event EventHandler? ShowQuickPopupRequested;
 
         /// <summary>
+        /// Fired to show or hide the on-screen display overlay.
+        /// </summary>
+        public event EventHandler? ToggleOsdRequested;
+
+        /// <summary>
         /// Get or set whether OMEN key interception is enabled.
         /// When disabled, the key passes through to system normally.
         /// </summary>
@@ -674,8 +679,12 @@ namespace OmenCore.Services
             // change applies to the next key press instead of only after a restart.
             LoadSettings();
             _logging.Info($"OMEN key pressed - executing: {_currentAction}");
-            
-            switch (_currentAction)
+            Dispatch(_currentAction);
+        }
+
+        internal void Dispatch(OmenKeyAction action)
+        {
+            switch (action)
             {
                 case OmenKeyAction.ToggleOmenCore:
                 case OmenKeyAction.ShowWindow:
@@ -700,6 +709,10 @@ namespace OmenCore.Services
                     ShowQuickPopupRequested?.Invoke(this, EventArgs.Empty);
                     break;
 
+                case OmenKeyAction.ToggleOsd:
+                    ToggleOsdRequested?.Invoke(this, EventArgs.Empty);
+                    break;
+
                 case OmenKeyAction.LaunchExternalApp:
                     LaunchExternalApplication();
                     break;
@@ -709,6 +722,21 @@ namespace OmenCore.Services
             }
         }
         
+        internal static OmenKeyAction ParseAction(string? actionStr) => actionStr switch
+        {
+            "ShowQuickPopup"       => OmenKeyAction.ShowQuickPopup,
+            "ShowWindow"           => OmenKeyAction.ShowWindow,
+            "ToggleFanMode"        => OmenKeyAction.ToggleFanMode,
+            "TogglePerformanceMode"=> OmenKeyAction.TogglePerformanceMode,
+            "CyclePerformance"     => OmenKeyAction.CyclePerformance,
+            "CycleFanMode"         => OmenKeyAction.CycleFanMode,
+            "ToggleMaxCooling"     => OmenKeyAction.ToggleMaxCooling,
+            "ToggleOsd"            => OmenKeyAction.ToggleOsd,
+            "LaunchExternalApp"    => OmenKeyAction.LaunchExternalApp,
+            "DoNothing"            => OmenKeyAction.DoNothing,
+            _                      => OmenKeyAction.ShowQuickPopup
+        };
+
         private void LaunchExternalApplication()
         {
             if (string.IsNullOrWhiteSpace(_externalAppPath))
@@ -748,19 +776,7 @@ namespace OmenCore.Services
                 // Map both old enum names (ToggleOmenCore, CycleFanMode…) and the UI display
                 // strings (ShowWindow, ToggleFanMode…) that SettingsViewModel persists.
                 var actionStr = _configService.Config.Features?.OmenKeyAction ?? _configService.Config.OmenKeyAction;
-                _currentAction = actionStr switch
-                {
-                    "ShowQuickPopup"       => OmenKeyAction.ShowQuickPopup,
-                    "ShowWindow"           => OmenKeyAction.ShowWindow,
-                    "ToggleFanMode"        => OmenKeyAction.ToggleFanMode,
-                    "TogglePerformanceMode"=> OmenKeyAction.TogglePerformanceMode,
-                    "CyclePerformance"     => OmenKeyAction.CyclePerformance,
-                    "CycleFanMode"         => OmenKeyAction.CycleFanMode,
-                    "ToggleMaxCooling"     => OmenKeyAction.ToggleMaxCooling,
-                    "LaunchExternalApp"    => OmenKeyAction.LaunchExternalApp,
-                    "DoNothing"            => OmenKeyAction.DoNothing,
-                    _                      => OmenKeyAction.ShowQuickPopup
-                };
+                _currentAction = ParseAction(actionStr);
                 
                 _logging.Info($"OMEN key settings loaded: Enabled={_isEnabled}, Action={_currentAction}");
             }
@@ -1145,6 +1161,9 @@ namespace OmenCore.Services
 
         /// <summary>Toggle max cooling on/off</summary>
         ToggleMaxCooling,
+
+        /// <summary>Show or hide the on-screen display overlay</summary>
+        ToggleOsd,
 
         /// <summary>Launch a user-specified external application</summary>
         LaunchExternalApp,
