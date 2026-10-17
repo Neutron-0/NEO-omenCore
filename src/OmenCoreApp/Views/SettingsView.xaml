@@ -1195,6 +1195,31 @@
                                           AutomationProperties.Name="Link fan to performance mode"/>
                         </Grid>
 
+                        <!-- Max fan auto-return (off by default) -->
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Return Max fan mode to Auto" FontSize="14"
+                                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <TextBlock Text="Off keeps Max until you change it. Cooldown hands the fans back to BIOS Auto when CPU and GPU stay under 60 C for 2 minutes. Timer hands them back after the chosen time. Not yet confirmed on hardware."
+                                           FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <ComboBox Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"
+                                      SelectedItem="{Binding MaxAutoReturnMode, Mode=TwoWay}"
+                                      ItemsSource="{Binding MaxAutoReturnModeOptions}"
+                                      AutomationProperties.Name="Return Max fan mode to Auto"/>
+                            <ComboBox Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" MinWidth="64"
+                                      SelectedItem="{Binding MaxAutoReturnTimerMinutes, Mode=TwoWay}"
+                                      ItemsSource="{Binding MaxAutoReturnTimerOptions}"
+                                      Visibility="{Binding MaxAutoReturnUsesTimer, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                      ToolTip="Minutes"
+                                      AutomationProperties.Name="Max fan auto-return timer minutes"/>
+                        </Grid>
+
                         <Separator Margin="0,16,0,16" Background="{StaticResource BorderBrush}"/>
 
                         <Grid Margin="0,0,0,12">

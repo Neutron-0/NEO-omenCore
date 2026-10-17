@@ -150,5 +150,14 @@ namespace OmenCore.Models
         /// Enabled by default because the watcher listens only for the narrow known event.
         /// </summary>
         public bool EnableFirmwareFnPProfileCycle { get; set; } = true;
+
+        /// <summary>
+        /// Return Max fan mode to BIOS Auto by itself: "Off" (default), "Cooldown" (CPU and GPU under 60 C for 2 minutes)
+        /// or "Timer" (after <see cref="MaxAutoReturnTimerMinutes"/> minutes).
+        /// </summary>
+        public string MaxAutoReturnMode { get; set; } = "Off";
+
+        /// <summary>Minutes for the "Timer" mode of <see cref="MaxAutoReturnMode"/>: 15, 30 or 60.</summary>
+        public int MaxAutoReturnTimerMinutes { get; set; } = 15;
     }
 }

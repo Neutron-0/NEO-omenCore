@@ -45,6 +45,53 @@ namespace OmenCoreApp.Tests.Services
             controller.AppliedPresetNames.Should().ContainSingle().Which.Should().Be(expected);
         }
 
+        [Fact]
+        public void MaxAutoReturn_Timer_HandsFansBackToAuto_AfterTheChosenTime()
+        {
+            var controller = new TrackingFanController();
+            using var service = CreateFanService(controller);
+            service.MaxAutoReturnOptions = () => (MaxAutoReturnMode.Timer, 15);
+            service.ApplyPreset(new FanPreset { Name = "Max", Mode = FanMode.Max });
+            var t0 = new DateTime(2026, 10, 17, 12, 0, 0, DateTimeKind.Utc);
+
+            service.EvaluateMaxAutoReturn(80, 70, t0);
+            service.EvaluateMaxAutoReturn(80, 70, t0.AddMinutes(14));
+            service.ActivePresetName.Should().Be("Max", "the timer has not run out");
+
+            service.EvaluateMaxAutoReturn(80, 70, t0.AddMinutes(15));
+            service.ActivePresetName.Should().Be("Auto");
+        }
+
+        [Fact]
+        public void MaxAutoReturn_Off_NeverLeavesMax()
+        {
+            var controller = new TrackingFanController();
+            using var service = CreateFanService(controller);
+            service.MaxAutoReturnOptions = () => (MaxAutoReturnMode.Off, 15);
+            service.ApplyPreset(new FanPreset { Name = "Max", Mode = FanMode.Max });
+            var t0 = new DateTime(2026, 10, 17, 12, 0, 0, DateTimeKind.Utc);
+
+            service.EvaluateMaxAutoReturn(40, 40, t0);
+            service.EvaluateMaxAutoReturn(40, 40, t0.AddHours(3));
+
+            service.ActivePresetName.Should().Be("Max");
+        }
+
+        [Fact]
+        public void MaxAutoReturn_Cooldown_DoesNothingWhileAnotherPresetIsActive()
+        {
+            var controller = new TrackingFanController();
+            using var service = CreateFanService(controller);
+            service.MaxAutoReturnOptions = () => (MaxAutoReturnMode.Cooldown, 15);
+            service.ApplyPreset(new FanPreset { Name = "Quiet", Mode = FanMode.Quiet });
+            var t0 = new DateTime(2026, 10, 17, 12, 0, 0, DateTimeKind.Utc);
+
+            service.EvaluateMaxAutoReturn(40, 40, t0);
+            service.EvaluateMaxAutoReturn(40, 40, t0.AddMinutes(10));
+
+            service.ActivePresetName.Should().Be("Quiet");
+        }
+
         // GitHub #189: the factory curve must only ever drive fans that are on firmware Auto.
         private static (AutomaticFanCurveController Curve, List<(int, int)> Writes) AttachCurve(FanService service, Func<bool> wanted)
         {

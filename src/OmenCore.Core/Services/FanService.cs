@@ -84,6 +84,10 @@ namespace OmenCore.Services
         /// Expose ThermalSensorProvider for OSD and other services that need temperature data.
         /// </summary>
         public ThermalSensorProvider ThermalProvider => _thermalProvider;
+
+        // Optional Max-to-Auto return (off by default). The app supplies the current setting; null means off.
+        private readonly MaxAutoReturnPolicy _maxAutoReturn = new();
+        public Func<(MaxAutoReturnMode Mode, int TimerMinutes)>? MaxAutoReturnOptions { get; set; }
         
         // Curve update timing - more aggressive for responsive fan control
         // v2.7.0: Reduced intervals to combat BIOS fan reversion on OMEN 16/Max models
@@ -1818,6 +1822,24 @@ namespace OmenCore.Services
             _fixedPollOverrideMs = Math.Max(1, ms);
         }
 
+        /// <summary>
+        /// Hands Max back to BIOS Auto when the user's Max auto-return setting says so. It goes through the same preset path as the
+        /// user choosing Auto, so the Max flag is released by the controller and the UI hears about it (never a bare SetFanMax(false)).
+        /// </summary>
+        internal void EvaluateMaxAutoReturn(double cpuTemp, double gpuTemp, DateTime? nowUtc = null)
+        {
+            var options = MaxAutoReturnOptions?.Invoke();
+            if (options is null) return;
+
+            var maxActive = _activePreset != null && IsMaxPreset(_activePreset) && !_diagnosticModeActive;
+            if (!_maxAutoReturn.ShouldReturn(nowUtc ?? DateTime.UtcNow, maxActive, Math.Max(cpuTemp, gpuTemp), options.Value.Mode, options.Value.TimerMinutes))
+                return;
+
+            _maxAutoReturn.Reset();
+            _logging.Info($"Max fan auto-return ({options.Value.Mode}): handing fans back to BIOS auto control");
+            ApplyPreset(new FanPreset { Name = "Auto", Mode = FanMode.Auto, IsBuiltIn = true }, immediate: true);
+        }
+
         private async Task MonitorLoop(CancellationToken token)
         {
             _logging.Info("Fan monitor loop started (with continuous curve support)");
@@ -1909,6 +1931,7 @@ namespace OmenCore.Services
                     
                     // Check thermal protection FIRST (overrides Auto mode when temps critical)
                     CheckThermalProtection(cpuTemp, gpuTemp);
+                    EvaluateMaxAutoReturn(cpuTemp, gpuTemp);
                     
                     // Apply fan curve if enabled and enough time has passed
                     await ApplyCurveIfNeededAsync(cpuTemp, gpuTemp, immediate: false);

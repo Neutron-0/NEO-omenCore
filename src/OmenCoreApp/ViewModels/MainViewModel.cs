@@ -1367,6 +1367,12 @@ namespace OmenCore.ViewModels
             _thermalMonitoringService.SsdWarningThreshold = ta.SsdWarningC;
             
             _fanService = new FanService(fanController, new ThermalSensorProvider(monitorBridge), _logging, _notificationService, _config.MonitoringIntervalMs, _resumeRecoveryDiagnostics, _ecOperationCoordinator, capabilities);
+            _fanService.MaxAutoReturnOptions = () =>
+            {
+                var features = _config.Features;
+                return (Enum.TryParse<MaxAutoReturnMode>(features?.MaxAutoReturnMode, true, out var mode) ? mode : MaxAutoReturnMode.Off,
+                        features?.MaxAutoReturnTimerMinutes ?? 15);
+            };
             _fanService.SetHysteresis(_config.FanHysteresis);
             _fanService.ThermalProtectionEnabled = _config.FanHysteresis?.ThermalProtectionEnabled ?? true;
             // Configure smoothing/transition settings for fan ramping

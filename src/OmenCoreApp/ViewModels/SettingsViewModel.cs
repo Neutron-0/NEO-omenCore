@@ -449,6 +449,39 @@ namespace OmenCore.ViewModels
             }
         }
 
+        public string[] MaxAutoReturnModeOptions { get; } = { "Off", "Cooldown", "Timer" };
+        public int[] MaxAutoReturnTimerOptions { get; } = { 15, 30, 60 };
+
+        /// <summary>"Off" (default), "Cooldown" or "Timer". Saved immediately: the fan loop reads it on every pass.</summary>
+        public string MaxAutoReturnMode
+        {
+            get => _config.Features?.MaxAutoReturnMode ?? "Off";
+            set
+            {
+                if (MaxAutoReturnMode == value) return;
+                _config.Features ??= new FeaturePreferences();
+                _config.Features.MaxAutoReturnMode = value;
+                _configService.Save(_config);
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(MaxAutoReturnUsesTimer));
+            }
+        }
+
+        public bool MaxAutoReturnUsesTimer => string.Equals(MaxAutoReturnMode, "Timer", StringComparison.OrdinalIgnoreCase);
+
+        public int MaxAutoReturnTimerMinutes
+        {
+            get => _config.Features?.MaxAutoReturnTimerMinutes ?? 15;
+            set
+            {
+                if (MaxAutoReturnTimerMinutes == value) return;
+                _config.Features ??= new FeaturePreferences();
+                _config.Features.MaxAutoReturnTimerMinutes = value;
+                _configService.Save(_config);
+                OnPropertyChanged();
+            }
+        }
+
         public bool StartupRestoreFansEnabled
         {
             get => _startupRestoreFansEnabled;
