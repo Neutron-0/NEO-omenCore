@@ -844,9 +844,9 @@ Every open item is listed once. "Owner reply last" means the maintainer answered
 | Issue | Board or topic | Where it is covered | State |
 |---|---|---|---|
 | #230 | 8F21 HyperX OMEN 16-ap1xxx | WP-07, K.15 | new, export read, entry added (`34951e2`), reply drafted, not posted |
-| #228 | 88D1 OMEN 15-en1xxx | WP-07, K.12 | new, export read, no reply yet |
-| #227 | 8BC2 Victus 16-r0xxx | WP-07, WP-14, K.2 | new, export read, no reply yet |
-| #226 | 8BD4 calibration, "stuck at 2000" | WP-06, K.1 | new, no reply yet |
+| #228 | 88D1 OMEN 15-en1xxx | WP-07, K.12 | replied 2026-10-12; entry added (`cd8bf89`); waiting on the reporter |
+| #227 | 8BC2 Victus 16-r0xxx | WP-07, WP-14, K.2, K.17 | replied 2026-10-14; reporter answered (fans at 2000 RPM, will test one-zone RGB); reply drafted `r227b.md`, not posted |
+| #226 | 8BD4 calibration, "stuck at 2000" | WP-06, K.1, K.17 | replied 2026-10-13; level-20 hint finding (K.17) not yet told to the reporter |
 | #225 | 8A13 | WP-07 | reporter replied 2026-10-11 (6/6 pass) |
 | #224 | 8E9F | WP-14, K.5 | reporter replied: keyboard no, light bar yes |
 | #223 | 8EEC (Ryzen 7 260) | WP-17 | owner reply last; needs a 4.4.5 export with PawnIO |
@@ -862,7 +862,7 @@ Every open item is listed once. "Owner reply last" means the maintainer answered
 | #195 | 8E35 | K.10 | reporter replied; rerun expected 6/6 |
 | #189 | 8D87 factory curve | section 1 | waiting on mbilykov's run |
 | #179, #151, #87 | Linux per-key RGB, 8D87 and 8D41 | section 3B | tester volunteered (#179) |
-| #229 | 88ED Victus 16-e0xxx | WP-07, K.13 | new, export read, no reply yet |
+| #229 | 88ED Victus 16-e0xxx | WP-07, K.13 | replied 2026-10-14; reporter asks about replaced fans, reply drafted `r229b.md`, not posted; keyboard row added (`cd8bf89`) |
 | #142 | 8E9A | WP-14, K.14 | replied 2026-10-13; reporter answered with effects/startup questions, new reply drafted 2026-10-14 |
 
 **Waiting on a reporter's export or test (owner reply last)**
