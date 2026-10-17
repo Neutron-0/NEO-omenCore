@@ -616,7 +616,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] Maintainer: tag `v4.5.0`, check the release notes step, record SHA256, update README and website
 - [ ] Maintainer: close issues earmarked "close on ship"
 
-**Suite line:** baseline (4.4.5, 2026-10-12): 1864 passing, Windows. Cycle baseline (2026-10-17, versions at 4.5.0): 1864 App + 66 Linux passing. Last full run (2026-10-17, through the 115 W 5070 Ti variant): 1960 App + 71 Linux passing, 0 warnings. One earlier run of the same code aborted at 1750 tests with a native `AccessViolationException` in the test host (no test name in the log); it did not repeat after the CPU-throttle reader stopped being a static, and a re-run of the related test groups passed. The cause is unproven: if it returns, suspect a test that holds a native handle (MSR, NVML) past its owner.
+**Suite line:** baseline (4.4.5, 2026-10-12): 1864 passing, Windows. Cycle baseline (2026-10-17, versions at 4.5.0): 1864 App + 66 Linux passing. Last full run (2026-10-17, through the 115 W 5070 Ti variant): 1964 App + 71 Linux passing, 0 warnings. One earlier run of the same code aborted at 1750 tests with a native `AccessViolationException` in the test host (no test name in the log); it did not repeat after the CPU-throttle reader stopped being a static, and a re-run of the related test groups passed. The cause is unproven: if it returns, suspect a test that holds a native handle (MSR, NVML) past its owner.
 
 ## 6. Work packages
 
