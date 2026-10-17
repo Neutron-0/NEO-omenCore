@@ -174,7 +174,7 @@ namespace OmenCore.ViewModels
         {
             if (_wmiBios == null) return;
             var confirm = System.Windows.MessageBox.Show(
-                "This sends 5 experimental keyboard colour commands, one every 4 seconds, each in red.\n\n" +
+                $"This sends {OmenCore.Hardware.ColorTableProbe.Variants.Count} experimental keyboard colour commands, one every 4 seconds, each in red.\n\n" +
                 "Watch the keyboard and note the NUMBER of the step during which it turns red, then report it on the GitHub issue. " +
                 "Afterwards, set your usual colour on the Lighting page to put things back.",
                 "RGB payload probe", System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Information);
@@ -191,7 +191,8 @@ namespace OmenCore.ViewModels
                     await Task.Delay(500);
                     var readback = await Task.Run(() => _wmiBios.GetColorTable());
                     var rb = readback == null || readback.Length < 28 ? "none" : $"{readback[25]:X2}{readback[26]:X2}{readback[27]:X2}";
-                    var line = $"PROBE {i + 1}/{variants.Count} {v.Id}: sent={(ok ? "ok" : "refused")}, readback@25=#{rb} - {v.Description}";
+                    var rb1 = readback == null || readback.Length < 4 ? "none" : $"{readback[1]:X2}{readback[2]:X2}{readback[3]:X2}";
+                    var line = $"PROBE {i + 1}/{variants.Count} {v.Id}: sent={(ok ? "ok" : "refused")}, readback@25=#{rb}, readback@1=#{rb1} - {v.Description}";
                     _logging.Info(line);
                     DiagnosticLogs.Insert(0, $"{DateTime.Now:HH:mm:ss} - {line}");
                     DiagnosticStatus = $"Probe step {i + 1} of {variants.Count}: is the keyboard red now?";

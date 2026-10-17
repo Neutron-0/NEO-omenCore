@@ -33,7 +33,7 @@ namespace OmenCoreApp.Tests.Hardware
         public void EachVariantChangesExactlyOneThingFromTheBaseline()
         {
             var baseline = ColorTableProbe.Variants[0].Build(0xAA, 0xBB, 0xCC);
-            foreach (var v in ColorTableProbe.Variants.Skip(1))
+            foreach (var v in ColorTableProbe.Variants.Skip(1).Where(v => !v.Id.StartsWith("count4")))
             {
                 var t = v.Build(0xAA, 0xBB, 0xCC);
                 t.Should().NotEqual(baseline, v.Id);
@@ -45,5 +45,18 @@ namespace OmenCoreApp.Tests.Hardware
         [Fact]
         public void VariantIds_AreUnique() =>
             ColorTableProbe.Variants.Select(v => v.Id).Should().OnlyHaveUniqueItems();
+
+        [Fact]
+        public void FourZoneVariants_CarryAllFourColoursWhereTheyClaim()
+        {
+            var t = ColorTableProbe.Variants.Single(v => v.Id == "count4-offset1").Build(0xFF, 0, 0);
+            t[0].Should().Be(4);
+            for (var z = 0; z < 4; z++) t[1 + 3 * z].Should().Be(0xFF);
+            t[25].Should().Be(0);
+
+            var both = ColorTableProbe.Variants.Single(v => v.Id == "count4-both").Build(0xFF, 0, 0);
+            both[1].Should().Be(0xFF);
+            both[34].Should().Be(0xFF);
+        }
     }
 }

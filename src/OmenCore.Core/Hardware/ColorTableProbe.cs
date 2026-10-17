@@ -6,7 +6,7 @@ namespace OmenCore.Hardware
     /// <summary>
     /// GitHub #212 (Victus 16-s0xxx, board 8BD4, firmware topology OneZoneWithNumpad): the declared zone count in byte 0
     /// reaches the hardware but the keyboard still does not change colour. The real single-zone payload is not known,
-    /// so this holds a short list of candidate layouts. Each differs from the baseline in exactly one way, so the owner
+    /// so this holds a short list of candidate layouts (single-zone first, then two four-zone ones added for 8F21, #230). Each differs from the baseline in exactly one way, so the owner
     /// can report which numbered step (if any) lit the keyboard. These are hypotheses to test, not fixes.
     /// </summary>
     public static class ColorTableProbe
@@ -32,6 +32,14 @@ namespace OmenCore.Hardware
             new Variant("count1-offset25-rgbx",
                 "Zone count 1, colour at offset 25 as four bytes R,G,B,255 (a padded pixel)",
                 (r, g, b) => { var t = Table(1, 25, r, g, b); t[28] = 0xFF; return t; }),
+            // #230 (8F21): the firmware reports four zones, a four-zone write at offset 25 reads back as accepted
+            // and the keyboard does not change, which is what 8BD4 did before its colour moved to offset 1.
+            new Variant("count4-offset1",
+                "Zone count 4, all four colours directly after the count byte (no 24-byte pad)",
+                (r, g, b) => { var t = Table(4, 1, r, g, b); for (var z = 1; z < 4; z++) Put(t, 1 + 3 * z, r, g, b); return t; }),
+            new Variant("count4-both",
+                "Zone count 4, four colours at offset 1 and again at offset 25",
+                (r, g, b) => { var t = Table(4, 1, r, g, b); for (var z = 1; z < 4; z++) Put(t, 1 + 3 * z, r, g, b); for (var z = 0; z < 4; z++) Put(t, 25 + 3 * z, r, g, b); return t; }),
         };
 
         private static byte[] Table(byte count, int colourAt, byte r, byte g, byte b)
