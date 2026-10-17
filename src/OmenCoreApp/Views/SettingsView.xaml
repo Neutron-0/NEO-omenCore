@@ -1195,6 +1195,24 @@
                                           AutomationProperties.Name="Link fan to performance mode"/>
                         </Grid>
 
+                        <!-- Experimental: do not pin a fan level when handing back to BIOS Auto (V1 boards) -->
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Do not pin a fan level when returning to Auto (experimental)" FontSize="14"
+                                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <TextBlock Text="For laptops whose fans stay near 2000 RPM at high temperature until you restore the OEM profile. Skips a fan-level hint OmenCore sends when it hands control back to the BIOS. Off by default; takes effect after a restart. Not yet confirmed on hardware."
+                                           FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <ToggleButton Grid.Column="1"
+                                          Style="{StaticResource ModernToggleButton}"
+                                          IsChecked="{Binding SkipV1FanLevelHint, Mode=TwoWay}"
+                                          AutomationProperties.Name="Do not pin a fan level when returning to Auto"/>
+                        </Grid>
+
                         <!-- Max fan auto-return (off by default) -->
                         <Grid Margin="0,12,0,0">
                             <Grid.ColumnDefinitions>

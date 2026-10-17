@@ -183,7 +183,8 @@ namespace OmenCore.Hardware
 
             // Create fan controller with intelligent backend selection using pre-detected capabilities.
             // Priority: OGH Proxy > WMI BIOS (no driver) > EC (PawnIO-preferred) > Fallback (monitoring only)
-            var fanControllerFactory = new FanControllerFactory(wmiBiosMonitor, ec, config.EcFanRegisterMap, logging, capabilities, config.MaxFanLevelOverride);
+            var fanControllerFactory = new FanControllerFactory(wmiBiosMonitor, ec, config.EcFanRegisterMap, logging, capabilities, config.MaxFanLevelOverride,
+                skipV1LevelHint: config.Features?.SkipV1FanLevelHint == true);
             FanController = fanControllerFactory.Create();
             FanBackend = fanControllerFactory.ActiveBackend;
         }

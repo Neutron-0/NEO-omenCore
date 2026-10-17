@@ -72,6 +72,11 @@ namespace OmenCore.Hardware
         private readonly LoggingService? _logging;
         private readonly bool _strictFanModeReadback;
         private readonly bool _allowV1AutoModeFloorClear;
+
+        // Opt-in (Settings, off by default): do not send the V1 "SetFanLevel(20, 20)" transition hint when handing fans back to the
+        // BIOS. On boards that skip the matching (0, 0) floor clear the hint is never undone, and #227, #226, #217 and #143 show fans
+        // sitting at level 20 (about 2000 RPM) at 80 to 96 C until the OEM profile is restored. Unconfirmed cause, hence opt-in.
+        private readonly bool _skipV1LevelHint;
         private readonly int _maxModeDropChecksBeforeReapply;
         private bool _disposed;
 
@@ -248,8 +253,10 @@ namespace OmenCore.Hardware
             bool strictFanModeReadback = true,
             bool allowV1AutoModeFloorClear = true,
             int? maxModeDropChecksBeforeReapply = null,
-            ushort[]? ecFanTachometerOffsets = null)
+            ushort[]? ecFanTachometerOffsets = null,
+            bool skipV1LevelHint = false)
         {
+            _skipV1LevelHint = skipV1LevelHint;
             _hwMonitor = hwMonitor;
             _logging = logging;
             _wmiBios = injectedWmiBios ?? new HpWmiBios(logging);
@@ -530,7 +537,7 @@ namespace OmenCore.Hardware
                         // systems where SetFanLevel uses percentage scale and 20% is a real target.
                         bool wasPerformanceMode = previousMode == HpWmiBios.FanMode.Performance ||
                                                   previousMode == HpWmiBios.FanMode.LegacyPerformance;
-                        if (wasPerformanceMode && _maxFanLevel < 100)
+                        if (wasPerformanceMode && _maxFanLevel < 100 && !_skipV1LevelHint)
                         {
                             System.Threading.Thread.Sleep(25);
                             if (_wmiBios.SetFanLevel(20, 20))
@@ -1159,7 +1166,7 @@ namespace OmenCore.Hardware
                 // control from working. On V2, we skip SetFanLevel entirely and rely on
                 // SetFanMode(Default) to restore BIOS control.
                 // V1 systems (MaxFanLevel=55) use krpm scale where 0 means "BIOS takes over".
-                if (_maxFanLevel < 100)
+                if (_maxFanLevel < 100 && !_skipV1LevelHint)
                 {
                     // V1: Use krpm hint to help BIOS transition
                     // Step 3: Set fan levels to minimum (20 krpm = ~2000 RPM) as a transition hint
@@ -1218,7 +1225,7 @@ namespace OmenCore.Hardware
                 // Step 3: Hand fan levels back to BIOS without sending a hard 0%/0 krpm write.
                 // V1 firmware has treated SetFanLevel(0,0) as a transient fan stop on some
                 // models, while V2 percentage-scale firmware treats it as manual 0% duty.
-                if (_maxFanLevel < 100)
+                if (_maxFanLevel < 100 && !_skipV1LevelHint)
                 {
                     _logging?.Info("Step 3: Sending V1 fan transition hint...");
                     _wmiBios.SetFanLevel(20, 20);

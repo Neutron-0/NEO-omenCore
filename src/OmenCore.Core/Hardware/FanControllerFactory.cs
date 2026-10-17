@@ -118,6 +118,7 @@ namespace OmenCore.Hardware
         private readonly DeviceCapabilities? _capabilities;
         private OghServiceProxy? _oghProxy;
         private readonly int _maxFanLevelOverride;
+        private readonly bool _skipV1LevelHint;
         
         /// <summary>
         /// The backend currently in use (for UI display).
@@ -130,8 +131,10 @@ namespace OmenCore.Hardware
             IReadOnlyDictionary<string, int>? registerMap = null,
             LoggingService? logging = null,
             DeviceCapabilities? capabilities = null,
-            int maxFanLevelOverride = 0)
+            int maxFanLevelOverride = 0,
+            bool skipV1LevelHint = false)
         {
+            _skipV1LevelHint = skipV1LevelHint;
             _hwMonitor = hwMonitor;
             _libreHwMonitor = hwMonitor as LibreHardwareMonitorImpl; // May be null if using WmiBiosMonitor
             _wmiBios = new HpWmiBios(logging); // Always available for self-sufficient fallback
@@ -428,7 +431,8 @@ namespace OmenCore.Hardware
                     // these offsets are read-only. A board with EC fan control disabled can
                     // still have a perfectly readable tachometer, and on the boards where
                     // GetFanRpmDirect is refused it is the only physical RPM source there is.
-                    ecFanTachometerOffsets: _capabilities?.ModelConfig?.EcFanTachometerOffsets);
+                    ecFanTachometerOffsets: _capabilities?.ModelConfig?.EcFanTachometerOffsets,
+                    skipV1LevelHint: _skipV1LevelHint);
                 if (controller.IsAvailable)
                 {
                     if (conservativeWmiProfile)

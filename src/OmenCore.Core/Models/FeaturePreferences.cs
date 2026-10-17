@@ -157,6 +157,13 @@ namespace OmenCore.Models
         /// </summary>
         public string MaxAutoReturnMode { get; set; } = "Off";
 
+        /// <summary>
+        /// Experimental, off by default. Do not send the V1 fan "level 20" transition hint when fans are handed back to BIOS Auto.
+        /// For boards whose fans sit near 2000 RPM at high temperature until the OEM profile is restored (#227, #226, #217, #143).
+        /// Takes effect after a restart.
+        /// </summary>
+        public bool SkipV1FanLevelHint { get; set; } = false;
+
         /// <summary>Minutes for the "Timer" mode of <see cref="MaxAutoReturnMode"/>: 15, 30 or 60.</summary>
         public int MaxAutoReturnTimerMinutes { get; set; } = 15;
     }

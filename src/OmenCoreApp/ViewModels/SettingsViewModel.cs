@@ -467,6 +467,20 @@ namespace OmenCore.ViewModels
             }
         }
 
+        /// <summary>Experimental, restart required: skip the V1 level-20 hint when handing fans back to BIOS Auto (#227).</summary>
+        public bool SkipV1FanLevelHint
+        {
+            get => _config.Features?.SkipV1FanLevelHint == true;
+            set
+            {
+                if (SkipV1FanLevelHint == value) return;
+                _config.Features ??= new FeaturePreferences();
+                _config.Features.SkipV1FanLevelHint = value;
+                _configService.Save(_config);
+                OnPropertyChanged();
+            }
+        }
+
         public bool MaxAutoReturnUsesTimer => string.Equals(MaxAutoReturnMode, "Timer", StringComparison.OrdinalIgnoreCase);
 
         public int MaxAutoReturnTimerMinutes
