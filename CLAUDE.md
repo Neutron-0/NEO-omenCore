@@ -23,7 +23,7 @@ diagnostics exports (zip/json attached to issues), Discord, forks and PRs.
 | `src/OmenCore.Cli/` | CLI |
 | `src/OmenCore.Linux/` + `.Linux.Tests/` | Linux daemon/CLI (hp-wmi sysfs), net8.0 |
 | `src/OmenCore.Avalonia/`, `src/OmenCore.Desktop/` | Cross-platform UI (Desktop csproj still on old 3.6.3 version — ignore on bumps unless asked) |
-| `src/OmenCoreApp.Tests/` | xUnit tests for Core + App (~1650 tests) |
+| `src/OmenCoreApp.Tests/` | xUnit tests for Core + App (~1940 tests) |
 | `installer/OmenCoreInstaller.iss` | Inno Setup installer |
 | `docs/` | Per-version CHANGELOG / ROADMAP, evidence docs, bug-report logs |
 | `website/` | GitHub Pages site (`pages.yml`) |
@@ -37,7 +37,7 @@ dotnet test OmenCore.sln                       # full suite, ~7 min; run in back
 dotnet test src/OmenCoreApp.Tests/OmenCoreApp.Tests.csproj --filter "FullyQualifiedName~DeviceCapabilitiesTests"
 ```
 
-- The full suite must stay green before every push (last known: 1658 App tests + 30 Linux tests).
+- The full suite must stay green before every push (last known, 2026-10-17: 1943 App tests + 71 Linux tests).
 - Build should be 0 warnings / 0 errors.
 - Tests that touch config use `[Collection("Config Isolation")]` and `OMENCORE_CONFIG_DIR` temp dirs.
 - Shell is Windows (Git Bash / PowerShell). Repo root is `E:\OmenCore\omencore`.
@@ -114,7 +114,8 @@ dotnet test src/OmenCoreApp.Tests/OmenCoreApp.Tests.csproj --filter "FullyQualif
 
 ## Versioning & docs
 
-- Current released: **4.4.0**. **4.4.1 is release-ready** (versions bumped, docs finalized) and waits only on the maintainer tagging `v4.4.1`.
+- Current released: **4.4.5** (2026-10-11). **4.5.0 is in development** (versions bumped; no 4.4.6). Work is tracked in `docs/ROADMAP_v4.5.0.md`:
+  section 5A is the tick sheet an agent ticks off as it goes, section 6 the work packages, section 7 the open-issue index, K.* the field evidence.
 - Version lives in: `VERSION.txt`, `installer/OmenCoreInstaller.iss` (`MyAppVersion`), and the
   `<Version>` in the six 4.x `.csproj` files.
 - Each cycle has `docs/CHANGELOG_vX.Y.Z.md` (short, user-facing: Fixed / Added / Investigated, Not
@@ -137,18 +138,18 @@ dotnet test src/OmenCoreApp.Tests/OmenCoreApp.Tests.csproj --filter "FullyQualif
 - Reply tone on GitHub: friendly, concrete, transparent about uncertainty; ask for the specific
   artefact you need (diagnostics export, HardwareWorker.log, Guided Fan Verification export).
 
-## Open threads (as of 2026-10-03 — verify on GitHub before acting)
+## Open threads (as of 2026-10-17 — verify on GitHub before acting)
 
-- Field confirmation wanted: see "Needs Field Confirmation" in `docs/CHANGELOG_v4.4.1.md`; the full
-  item→code→test map is `docs/V4.4.1_IMPLEMENTATION_STATUS.md`.
-- PR #216 (guided RGB check + a controller handoff that fixes the stuck-level hole in our #198 fix):
-  reviewed, ready for the maintainer to merge.
-- #211 awaiting the first sentinel line; #217 (88EE), #218 (878A), #220 (8C30) need a 4.4.1 rerun;
-  #219 (Linux 8D2F) is a kernel `hp-wmi` allowlist limit; #213, #212, #207, #195 as before.
-- Close on 4.4.1 ship: #115, #172, #214, #215, #205. #199 stays open for 8BA9.
-- Issue sweep done 2026-10-03: every open issue has a maintainer reply or is waiting on a reporter; see the roadmap's *Issue sweep*. Linux kernel-limit threads (#219 explains) and Linux Darfon RGB (#179) are the recurring classes.
-- Primax per-key: next step is an owner test, then an index map from our own source (Ohman is
-  GPL-3 — use its documented facts only, never its code or key maps).
+- The roadmap's section 7 is the live index of open issues and their state; replies drafted but not posted live in the working
+  scratch folder and are named in the index. Do not post to GitHub or Discord without the maintainer's go-ahead.
+- Fans pinned near level 20 (about 2000 RPM) after a hand-back on V1 boards with the conservative fan policy: roadmap K.17, an
+  experimental off-by-default setting exists, waiting on an owner's A/B (#227, also #226, #217, #143).
+- 8BD4 / 8BC2 one-zone keyboard colour layout implemented (WP-14), waiting on the 8BD4 owner's retest (#212, #227).
+- NVIDIA power unlock (from the Prophecy author's work, used with permission): WP-22; the Apply CURRENT fault is not yet traced, it needs a log.
+- Design note awaiting a go-ahead: `docs/DESIGN_FAN_WRITE_LEASE.md` (WP-19).
+- Maintainer-owned: tagging and releases, closing issues, PR #147, code signing, the #215 undervolt test build.
+- Primax per-key: next step is an owner test, then an index map from our own source (Ohman is GPL-3, use its documented facts
+  only, never its code or key maps).
 
 ## Constraints
 

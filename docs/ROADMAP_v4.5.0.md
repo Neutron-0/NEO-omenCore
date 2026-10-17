@@ -599,8 +599,8 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-19 shared capability resolver
 
 **Housekeeping and release (maintainer owns the last block)**
-- [ ] WP-20 Linux package suspend hook
-- [ ] WP-20 `CLAUDE.md` updated (version and open threads)
+- [x] (this commit) WP-20 Linux package suspend hook — copied into the zip by `build-linux-package.ps1` (snippet dry-run on Windows; the Linux build itself runs in CI on the next tag, unverified until then)
+- [x] (this commit) WP-20 `CLAUDE.md` updated (version and open threads)
 - [ ] Section 4 "What counts as done" reviewed line by line
 - [ ] Replies drafted for every issue a shipped item touches; "Needs field confirmation" list rewritten
 - [ ] Full suite green, 0 warnings, count not lower than the baseline

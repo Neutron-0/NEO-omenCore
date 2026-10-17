@@ -82,6 +82,16 @@ if (Test-Path "$cliOut\omencore-cli.pdb") {
     Copy-Item "$cliOut\omencore-cli.pdb" $packageDir -Force
 }
 
+# The optional keyboard suspend hook ships in the zip so it can be installed without cloning the repo
+# (docs/LINUX_INSTALL_GUIDE.md, "Keyboard backlight across suspend"). install -m 0755 sets the mode, so zip permissions do not matter.
+$suspendHook = Join-Path $root "scripts/linux/omencore-kbd-suspend.sh"
+if (-not (Test-Path $suspendHook)) {
+    throw "Missing $suspendHook"
+}
+$hookDir = Join-Path $packageDir "scripts/linux"
+New-Item -ItemType Directory -Path $hookDir -Force | Out-Null
+Copy-Item $suspendHook $hookDir -Force
+
 # Remove framework-dependent sidecar files that may be emitted via project references
 # in the GUI publish output. The final CLI in this package is a self-contained single-file binary.
 @(

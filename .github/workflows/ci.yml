@@ -70,7 +70,7 @@ jobs:
 
   model-database-submissions:
     name: Validate community model-database submissions
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned: ubuntu-latest moves to a newer image on 2026-10-19; move on purpose after a CI check
     steps:
       - uses: actions/checkout@v7
       - name: Validate any submitted model JSON files

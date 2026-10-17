@@ -95,6 +95,11 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
 - **CI actions moved off Node 20** (checkout, setup-dotnet, upload/download-artifact, softprops, Pages). Checked on
   the first CI run after the change (*pending*); the tag path (Release Build) only runs on the next release tag.
 
+- **The Linux zip includes the keyboard suspend hook** (`scripts/linux/omencore-kbd-suspend.sh`), so it can be installed without cloning
+  the repository. The Linux install guide says where to find it.
+- **Workflows use the `ubuntu-24.04` runner instead of `ubuntu-latest`**, which moves to a newer image on 2026-10-19. A tag build should not be
+  the first run on a new image; move to the new image on purpose after a normal CI run.
+
 ## Contributors
 
 - **bobshmo**: the V0/V1+ performance-mode finding (standalone Prophecy Power Unlocker 1.2.0).

@@ -160,7 +160,7 @@ jobs:
         retention-days: 30
     
   run-unit-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned: ubuntu-latest moves to a newer image on 2026-10-19; move on purpose after a CI check
     name: Run Unit Tests
     
     steps:
@@ -190,7 +190,7 @@ jobs:
         path: '**/*.trx'
 
   check-warnings:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned: ubuntu-latest moves to a newer image on 2026-10-19; move on purpose after a CI check
     name: Code Quality Checks
     
     steps:

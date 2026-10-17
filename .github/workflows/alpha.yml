@@ -64,7 +64,7 @@ jobs:
           path: artifacts/OmenCore-${{ steps.version.outputs.value }}-${{ inputs.versionSuffix }}-win-x64.zip
 
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned: ubuntu-latest moves to a newer image on 2026-10-19; move on purpose after a CI check
 
     steps:
       - uses: actions/checkout@v7
@@ -107,7 +107,7 @@ jobs:
 
   release:
     needs: [build-windows, build-linux]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned: ubuntu-latest moves to a newer image on 2026-10-19; move on purpose after a CI check
 
     steps:
       - uses: actions/checkout@v7

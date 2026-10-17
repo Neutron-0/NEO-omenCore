@@ -971,6 +971,9 @@ colour and single-zone backlight off before suspend and restores them on resume:
 sudo install -m 0755 scripts/linux/omencore-kbd-suspend.sh /lib/systemd/system-sleep/omencore-kbd-suspend.sh
 ```
 
+The script is inside the release zip under `scripts/linux/` (from 4.5.0), and in the repository at the same path. Run the command
+from the folder you unpacked, or from a clone.
+
 It only touches the keyboard sysfs files and does nothing on boards that don't have them. Adapted from
 saikiranworks' fork. That fork also ships a udev rule making the hp-wmi fan PWM files world-writable; it is
 deliberately not included here, because it would let any local user set the fans to zero.
