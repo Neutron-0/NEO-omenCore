@@ -45,6 +45,15 @@ namespace OmenCore.Services
         private const int MaxRetryAttempts = 5;
         private const int RetryIntervalMs = 2000;
 
+        // A key another app holds is retried for a bounded time (12 tries, 5 s apart), then reported once.
+        internal const int HotkeyRetryIntervalMs = 5000;
+        internal const int HotkeyRetryMaxTries = 12;
+        private System.Threading.Timer? _hotkeyRetryTimer;
+        private int _hotkeyRetryTries;
+        private readonly List<HotkeyBinding> _failedHotkeys = new(); // gave up: held by another app
+        private readonly Func<IntPtr, int, uint, uint, bool> _registerHotKey;
+        private readonly Func<IntPtr, int, bool> _unregisterHotKey;
+
         // Events for hotkey actions
         public event EventHandler? ToggleFanModeRequested;
         public event EventHandler? ToggleMaxFanRequested;
@@ -72,9 +81,17 @@ namespace OmenCore.Services
 
         public IReadOnlyDictionary<int, HotkeyBinding> RegisteredHotkeys => _registeredHotkeys;
 
-        public HotkeyService(LoggingService logging)
+        public HotkeyService(LoggingService logging) : this(logging, RegisterHotKey, UnregisterHotKey)
+        {
+        }
+
+        /// <summary>The Win32 calls are injectable so tests can make a key fail to register.</summary>
+        internal HotkeyService(LoggingService logging,
+            Func<IntPtr, int, uint, uint, bool> registerHotKey, Func<IntPtr, int, bool> unregisterHotKey)
         {
             _logging = logging;
+            _registerHotKey = registerHotKey;
+            _unregisterHotKey = unregisterHotKey;
         }
 
         public HotkeyDiagnosticSnapshot GetDiagnosticSnapshot()
@@ -85,6 +102,11 @@ namespace OmenCore.Services
                 WindowHandleReady = _windowHandle != IntPtr.Zero,
                 RegisteredCount = _registeredHotkeys.Count,
                 PendingCount = _pendingHotkeys.Count,
+                FailedCount = _failedHotkeys.Count,
+                FailedBindings = _failedHotkeys
+                    .OrderBy(binding => binding.Action)
+                    .Select(binding => HotkeyDiagnosticBinding.From(binding))
+                    .ToArray(),
                 RegisteredBindings = _registeredHotkeys.Values
                     .OrderBy(binding => binding.Action)
                     .Select(binding => HotkeyDiagnosticBinding.From(binding))
@@ -187,6 +209,55 @@ namespace OmenCore.Services
             }
         }
 
+        private void StartHotkeyRetryTimer()
+        {
+            if (_hotkeyRetryTimer != null) return;
+            _hotkeyRetryTries = 0;
+            _hotkeyRetryTimer = new System.Threading.Timer(_ =>
+            {
+                try { DispatcherHelper.RunOnUiThread(RetryPendingHotkeysOnce); } // RegisterHotKey must run on the window's thread
+                catch (Exception ex) { _logging.Error($"Hotkey retry error: {ex.Message}", ex); }
+            }, null, HotkeyRetryIntervalMs, HotkeyRetryIntervalMs);
+        }
+
+        /// <summary>One bounded retry round. When the tries run out, each key still failing is reported once and kept in <see cref="HotkeyDiagnosticSnapshot.FailedBindings"/>.</summary>
+        internal void RetryPendingHotkeysOnce()
+        {
+            if (_pendingHotkeys.Count == 0 || _windowHandle == IntPtr.Zero)
+            {
+                StopHotkeyRetryTimer();
+                return;
+            }
+
+            _hotkeyRetryTries++;
+            var toRetry = _pendingHotkeys.ToList();
+            _pendingHotkeys.Clear();
+            foreach (var binding in toRetry)
+                RegisterHotkey(binding.Action, binding.Modifiers, binding.Key);
+
+            if (_pendingHotkeys.Count == 0)
+            {
+                _logging.Info($"Hotkey retry: all pending hotkeys registered after {_hotkeyRetryTries} retr{(_hotkeyRetryTries == 1 ? "y" : "ies")}");
+                StopHotkeyRetryTimer();
+            }
+            else if (_hotkeyRetryTries >= HotkeyRetryMaxTries)
+            {
+                foreach (var binding in _pendingHotkeys)
+                {
+                    _failedHotkeys.Add(binding);
+                    _logging.Warn($"Hotkey {binding.DisplayString} for {binding.Action} could not be registered after {HotkeyRetryMaxTries} tries: it is held by another app. Choose a different key in Settings.");
+                }
+                _pendingHotkeys.Clear();
+                StopHotkeyRetryTimer();
+            }
+        }
+
+        private void StopHotkeyRetryTimer()
+        {
+            _hotkeyRetryTimer?.Dispose();
+            _hotkeyRetryTimer = null;
+        }
+
         /// <summary>
         /// Register default hotkeys
         /// v2.6.0: Removed Ctrl+S which conflicted with save in other applications (Issue #53)
@@ -235,6 +306,7 @@ namespace OmenCore.Services
         /// </summary>
         public bool RegisterHotkey(HotkeyAction action, ModifierKeys modifiers, Key key)
         {
+            _failedHotkeys.RemoveAll(f => f.Action == action); // a new attempt replaces an earlier give-up
             // Skip if this action is already registered (e.g. ToggleWindow registered globally
             // before window-focused hotkeys are layered on top via OnMainWindowActivated).
             foreach (var existing in _registeredHotkeys.Values)
@@ -283,7 +355,7 @@ namespace OmenCore.Services
 
             int id = _nextHotkeyId++;
             
-            if (RegisterHotKey(_windowHandle, id, mod | MOD_NOREPEAT, vk))
+            if (_registerHotKey(_windowHandle, id, mod | MOD_NOREPEAT, vk))
             {
                 var binding = new HotkeyBinding
                 {
@@ -306,6 +378,7 @@ namespace OmenCore.Services
                     Key = key
                 });
                 _logging.Warn($"Failed to register hotkey: {modifiers}+{key} for {action}, queued for retry");
+                StartHotkeyRetryTimer();
                 return false;
             }
         }
@@ -317,7 +390,7 @@ namespace OmenCore.Services
         {
             if (_registeredHotkeys.TryGetValue(id, out var binding))
             {
-                UnregisterHotKey(_windowHandle, id);
+                _unregisterHotKey(_windowHandle, id);
                 _registeredHotkeys.Remove(id);
                 _logging.Info($"Unregistered hotkey: {binding}");
                 return true;
@@ -332,7 +405,7 @@ namespace OmenCore.Services
         {
             foreach (var id in _registeredHotkeys.Keys)
             {
-                UnregisterHotKey(_windowHandle, id);
+                _unregisterHotKey(_windowHandle, id);
             }
             _registeredHotkeys.Clear();
             _pendingHotkeys.Clear();
@@ -354,7 +427,7 @@ namespace OmenCore.Services
             {
                 if (!preserve.Contains(kvp.Value.Action))
                 {
-                    UnregisterHotKey(_windowHandle, kvp.Key);
+                    _unregisterHotKey(_windowHandle, kvp.Key);
                     toRemove.Add(kvp.Key);
                 }
             }
@@ -497,6 +570,7 @@ namespace OmenCore.Services
 
         public void Dispose()
         {
+            StopHotkeyRetryTimer();
             _retryTimer?.Dispose();
             _retryTimer = null;
             _pendingHotkeys.Clear();
@@ -569,6 +643,8 @@ namespace OmenCore.Services
         public bool WindowHandleReady { get; init; }
         public int RegisteredCount { get; init; }
         public int PendingCount { get; init; }
+        public int FailedCount { get; init; }
+        public HotkeyDiagnosticBinding[] FailedBindings { get; init; } = Array.Empty<HotkeyDiagnosticBinding>();
         public HotkeyDiagnosticBinding[] RegisteredBindings { get; init; } = Array.Empty<HotkeyDiagnosticBinding>();
         public HotkeyDiagnosticBinding[] PendingBindings { get; init; } = Array.Empty<HotkeyDiagnosticBinding>();
     }

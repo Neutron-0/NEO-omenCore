@@ -10,6 +10,60 @@ namespace OmenCoreApp.Tests.Services
     public class HotkeyServiceTests
     {
         [Fact]
+        public void FailedHotkey_IsRetriedThenReportedOnce_WhenAnotherAppHoldsIt()
+        {
+            using var logging = new LoggingService();
+            var attempts = 0;
+            var service = new HotkeyService(logging, (_, _, _, _) => { attempts++; return false; }, (_, _) => true);
+            service.Initialize(new System.IntPtr(1));
+
+            service.RegisterHotkey(HotkeyAction.ToggleWindow, ModifierKeys.Control | ModifierKeys.Shift, Key.O).Should().BeFalse();
+            for (var i = 0; i < HotkeyService.HotkeyRetryMaxTries; i++) service.RetryPendingHotkeysOnce();
+
+            var snapshot = service.GetDiagnosticSnapshot();
+            snapshot.PendingCount.Should().Be(0);
+            snapshot.FailedCount.Should().Be(1);
+            snapshot.FailedBindings[0].Action.Should().Be(HotkeyAction.ToggleWindow);
+            attempts.Should().Be(1 + HotkeyService.HotkeyRetryMaxTries);
+
+            service.RetryPendingHotkeysOnce();
+            attempts.Should().Be(1 + HotkeyService.HotkeyRetryMaxTries, "it gives up instead of retrying forever");
+        }
+
+        [Fact]
+        public void FailedHotkey_Registers_WhenTheOtherAppLetsGo()
+        {
+            using var logging = new LoggingService();
+            var attempts = 0;
+            var service = new HotkeyService(logging, (_, _, _, _) => ++attempts > 2, (_, _) => true);
+            service.Initialize(new System.IntPtr(1));
+
+            service.RegisterHotkey(HotkeyAction.ToggleWindow, ModifierKeys.Control | ModifierKeys.Shift, Key.O);
+            service.RetryPendingHotkeysOnce(); // second failure
+            service.RetryPendingHotkeysOnce(); // succeeds
+
+            var snapshot = service.GetDiagnosticSnapshot();
+            snapshot.RegisteredCount.Should().Be(1);
+            snapshot.PendingCount.Should().Be(0);
+            snapshot.FailedCount.Should().Be(0);
+        }
+
+        [Fact]
+        public void Retry_DoesNothingAfterDispose()
+        {
+            using var logging = new LoggingService();
+            var attempts = 0;
+            var service = new HotkeyService(logging, (_, _, _, _) => { attempts++; return false; }, (_, _) => true);
+            service.Initialize(new System.IntPtr(1));
+            service.RegisterHotkey(HotkeyAction.ToggleWindow, ModifierKeys.Control | ModifierKeys.Shift, Key.O);
+
+            service.Dispose();
+            service.RetryPendingHotkeysOnce();
+
+            attempts.Should().Be(1);
+        }
+
+        [Fact]
         public void RegisterHotkey_DoesNotQueueDuplicateAction_WhenWindowHandleIsNotReady()
         {
             using var logging = new LoggingService();
