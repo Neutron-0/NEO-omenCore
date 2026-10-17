@@ -47,9 +47,9 @@
                 <!-- Guided Diagnostic (v2.7.0) -->
                 <Border Background="{StaticResource SurfaceDarkBrush}" CornerRadius="6" Padding="12" Margin="0,0,16,8" VerticalAlignment="Top">
                     <StackPanel MinWidth="200" MaxWidth="320">
-                        <TextBlock Text="Fan Verification Sequence" FontWeight="SemiBold" />
+                        <TextBlock Text="Guided Fan Verification" FontWeight="SemiBold" />
                         <TextBlock Text="Tests: 30% → 60% → 100%" Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        <Button Content="Run Verification Sequence" Command="{Binding RunGuidedDiagnosticCommand}" 
+                        <Button Content="Run Guided Fan Verification" Command="{Binding RunGuidedDiagnosticCommand}" 
                                 Style="{StaticResource ModernButton}" Margin="0,8,0,0" 
                                 IsEnabled="{Binding IsGuidedTestRunning, Converter={StaticResource InverseBooleanConverter}}"/>
                         

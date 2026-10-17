@@ -1788,7 +1788,8 @@ namespace OmenCore.Hardware
                 SupportsFanControlEc = false,
                 SupportsFanCurves = false,
                 SupportsIndependentFanCurves = false,
-                FanZoneCount = 1,
+                FanZoneCount = 2, // #157 export: firmware reports 2 fans (the runtime already uses the firmware answer)
+                SupportsRpmReadback = false,
                 HasMuxSwitch = true,
                 SupportsGpuPowerBoost = true,
                 HasFourZoneRgb = false,
@@ -1796,7 +1797,7 @@ namespace OmenCore.Hardware
                 SupportsUndervolt = false,
                 AllowV1AutoModeFloorClear = true,
                 UserVerified = false,
-                Notes = "GitHub #99 / Linux reports for 8E41 (Transcend 14-fb1xxx). Discord 2026-06-02 Windows field report confirms exact board identity and WMI V1 behavior; use profile-based control paths, allow V1 auto handoff floor clear, and avoid legacy EC writes or custom curves."
+                Notes = "GitHub #99 / Linux reports for 8E41 (Transcend 14-fb1xxx). Discord 2026-06-02 Windows field report confirms exact board identity and WMI V1 behavior; use profile-based control paths, allow V1 auto handoff floor clear, and avoid legacy EC writes or custom curves. 2026-10-16 (#157, BIOS F.05): firmware reports 2 fans, thermal policy V1, fan level readback works, RPM readback null (estimates only), keyboard topology FourZoneWithoutNumpad (0x02) with WMI ColorTable writes read back as verified; Guided Fan Verification 6/6 (88/100) on level evidence only. The per-key flag above contradicts that topology and is left as it was until a second export or a visual confirmation settles it; the runtime backend follows the live probe."
             });
             
             // ═══════════════════════════════════════════════════════════════════════════════════
@@ -2312,6 +2313,33 @@ namespace OmenCore.Hardware
             // keyboard topology RgbPerKey (0x03). Not measured: fan RPM (readback null, estimated only), the per-key
             // keyboard path (no Primax HID device found), curves, MUX, undervolt. Kept conservative until a
             // Guided Fan Verification and an RGB check come back from the reporter.
+            // GitHub #230 (Projectorigins, 2026-10-14): HyperX OMEN 16-ap1xxx, Ryzen 7 8745HX + RTX 5060 Laptop + Radeon 610M,
+            // BIOS F.04. Measured in the export: thermal policy V1, 2 fans, max level 55, fan level readback works, RPM readback
+            // null (estimates only), keyboard topology FourZoneWithNumpad (0x01) with a WMI ColorTable write read back as verified.
+            // Not measured: any visible colour change, curves, GPU power boost, MUX, undervolt (the PawnIO MSR module is Intel only).
+            AddModel(new ModelCapabilities
+            {
+                ProductId = "8F21",
+                ModelName = "HyperX OMEN 16-ap1xxx",
+                ModelNamePattern = "16-ap1",
+                RequiredCpuVendor = CpuUndervoltProviderFactory.CpuVendor.AMD,
+                ModelYear = 2025,
+                Family = OmenModelFamily.OMEN2024Plus,
+                SupportsFanControlWmi = true,
+                SupportsFanControlEc = false,
+                SupportsFanCurves = false,
+                SupportsRpmReadback = false,
+                FanZoneCount = 2,
+                SupportsPerformanceModes = true,
+                SupportsGpuPowerBoost = false,
+                HasMuxSwitch = false,
+                SupportsUndervolt = false,
+                HasFourZoneRgb = true,
+                HasKeyboardBacklight = true,
+                UserVerified = false,
+                Notes = "GitHub #230 (2026-10-14) - HyperX OMEN 16-ap1xxx, ProductId 8F21 (Ryzen 7 8745HX, RTX 5060 Laptop, BIOS F.04). Measured: thermal policy V1, 2 fans, max level 55, fan level readback works, RPM readback null, keyboard topology FourZoneWithNumpad with a WMI ColorTable write read back as verified. Nobody has yet confirmed a visible colour change. Curves, GPU boost, MUX and undervolt are not measured and left off. Previously the family fallback (Unknown OMEN16, Low confidence)."
+            });
+
             AddModel(new ModelCapabilities
             {
                 ProductId = "8E9F",

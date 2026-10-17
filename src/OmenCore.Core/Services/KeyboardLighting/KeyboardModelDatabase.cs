@@ -149,6 +149,21 @@ namespace OmenCore.Services.KeyboardLighting
                 Notes = "GitHub #120 - 4-zone WMI BIOS ColorTable works; RPM/fan diagnostics pending verification"
             });
 
+            // GitHub #230: HyperX OMEN 16-ap1xxx, firmware topology FourZoneWithNumpad (0x01); the WMI colour table write read back
+            // as verified in the export, a visible change has not been reported yet.
+            AddModel(new KeyboardModelConfig
+            {
+                ProductId = "8F21",
+                ModelName = "HyperX OMEN 16-ap1xxx",
+                ModelNamePattern = "16-ap1",
+                KeyboardType = KeyboardType.FourZone,
+                PreferredMethod = KeyboardMethod.ColorTable2020,
+                FallbackMethods = new[] { KeyboardMethod.NewWmi2023 },
+                ModelYear = 2025,
+                UserVerified = false,
+                Notes = "GitHub #230: firmware topology FourZoneWithNumpad (0x01); WMI ColorTable write read back as verified, visible colour change not yet reported."
+            });
+
             // GitHub #228: OMEN 15-en1xxx, firmware topology FourZoneWithoutNumpad. Same colour-table path as 8787; the WMI write ran
             // without error but no one has reported seeing the keys change.
             AddModel(new KeyboardModelConfig

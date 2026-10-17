@@ -431,6 +431,32 @@ namespace OmenCoreApp.Tests.Hardware
         }
 
         [Fact]
+        public void GetCapabilities_8F21_HyperxOmen16Ap1xxx_HasItsOwnConservativeEntry()
+        {
+            // #230: used to fall to the Unknown OMEN16 family default. Measured V1, 2 fans, level readback only.
+            var caps = ModelCapabilityDatabase.GetCapabilities("8F21");
+
+            caps.ProductId.Should().Be("8F21");
+            caps.FanZoneCount.Should().Be(2);
+            caps.SupportsFanControlWmi.Should().BeTrue();
+            caps.SupportsRpmReadback.Should().BeFalse();
+            caps.SupportsFanCurves.Should().BeFalse();
+            caps.SupportsUndervolt.Should().BeFalse();
+            caps.UserVerified.Should().BeFalse();
+        }
+
+        [Fact]
+        public void GetCapabilities_8E41_UsesTheFirmwaresTwoFansAndHasNoRealRpm()
+        {
+            // #157: the firmware reports 2 fans (the database said 1) and RPM readback is null.
+            var caps = ModelCapabilityDatabase.GetCapabilities("8E41");
+
+            caps.FanZoneCount.Should().Be(2);
+            caps.SupportsRpmReadback.Should().BeFalse();
+            caps.UserVerified.Should().BeFalse();
+        }
+
+        [Fact]
         public void GetCapabilities_8BC2_Victus16R0xxxIntel_HasItsOwnConservativeEntry()
         {
             // #227: measured V1, 2 fans, level readback only, one-zone keyboard. Resolved by model name to 8BBE before.
