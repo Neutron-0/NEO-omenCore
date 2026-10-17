@@ -509,8 +509,8 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [x] (2613f4d) WP-08 panel text (do not disable PPAB, driver update may undo, RTX 5050 untested, re-toggle hint)
 - [x] (2613f4d) WP-08 TPP read-only, or left out with a note — left out: the backend has no TPP read, and adding one would be a new probe; revisit with the PCF/TPP work
 - [x] (2613f4d) WP-08 tests: range clamp, mismatch text — mismatch text tested (`NvidiaPowerStockNoteTests`); the range clamp needs a GPU and driver, so it stays untested here
-- [ ] WP-09 `docs/LINUX_KERNEL_BOARD_SUPPORT.md` written, linked from the install guide, `46be1453` verified on kernel.org
-- [ ] WP-09 #219 reply drafted into a scratch file
+- [x] (973b1ec) WP-09 `docs/LINUX_KERNEL_BOARD_SUPPORT.md` written, linked from the install guide, `46be1453` verified on kernel.org — verified through the GitHub mirror (kernel.org returned 403): Krishna Chomal, 2026-01-13, hp-wmi manual fan control for Victus S
+- [x] (973b1ec) WP-09 #219 reply drafted into a scratch file (`r219b.md`, not posted; maintainer posts it)
 
 **Phase 2: behaviour changes, off by default**
 - [ ] WP-10 Max auto-return setting (off / cool-down / timer) through `ReleaseMaxAndHandBackToBios()`
@@ -667,7 +667,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - Tests: `NvidiaPowerServiceTests` for the range clamp; a view-model test for the mismatch text.
 - Gate: no new write path. If TPP cannot be read without a new write, leave it out and say so.
 
-**WP-09 Linux kernel-side guide and the #219 reply** (`todo`)
+**WP-09 Linux kernel-side guide and the #219 reply** (`done`, reply drafted not posted)
 - Goal: one document that answers the repeating Linux question ("my board has no `platform_profile`").
 - Evidence: #219, #99, #84, #76, #28, #127, #26, #60, #123; K.10; the third-party README claim about upstream commit `46be1453`.
 - Where: new `docs/LINUX_KERNEL_BOARD_SUPPORT.md`, linked from `docs/LINUX_INSTALL_GUIDE.md`.
