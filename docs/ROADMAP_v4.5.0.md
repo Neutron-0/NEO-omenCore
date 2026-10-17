@@ -536,8 +536,8 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [x] (242e829) WP-04 `[Power Transitions]` section (event IDs 41, 42, 107, 506, 507, no `powercfg`)
 - [x] (242e829) WP-04 `[CPU Throttle]` placeholder line
 - [x] (242e829) WP-04 tests: fake source and throwing source for each section
-- [ ] WP-05 live RPM source and PL1/PL2 result passed into the capability card
-- [ ] WP-05 card wording: "Estimated from fan level" / "not readable on this board" — the card already reads "Estimated only" when the flag is false; 8BBE and 8BD4 now get it (dfcf2ce); a live-probe override (probe wins over database) not done
+- [x] WP-05 live RPM source and PL1/PL2 result passed into the capability card
+- [x] WP-05 card wording: "Estimated from fan level"; the row now follows the live RPM source (`RpmReadbackLabel`), so a live estimate beats a database claim of real RPM and a live real reading beats a false flag; falls back to the database with no live data
 - [x] (dfcf2ce) WP-05 list of entries relying on the `SupportsRpmReadback` default in the commit message — 56 of 82 entries; 8BBE and 8BD4 set false; 8BC2 has no entry yet (WP-07)
 - [x] (63af90b) WP-05 `SupportsRpmReadback = false` set for 8BBE, 8BD4, 8BC2 with tests
 - [ ] WP-06.1 calibration says RPM cannot be measured when the source is Estimated; table labelled estimated — not done: the wizard reads `ReadFanSpeeds()` (physical sources only, returns nothing on V1), while the "passes at 2000" result in K.1 comes from the verification path; needs a trace of which screen showed it before changing anything

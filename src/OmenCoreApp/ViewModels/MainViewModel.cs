@@ -162,6 +162,7 @@ namespace OmenCore.ViewModels
         public bool IsSystemControlLoaded => _systemControl != null;
         public SystemControlViewModel? LoadedSystemControl => _systemControl;
         public bool IsGpuPowerTrayLikelyAvailable => DetectedCapabilities?.ShowGpuPowerBoost ?? true;
+        public string RpmReadbackLabel => Hardware.RpmReadbackLabel.Describe(DetectedCapabilities?.ModelConfig?.SupportsRpmReadback ?? true, FanTelemetry?.Select(t => t.RpmSource));
 
         public SystemControlViewModel? SystemControl
         {
@@ -1399,6 +1400,7 @@ namespace OmenCore.ViewModels
             }
             ThermalSamples = _fanService.ThermalSamples;
             FanTelemetry = _fanService.FanTelemetry;
+            ((System.Collections.Specialized.INotifyCollectionChanged)FanTelemetry).CollectionChanged += (_, _) => OnPropertyChanged(nameof(RpmReadbackLabel));
             var powerPlanService = new PowerPlanService(_logging);
             
             // Hardware watchdog — emergency fan-to-100% if temperature monitoring freezes
