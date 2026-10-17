@@ -57,6 +57,8 @@ namespace OmenCore.Services
         public string RpmDisplay => RpmSource switch
         {
             RpmSource.Estimated => $"~{ActualRpmAfter} RPM (fan-level estimate)",
+            // 878A (#218): the per-fan write itself was refused, so there was never anything to read. Say that, not "unavailable".
+            RpmSource.Unknown when ActualRpmAfter <= 0 && !WmiCallSucceeded && ExpectedLevel > 0 => $"firmware refused level {ExpectedLevel}",
             RpmSource.Unknown when ActualRpmAfter <= 0 => "Physical RPM unavailable",
             RpmSource.Unknown => $"{ActualRpmAfter} RPM (source unverified)",
             _ => $"{ActualRpmAfter} RPM ({RpmSource})"

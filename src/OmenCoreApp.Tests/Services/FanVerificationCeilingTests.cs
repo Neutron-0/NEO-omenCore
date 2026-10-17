@@ -112,5 +112,22 @@ namespace OmenCoreApp.Tests.Services
 
             FanVerificationService.ReconcileCeilingAcrossFans(new[] { a, b }).Should().Be(0);
         }
+
+        [Fact]
+        public void RefusedWrite_IsReportedAsRefused_NotAsUnavailableRpm()
+        {
+            // 878A (#218): "WMI fan control failed for fan 0, level 16" - nothing was written, so nothing could be read.
+            var r = new FanApplyResult { RequestedPercent = 30, ExpectedLevel = 16, RpmSource = RpmSource.Unknown, WmiCallSucceeded = false };
+
+            r.RpmDisplay.Should().Be("firmware refused level 16");
+        }
+
+        [Fact]
+        public void AcceptedWriteWithNoTachometer_StillSaysUnavailable()
+        {
+            var r = new FanApplyResult { RequestedPercent = 30, ExpectedLevel = 16, RpmSource = RpmSource.Unknown, WmiCallSucceeded = true };
+
+            r.RpmDisplay.Should().Be("Physical RPM unavailable");
+        }
     }
 }
