@@ -513,8 +513,8 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [x] (973b1ec) WP-09 #219 reply drafted into a scratch file (`r219b.md`, not posted; maintainer posts it)
 
 **Phase 2: behaviour changes, off by default**
-- [ ] WP-10 Max auto-return setting (off / cool-down / timer) through `ReleaseMaxAndHandBackToBios()`
-- [ ] WP-10 tests with fake clock; `FirmwareMaxPairingGateTests` green
+- [x] (0fa59d5) WP-10 Max auto-return setting (off / cool-down / timer) through `ReleaseMaxAndHandBackToBios()` — releases through the normal Max-to-Auto `ApplyPreset` path (which hands the flag back in the controller), not a direct call; "chassis" temperature has no sensor, so the higher of CPU and GPU stands in
+- [x] (0fa59d5) WP-10 tests with fake clock; `FirmwareMaxPairingGateTests` green
 - [ ] WP-11 confirm from a real #222 export first (needs data)
 - [ ] WP-11 failsafe release fix and tests (70 C releases, 85 C does not)
 - [ ] WP-12 fan-stall guard (needs data; physical RPM source only)
@@ -680,7 +680,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 
 ### Phase 2: behaviour changes, each opt-in or off by default
 
-**WP-10 Max auto-return** (`todo`)
+**WP-10 Max auto-return** (`done`, pending hardware)
 - Goal: optional return from Max to Auto after a cool-down or timer. Evidence: Ohman's rule (3A). Default off.
 - Do: setting with three modes (off, cool-down: CPU and chassis under 60 C for 2 minutes, timer: 15, 30 or 60 minutes). Implement
   in `FanService` next to where the Max preset is applied; the release calls `ReleaseMaxAndHandBackToBios()` through the existing

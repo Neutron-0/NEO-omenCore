@@ -64,6 +64,11 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
   Windows event log) and a reserved `[CPU Throttle]` line. Each is read-only and a failing read writes one line. Reports like
   #211 had none of this, so their cause stayed open. Test: `FanFirmwareStateTests`.
 
+- **Optional Max fan auto-return (off by default).** Settings, next to "Link fan to performance mode": Off keeps Max until you change it,
+  Cooldown hands the fans back to BIOS Auto when CPU and GPU stay under 60 C for 2 minutes, Timer does it after 15, 30 or 60 minutes.
+  The release uses the same path as choosing Auto yourself. There is no chassis sensor, so the hotter of CPU and GPU decides.
+  *Implemented, pending hardware confirmation.* Tests: `MaxAutoReturnPolicyTests`, `FanServiceSuspendTests`.
+
 ## Release and CI (no change to the shipped program)
 
 - **Release notes keep the changelog.** Release Build now writes the notes from the template, the version's changelog,
