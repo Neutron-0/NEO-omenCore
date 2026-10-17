@@ -2122,6 +2122,7 @@ namespace OmenCore.Hardware
                 SupportsFanCurves = true,
                 SupportsIndependentFanCurves = false,
                 FanZoneCount = 2,
+                SupportsRpmReadback = false, // #212 and #226 exports: V1 fan level x100 (estimated), no tachometer read
                 HasMuxSwitch = false,
                 SupportsGpuPowerBoost = false,
                 SupportsUndervolt = false,
@@ -2217,6 +2218,7 @@ namespace OmenCore.Hardware
                 SupportsFanControlEc = false,
                 SupportsFanCurves = false,
                 FanZoneCount = 2,
+                SupportsRpmReadback = false, // #211 export: RPM is the V1 fan level x100 (estimated), no tachometer read
                 HasMuxSwitch = false,
                 SupportsGpuPowerBoost = false,
                 SupportsUndervolt = false,

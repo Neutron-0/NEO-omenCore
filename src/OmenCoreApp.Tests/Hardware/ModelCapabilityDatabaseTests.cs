@@ -122,6 +122,16 @@ namespace OmenCoreApp.Tests.Hardware
             caps.UserVerified.Should().BeTrue();
         }
 
+        [Theory]
+        [InlineData("8BBE")] // #211: RPM is the V1 fan level x100
+        [InlineData("8BD4")] // #212 and #226: same
+        public void V1BoardsWhoseExportsShowNoTachometer_DoNotClaimRpmReadback(string productId)
+        {
+            // The database default is true, so a board that never said otherwise showed "Supported" on the capability card
+            // while its RPM was only an estimate (K.3). Set false explicitly, from the export, per board.
+            ModelCapabilityDatabase.GetCapabilities(productId).SupportsRpmReadback.Should().BeFalse();
+        }
+
         [Fact]
         public void GetCapabilities_8787_Omen15En0038ur_UsesReportedSafeCapabilities()
         {
