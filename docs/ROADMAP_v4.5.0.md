@@ -479,9 +479,9 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [x] (4234cc9) WP-01 tests: all-fail, fail-then-succeed, stops after Dispose
 - [ ] WP-02 `Ohman` entry in `ConflictDetectionService` (process name confirmed on a running copy) — entry added (0386d18) with the process name from the download file name; not checked on a running copy
 - [x] (0386d18) WP-02 new `ConflictDetectionServiceTests` (present and absent) — table entry only; the scan itself is not unit-testable without a refactor
-- [ ] WP-03 Linux fan-writer scan (`/proc/*/comm`, injected list) and `diagnose` "Other fan writers"
-- [ ] WP-03 daemon start warning, nothing is stopped or killed
-- [ ] WP-03 Linux test for the scanner
+- [x] (378d853) WP-03 Linux fan-writer scan (`/proc/*/comm`, injected list) and `diagnose` "Other fan writers"
+- [x] (378d853) WP-03 daemon start warning, nothing is stopped or killed
+- [x] (378d853) WP-03 Linux test for the scanner
 - [x] (c27bd2f) WP-04 `[Fan Firmware State]` section — Max flag, level readback, thermal policy, fan count; fan-mode readback and watchdog-failsafe flag not included (no getter exists yet)
 - [ ] WP-04 `[Power Transitions]` section (event IDs 41, 42, 107, 506, 507, no `powercfg`)
 - [ ] WP-04 `[CPU Throttle]` placeholder line

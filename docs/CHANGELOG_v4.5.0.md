@@ -36,6 +36,10 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
 - **Conflict detection knows Ohman**, the other tool that sends HP fan and performance commands. The process name comes from
   the download's file name and has not been checked on a running copy.
 
+- **Linux: other fan services are reported.** `omencore-cli diagnose` lists any of victus-fan, victus-backend, omen-fan-control or omenctld
+  that are running (they also write `pwm1_enable`), and the daemon logs one warning at start. Nothing is stopped or killed.
+  Test: `FanWriterScannerTests`.
+
 ## Release and CI (no change to the shipped program)
 
 - **Release notes keep the changelog.** Release Build now writes the notes from the template, the version's changelog,
