@@ -64,6 +64,11 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
 - **Board entries: 8F21 (HyperX OMEN 16-ap1xxx, #230), and 8E41 (Transcend 14) now has two fans and level-only RPM (#157).** The fan
   diagnostics button now reads "Run Guided Fan Verification", matching what we tell people to look for.
 
+- **NVIDIA power unlock: the HP OMEN RTX 5070 Ti board has a 115 W stock.** The generic RTX 5070 Ti Laptop profile assumes 140 W; on the HP OMEN
+  board with PCI subsystem 8E71103C the stock is 115 W, so MAX could not be resolved or targeted correctly (the "115 W against 140 W" case).
+  The profile now has a variant scoped to that subsystem only. Found by the Prophecy author (standalone 1.2.5); written here from that
+  finding. *Pending hardware confirmation* on an OmenCore owner's laptop. Tests: `NvidiaProfileVariantTests`, `NvidiaOmen115RomTests`.
+
 ## Added
 
 - **OMEN key can show or hide the OSD.** New "ToggleOsd" choice for the OMEN key action in Settings. If the OSD is turned
@@ -120,6 +125,6 @@ Everything below runs only in software tests so far. Each line says who can conf
 ## Contributors
 
 - **bobshmo**: the V0/V1+ performance-mode finding (standalone Prophecy Power Unlocker 1.2.0).
-- **bobshmo**: also the nvflashb.exe (RTX 50) note and the request to catch up with the standalone's 1.2.x fixes.
+- **bobshmo**: also the nvflashb.exe (RTX 50) note, the request to catch up with the standalone's 1.2.x fixes, and the HP OMEN RTX 5070 Ti 115 W finding (standalone 1.2.5).
 - **VoRtam4**: the 8BD4 colour-payload probe that found the one-zone layout (#212).
 - **Keith1341**: the 8E9A export and the tray GPU Power gap (#142).

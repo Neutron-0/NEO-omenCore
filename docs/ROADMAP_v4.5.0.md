@@ -591,6 +591,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-22.1 ask the reporter (via bobshmo) for the `NVIDIA power:` log lines and the panel status text; record board and GPU
 - [ ] WP-22.2 confirm with bobshmo in writing that 1.2.x code may be used before copying anything
 - [x] (bab4f61) WP-22.3 `FindNvflash` also finds `nvflashb.exe`; clear message when none is found; tests
+- [x] (abcf0fa) WP-22.5 standalone 1.2.x reviewed on 2026-10-17: latest is 1.2.5 (2026-10-13), nothing newer. 1.2.0 and the performance-mode finding were already in; 1.2.1 to 1.2.3 (PCF fields, TPP calibration) are not planned (PCF/TPP stay read only, 3C); 1.2.5 carried one MAX-related fix, the HP OMEN RTX 5070 Ti 115 W stock (subsystem 8E71103C), now in our profile (own code from the described finding, tests on a synthetic ROM); the PCF GPU-cap tester and baseline toggle are not planned. Draft ask to the author: `discord_bobshmo.md`, not sent
 - [ ] WP-22.4 CURRENT fault from WP-22.1 reproduced from the log and fixed, or recorded as unconfirmed
 - [ ] WP-16.1 ask the reporters (#217, #226, #143, new 2026-10-15) for the stop-with-OmenCore-closed A/B; record the result per board — the #227 log already shows the hint left in place (K.17); the closed-app A/B is still wanted from #217, #226, #143
 - [ ] WP-16.2 if OmenCore holds the floor: skip the level 20 hint and keepalive on those boards, opt-in "allow fans to stop at idle", tests — PARTLY: the level-20 hint skip is in as an opt-in (`bad5d47`, K.17, tested); the keepalive part and the "allow fans to stop at idle" option are not done and need the A/B result first
@@ -823,7 +824,7 @@ path) from `runtime-performance.txt`.
   bobshmo's notes document, if they differ; (3) show a clear message when no nvflash is found, saying CURRENT can still work without it;
   (4) re-read the 1.2.1 to 1.2.5 notes for fixes that touch MAX or CURRENT only. Tests next to `NvidiaPowerServiceTests`.
 - Do **not** bundle nvflash. bobshmo's own 1.2.0 notes say the NVFlashB upstream README says MIT while its LICENSE file is GPLv3, so no
-  blanket licence is claimed. We detect a copy the user supplies, as now. Not in 4.5.0: Backup ROM, Import ROM and Flash (physical flashing,
+  blanket licence is claimed. We detect a copy the user supplies, as now. Not in 4.5.0 (re-checked against 1.2.5 on 2026-10-17): Backup ROM, Import ROM and Flash (physical flashing,
   unconfirmed), the PCF/TPP controls and calibration (see 3I; PCF stays read only), the GPU-cap tester.
 - Permission: the 4.4.5 integration was "with permission". The permission for pulling in 1.2.x code should be confirmed with bobshmo
   before copying anything new; the standalone repo has no licence file, so ask in writing. Status wording: "implemented, pending hardware".
