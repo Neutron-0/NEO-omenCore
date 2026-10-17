@@ -994,3 +994,8 @@ If your OMEN model isn't supported:
 3. **Include**: Model name, product ID (`cat /sys/class/dmi/id/product_name`), kernel version, distro
 
 This helps us add your model to the database and verify which control methods work.
+
+## My board has no `platform_profile` / performance modes cannot be set
+
+That is a kernel-side limit, not something OmenCore can route around. See [LINUX_KERNEL_BOARD_SUPPORT.md](LINUX_KERNEL_BOARD_SUPPORT.md)
+for what to collect, how to send a board-ID patch upstream, and a safety checklist for out-of-tree drivers.
