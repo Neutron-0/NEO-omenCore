@@ -31,9 +31,9 @@ sudo ./omencore-cli diagnose --report > report.txt
 
 Two answers matter most:
 
-- **`dmesg` shows nothing from `hp_wmi` and `lsmod` shows no module:** the driver may not be bound to your machine at all.
+- **No `hp_wmi` module or no `/sys/devices/platform/hp-wmi/` directory:** the driver may not be bound to your machine at all.
   Try `sudo modprobe hp_wmi` and look again. If it still does nothing, say so in your report; that is a different problem from
-  "board not on the list".
+  "board not on the list". (`dmesg` being empty on its own means little: the driver is quiet unless something goes wrong.)
 - **`hp_wmi` is loaded but no `platform_profile`:** the board is probably missing from the driver's lists.
 
 ## Step 2: send a board-ID patch upstream
