@@ -404,6 +404,31 @@ All of this is single-laptop evidence from bobshmo's own machine unless stated. 
     in WP-14 neighbour: add an Extended item shown only when the board supports it, and tick the right item. Test the label/tick logic.
 
 
+**K.15 New board 8F21, HyperX OMEN 16-ap1xxx (#230, Projectorigins, 4.4.5, 2026-10-14)**
+- Evidence (export read; the issue text is a one-line request plus a zip): BIOS F.04, Ryzen 7 8745HX, RTX 5060 Laptop, Radeon 610M, SKU
+  D8RB8UA#ABA. No database entry, so it fell to the Unknown OMEN16 family default at Low confidence. Firmware: thermal policy V1,
+  2 fans, max level 55, fan level readback works (27 and 30 at start-up), RPM readback null (estimated, source Est). Keyboard topology
+  `FourZoneWithNumpad (0x01)`; the V2 engine's WMI ColorTable write was read back as verified. PawnIO's MSR module is Intel only, so CPU
+  power reads 0 W and throttling telemetry falls back to LibreHardwareMonitor (known, logged).
+- Done (`34951e2`): capability entry and keyboard row, both `UserVerified = false`, curves, GPU boost, MUX and undervolt left off.
+- Reply (draft `r230.md`, not posted): thank them, say the entry exists in the 4.5.0 work, ask for Guided Fan Verification and what
+  changes on the keyboard when a colour is set, and be plain that nothing about visible colour is confirmed yet.
+
+**K.16 Transcend 14 (8E41) export with a guided run (#157, jmsguevara, 4.4.5, 2026-10-16)**
+- Evidence: BIOS F.05, SKU BV8C6EA#ABD, thermal policy V1, **2 fans from the firmware** (the database said 1, and the runtime already uses
+  the firmware's answer), fan level readback works, RPM readback null. Keyboard topology `FourZoneWithoutNumpad (0x02)` and colour writes
+  verified through WMI ColorTable, while the database marks the board per-key (`HasPerKeyRgb`, keyboard type PerKeyRgb). Guided run: 6/6,
+  88/100, every step on level evidence only (RPM is the level times 100).
+- The reporter wrote that the app only offers "Run Verification Sequence", not "Guided Fan Verification". The button text was the
+  mismatch; it now reads "Run Guided Fan Verification" (`34951e2`).
+- Done: `FanZoneCount = 2` and `SupportsRpmReadback = false` for 8E41, with Notes. The per-key flag is deliberately left alone: one
+  export is not enough to overrule an earlier Discord report, and the live probe already decides the backend. Ask: does a colour set
+  on the Lighting page change the whole keyboard, zones, or individual keys?
+- Sensor freeze: the log shows CPU and GPU "frozen" at the **same** value (56 C and 56 C, 60 C and 60 C, 59 C and 59 C) across many
+  windows, with load swings of 15 to 60 percent. Two sensors holding an identical value is new; it points at one source feeding both
+  readings. Fourth board with the freeze pattern; goes to WP-19 (sensor identity), not a per-board fix.
+- Reply (draft `r157b.md`, not posted).
+
 ### L. Research log
 - 2026-10-11. **Ohman** (`P4R1H/ohman`, [repo](https://github.com/P4R1H/ohman), [releases](https://github.com/P4R1H/ohman/releases)):
   releases 1.0.6 (15 Sep) to 1.3.1 (10 Oct). Taken from the README and releases page through a summarising fetch, not checked
@@ -500,6 +525,9 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [x] (63af90b) WP-07 8BC2 `KeyboardModelDatabase` entry (`OneZoneWithNumpad`) and test
 - [x] (cd8bf89) WP-07 88D1 entry (#228) and test
 - [x] (cd8bf89) WP-07 88ED exact `KeyboardModelDatabase` row (#229) and test
+- [x] (34951e2) WP-07 8F21 entry (#230) and keyboard row, with tests
+- [x] (34951e2) WP-07 8E41: two fans and level-only RPM from the #157 export (per-key flag left, see K.16)
+- [x] (34951e2) Fan diagnostics button reads "Run Guided Fan Verification" (#157)
 - [x] (cd8bf89) WP-07 8A13 Notes and verified flags for the confirmed parts only (MUX stays off) — Notes only; `UserVerified` left false because the rest of the entry is unconfirmed
 - [x] (63af90b) WP-07 8BD4 Notes: second owner (#226)
 - [x] (cd8bf89) WP-07 8E9A Notes: keyboard colour confirmed through 30BF (#142)
@@ -797,6 +825,7 @@ Every open item is listed once. "Owner reply last" means the maintainer answered
 **Active, in packages above**
 | Issue | Board or topic | Where it is covered | State |
 |---|---|---|---|
+| #230 | 8F21 HyperX OMEN 16-ap1xxx | WP-07, K.15 | new, export read, entry added (`34951e2`), reply drafted, not posted |
 | #228 | 88D1 OMEN 15-en1xxx | WP-07, K.12 | new, export read, no reply yet |
 | #227 | 8BC2 Victus 16-r0xxx | WP-07, WP-14, K.2 | new, export read, no reply yet |
 | #226 | 8BD4 calibration, "stuck at 2000" | WP-06, K.1 | new, no reply yet |
