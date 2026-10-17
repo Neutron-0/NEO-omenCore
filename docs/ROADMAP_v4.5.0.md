@@ -604,7 +604,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-19 fan write lease coordinator: design doc, then implementation
 - [x] (this commit) WP-19 design note `docs/DESIGN_FAN_WRITE_LEASE.md` (lease coordinator and trace-replay plan); implementation waits for the maintainer's go-ahead on step 1 and on keeping scrubbed traces as test data
 - [x] WP-19 step 1 fan write lease: `FanService.AcquireFanWriteLease(owner)`, reference counted, idempotent Dispose, `FanWriteLeaseOwners`; `EnterDiagnosticMode`/`ExitDiagnosticMode` are now one anonymous lease. No caller migrated yet (steps 2 to 4)
-- [x] WP-19 step 2 callers moved to named leases: Guided Fan Verification, single-fan test, curve verification kick, fan cleaning, NVIDIA power write. Calibration (step 3) and owners in `[Fan Firmware State]` (step 4) still to do
+- [x] WP-19 step 2 callers moved to named leases: Guided Fan Verification, single-fan test, curve verification kick, fan cleaning, NVIDIA power write. Calibration now takes a lease too (step 3, via an optional `FanService` constructor argument; no test, the wizard waits 5 s per level), and `[Fan Firmware State]` lists `FanWriteLeaseOwners` (step 4)
 - [ ] WP-19 trace and replay harness with the 8BD4, 8BC2, 88F8 exports
 - [ ] WP-19 sensor identity record (frozen CPU reading on 8E9A, 8BC2, 8DD0, 88D1, 88ED) — started, not done: a one-time warning when the BIOS CPU and GPU readings are identical for 30 reads (`6604a54`, #157, observation only); the stable per-board record of which sensor feeds CPU temperature is still to do
 - [ ] WP-19 asymmetric temperature filter behind an off flag

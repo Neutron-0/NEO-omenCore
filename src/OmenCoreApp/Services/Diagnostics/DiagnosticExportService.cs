@@ -323,7 +323,8 @@ namespace OmenCore.Services.Diagnostics
                     sb.AppendLine($"LastMaxModeExternalResetDetails: {ownershipController.LastMaxModeExternalResetDetails}");
                 }
 
-                AppendFanFirmwareState(sb, BuildFanFirmwareProbes(wmiController as HpWmiBios, ownershipController));
+                AppendFanFirmwareState(sb, BuildFanFirmwareProbes(wmiController as HpWmiBios, ownershipController)
+                    .Append(("FanWriteLeaseOwners", () => fanService == null ? null : fanService.FanWriteLeaseOwners.Count == 0 ? "<none>" : string.Join(", ", fanService.FanWriteLeaseOwners))));
                 AppendPowerTransitions(sb, ReadKernelPowerEvents);
                 AppendCpuThrottle(sb, _cpuThrottleReader);
 

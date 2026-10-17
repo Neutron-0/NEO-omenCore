@@ -27,6 +27,7 @@ namespace OmenCore.Services.FanCalibration
         
         // Calibration wizard state
         private bool _calibrationInProgress = false;
+        private readonly FanService? _fanService;
         private readonly List<CalibrationStep> _calibrationSteps = new();
         private int _currentStep = 0;
         
@@ -62,8 +63,10 @@ namespace OmenCore.Services.FanCalibration
             IFanController fanController,
             SystemInfoService systemInfo,
             LoggingService logging,
-            DeviceCapabilities? capabilities = null)
+            DeviceCapabilities? capabilities = null,
+            FanService? fanService = null)
         {
+            _fanService = fanService;
             _fanController = fanController;
             _systemInfo = systemInfo;
             _logging = logging;
@@ -126,6 +129,8 @@ namespace OmenCore.Services.FanCalibration
                 FanCount = 2
             };
             
+            // Keep the curve engine and keepalive from writing between the wizard's steps.
+            var fanLease = _fanService?.AcquireFanWriteLease("Fan calibration");
             try
             {
                 _logging.Info("Starting fan calibration wizard...");
@@ -206,6 +211,7 @@ namespace OmenCore.Services.FanCalibration
                 _calibrationInProgress = false;
                 
                 await RestoreAutoControlAfterCalibrationAsync(ct);
+                fanLease?.Dispose();
             }
         }
         
