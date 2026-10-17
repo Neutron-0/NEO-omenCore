@@ -2869,6 +2869,9 @@ namespace OmenCore.ViewModels
                     return;
                 }
 
+                var msrForThrottle = _msrAccess;
+                OmenCore.Services.Diagnostics.DiagnosticExportService.CpuThrottleReader = () => msrForThrottle.ReadThermStatusRaw();
+
                 var tj = _msrAccess.ReadTjMax();
                 var currentOffset = _msrAccess.ReadTccOffset();
                 TccStatus = TccOffsetStatus.CreateSupported(tj, currentOffset);

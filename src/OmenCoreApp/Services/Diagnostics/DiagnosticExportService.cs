@@ -2257,12 +2257,32 @@ namespace OmenCore.Services.Diagnostics
         }
 
         /// <summary>Reserved for WP-13 (CPU throttle reasons); says so until that lands, so an export never implies it was checked.</summary>
-        internal static void AppendCpuThrottle(StringBuilder sb)
+        internal static void AppendCpuThrottle(StringBuilder sb, Func<ulong?>? readThermStatus = null)
         {
             sb.AppendLine();
             sb.AppendLine("[CPU Throttle]");
-            sb.AppendLine("  not available in this build");
+            ulong? raw;
+            try { raw = (readThermStatus ?? CpuThrottleReader)?.Invoke(); }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or ObjectDisposedException)
+            {
+                sb.AppendLine($"  <read failed: {ex.Message}>");
+                return;
+            }
+
+            if (raw is null)
+            {
+                sb.AppendLine("  not available (needs Intel and PawnIO MSR access; AMD is not covered yet)");
+                return;
+            }
+
+            sb.AppendLine($"  IA32_THERM_STATUS=0x{raw.Value:X}: {CpuThrottleStatus.Decode(raw.Value)}");
         }
+
+        /// <summary>
+        /// Set by the Tuning view model once it holds an MSR handle, so the export reads through that handle instead of opening a
+        /// second one. Null until then (and on AMD), which the section reports as not available.
+        /// </summary>
+        public static Func<ulong?>? CpuThrottleReader { get; set; }
 
         private static IEnumerable<(string Label, Func<string?> Read)> BuildFanFirmwareProbes(HpWmiBios? bios, IFanController? controller)
         {

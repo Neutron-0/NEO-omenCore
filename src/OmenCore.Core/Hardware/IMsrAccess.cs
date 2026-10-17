@@ -82,6 +82,11 @@ namespace OmenCore.Hardware
         /// Returns true if CPU is power limit throttling.
         /// </summary>
         bool ReadPowerThrottlingStatus();
+
+        /// <summary>
+        /// Raw IA32_THERM_STATUS (MSR 0x19C), or null when it cannot be read. Read only; decode with CpuThrottleStatus.Decode.
+        /// </summary>
+        ulong? ReadThermStatusRaw() => null;
         
         // ==========================================
         // Power Limit Control (EDP Override)

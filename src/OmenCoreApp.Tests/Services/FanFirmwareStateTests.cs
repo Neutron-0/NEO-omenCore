@@ -74,11 +74,27 @@ namespace OmenCoreApp.Tests.Services
         }
 
         [Fact]
-        public void CpuThrottle_IsReservedUntilItExists()
+        public void CpuThrottle_WithoutAReading_SaysNotAvailable()
         {
             var sb = new StringBuilder();
-            DiagnosticExportService.AppendCpuThrottle(sb);
+            DiagnosticExportService.AppendCpuThrottle(sb, () => null);
             sb.ToString().Should().Contain("[CPU Throttle]").And.Contain("not available");
+        }
+
+        [Fact]
+        public void CpuThrottle_DecodesTheStatusBits()
+        {
+            var sb = new StringBuilder();
+            DiagnosticExportService.AppendCpuThrottle(sb, () => (1UL << 10) | 1UL);
+            sb.ToString().Should().Contain("0x401").And.Contain("thermal=yes").And.Contain("power-limit=yes");
+        }
+
+        [Fact]
+        public void CpuThrottle_AThrowingReader_IsOneLine()
+        {
+            var sb = new StringBuilder();
+            DiagnosticExportService.AppendCpuThrottle(sb, () => throw new InvalidOperationException("driver gone"));
+            sb.ToString().Should().Contain("<read failed: driver gone>");
         }
     }
 }

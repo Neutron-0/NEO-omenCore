@@ -414,6 +414,17 @@ namespace OmenCore.Hardware
         /// Read CPU power throttling status from MSR.
         /// Returns true if CPU is power limit throttling.
         /// </summary>
+        public ulong? ReadThermStatusRaw()
+        {
+            if (!IsAvailable) return null;
+
+            try { return ReadMsr(CpuThrottleStatus.ThermStatusMsr); }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or System.IO.IOException)
+            {
+                return null;
+            }
+        }
+
         public bool ReadPowerThrottlingStatus()
         {
             if (!IsAvailable) return false;
