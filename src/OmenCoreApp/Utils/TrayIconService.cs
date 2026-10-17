@@ -67,6 +67,7 @@ namespace OmenCore.Utils
         private MenuItem? _gpuPowerMinMenuItem;
         private MenuItem? _gpuPowerMedMenuItem;
         private MenuItem? _gpuPowerMaxMenuItem;
+        private MenuItem? _gpuPowerExtMenuItem;
         private MenuItem? _keyboardBacklightMenuItem;
         private string _currentGpuPowerLevel = "Medium";
         private int _currentKeyboardBrightness = 3;
@@ -427,10 +428,14 @@ namespace OmenCore.Utils
             _gpuPowerMedMenuItem.Click += (s, e) => RequestGpuPowerChange("Medium");
             _gpuPowerMaxMenuItem = new MenuItem { Header = "   Maximum — TGP + Dynamic Boost" };
             _gpuPowerMaxMenuItem.Click += (s, e) => RequestGpuPowerChange("Maximum");
+            // Same list as the Tuning page offers; without it a profile set to Extended showed Medium here (#142).
+            _gpuPowerExtMenuItem = new MenuItem { Header = GpuPowerExtendedHeader(_currentGpuPowerLevel) };
+            _gpuPowerExtMenuItem.Click += (s, e) => RequestGpuPowerChange("Extended");
             
             _gpuPowerMenuItem.Items.Add(_gpuPowerMinMenuItem);
             _gpuPowerMenuItem.Items.Add(_gpuPowerMedMenuItem);
             _gpuPowerMenuItem.Items.Add(_gpuPowerMaxMenuItem);
+            _gpuPowerMenuItem.Items.Add(_gpuPowerExtMenuItem);
             _gpuPowerMenuItem.ItemContainerStyle = menuItemStyle;
             _gpuPowerMenuItem.SubmenuOpened += (s, e) =>
             {
@@ -810,7 +815,13 @@ namespace OmenCore.Utils
                 _gpuPowerMedMenuItem.Header = (activeLevel == "Medium" ? "✓" : "  ") + " Medium — Custom TGP";
             if (_gpuPowerMaxMenuItem != null)
                 _gpuPowerMaxMenuItem.Header = (activeLevel == "Maximum" ? "✓" : "  ") + " Maximum — TGP + Dynamic Boost";
+            if (_gpuPowerExtMenuItem != null)
+                _gpuPowerExtMenuItem.Header = GpuPowerExtendedHeader(activeLevel);
         }
+
+        /// <summary>Header text for the Extended tray item: ticked only when Extended is the active level.</summary>
+        internal static string GpuPowerExtendedHeader(string activeLevel) =>
+            (activeLevel == "Extended" ? "✓" : "  ") + " Extended — PPAB+, try if Maximum falls short";
         
         /// <summary>
         /// Update GPU power level from external source (v2.7.0)
