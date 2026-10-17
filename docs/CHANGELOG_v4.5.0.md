@@ -37,6 +37,12 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
 - **Fan verification: a refused per-fan write says so.** On 878A (#218) the write for a single fan is refused by the firmware; the
   result now reads "firmware refused level L" instead of "Physical RPM unavailable".
 
+- **Board entries: 8BC2 (Victus 16-r0xxx Intel, #227), 88D1 (OMEN 15-en1xxx, #228) and an exact 88ED keyboard row (#229).** All three
+  were borrowing a neighbouring board's profile by model name. Each entry holds only what the reporter's export measured (V1 policy,
+  two fans, level readback, one-zone or four-zone keyboard) and leaves curves, GPU boost, undervolt and MUX off. `UserVerified` is
+  false. 8BBE, 8BD4 and 8BC2 now say "Estimated only" for RPM on the capability card instead of "Supported". Tests:
+  `ModelCapabilityDatabaseTests`, `KeyboardModelDatabaseTests`.
+
 ## Added
 
 - **OMEN key can show or hide the OSD.** New "ToggleOsd" choice for the OMEN key action in Settings. If the OSD is turned

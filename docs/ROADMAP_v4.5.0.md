@@ -489,21 +489,21 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-05 live RPM source and PL1/PL2 result passed into the capability card
 - [ ] WP-05 card wording: "Estimated from fan level" / "not readable on this board" — the card already reads "Estimated only" when the flag is false; 8BBE and 8BD4 now get it (dfcf2ce); a live-probe override (probe wins over database) not done
 - [x] (dfcf2ce) WP-05 list of entries relying on the `SupportsRpmReadback` default in the commit message — 56 of 82 entries; 8BBE and 8BD4 set false; 8BC2 has no entry yet (WP-07)
-- [ ] WP-05 `SupportsRpmReadback = false` set for 8BBE, 8BD4, 8BC2 with tests
+- [x] (63af90b) WP-05 `SupportsRpmReadback = false` set for 8BBE, 8BD4, 8BC2 with tests
 - [ ] WP-06.1 calibration says RPM cannot be measured when the source is Estimated; table labelled estimated
 - [ ] WP-06.2 repeated stable readback below request counts as a firmware ceiling at any step
 - [x] (912b818) WP-06.3 `IsFirmwareCeilingPlateau` 90% rule (88F8 case); the 60%-step rule and its test kept — implemented as `ReconcileCeilingAcrossFans`, run after each 100% step, because the sibling fan is only known then
 - [ ] WP-06.4 thermal interruption marked, not failed; cool-down wait below 85 C before a run
 - [x] (d1c1fc4) WP-06.5 refused per-fan write says "firmware refused level L" (878A)
 - [ ] WP-06 scenario tests for #226 and #207 give "level-only" and "pass (ceiling)"
-- [ ] WP-07 8BC2 capability entry (V1, 2 fans, max 55, no RPM readback, curves/GPU boost/undervolt off, Intel) and test
-- [ ] WP-07 8BC2 `KeyboardModelDatabase` entry (`OneZoneWithNumpad`) and test
-- [ ] WP-07 88D1 entry (#228) and test
-- [ ] WP-07 88ED exact `KeyboardModelDatabase` row (#229) and test
-- [ ] WP-07 8A13 Notes and verified flags for the confirmed parts only (MUX stays off)
-- [ ] WP-07 8BD4 Notes: second owner (#226)
-- [ ] WP-07 8E9A Notes: keyboard colour confirmed through 30BF (#142)
-- [ ] WP-07 callers of `SetColorTable` that omit `zoneCount` (`KeyboardLightingService.cs:546`, `WmiBiosBackend.cs:213, 372`) pass the topology count
+- [x] (63af90b) WP-07 8BC2 capability entry (V1, 2 fans, max 55, no RPM readback, curves/GPU boost/undervolt off, Intel) and test
+- [x] (63af90b) WP-07 8BC2 `KeyboardModelDatabase` entry (`OneZoneWithNumpad`) and test
+- [x] (cd8bf89) WP-07 88D1 entry (#228) and test
+- [x] (cd8bf89) WP-07 88ED exact `KeyboardModelDatabase` row (#229) and test
+- [x] (cd8bf89) WP-07 8A13 Notes and verified flags for the confirmed parts only (MUX stays off) — Notes only; `UserVerified` left false because the rest of the entry is unconfirmed
+- [x] (63af90b) WP-07 8BD4 Notes: second owner (#226)
+- [x] (cd8bf89) WP-07 8E9A Notes: keyboard colour confirmed through 30BF (#142)
+- [x] (08465e2) WP-07 callers of `SetColorTable` that omit `zoneCount` — done as part of WP-14.1: the default now follows the board topology (`KeyboardLightingService.cs:546`, `WmiBiosBackend.cs:213, 372`) pass the topology count
 - [ ] WP-08 write clamp for MAX/CURRENT with refusal text
 - [ ] WP-08 "stock max read X W, expected Y W" explanation
 - [ ] WP-08 panel text (do not disable PPAB, driver update may undo, RTX 5050 untested, re-toggle hint)
