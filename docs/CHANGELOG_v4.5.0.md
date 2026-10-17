@@ -29,6 +29,14 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
   does not need nvflash. Reported through the Prophecy author. We do not ship nvflash. *Pending hardware confirmation.*
   Test: `NvflashLookupTests`.
 
+- **Guided Fan Verification: a fan held by the same firmware ceiling as its sibling now passes.** On 88F8 (#207) the CPU fan
+  settled at level 43/55 at 100% while the GPU fan reached 46/55 and passed; the CPU fan failed by two points. After each 100% step
+  a fan within 90% of the best level another fan reached is judged by the same ceiling (evidence "FirmwareCeiling"). Two fans both
+  stuck low still fail, and a physical tachometer reading zero is never upgraded. *Pending retest by the 88F8 owner.*
+  Test: `FanVerificationCeilingTests`.
+- **Fan verification: a refused per-fan write says so.** On 878A (#218) the write for a single fan is refused by the firmware; the
+  result now reads "firmware refused level L" instead of "Physical RPM unavailable".
+
 ## Added
 
 - **OMEN key can show or hide the OSD.** New "ToggleOsd" choice for the OMEN key action in Settings. If the OSD is turned
