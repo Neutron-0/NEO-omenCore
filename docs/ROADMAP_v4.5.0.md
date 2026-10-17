@@ -483,9 +483,9 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [x] (378d853) WP-03 daemon start warning, nothing is stopped or killed
 - [x] (378d853) WP-03 Linux test for the scanner
 - [x] (c27bd2f) WP-04 `[Fan Firmware State]` section — Max flag, level readback, thermal policy, fan count; fan-mode readback and watchdog-failsafe flag not included (no getter exists yet)
-- [ ] WP-04 `[Power Transitions]` section (event IDs 41, 42, 107, 506, 507, no `powercfg`)
-- [ ] WP-04 `[CPU Throttle]` placeholder line
-- [ ] WP-04 tests: fake source and throwing source for each section
+- [x] (242e829) WP-04 `[Power Transitions]` section (event IDs 41, 42, 107, 506, 507, no `powercfg`)
+- [x] (242e829) WP-04 `[CPU Throttle]` placeholder line
+- [x] (242e829) WP-04 tests: fake source and throwing source for each section
 - [ ] WP-05 live RPM source and PL1/PL2 result passed into the capability card
 - [ ] WP-05 card wording: "Estimated from fan level" / "not readable on this board"
 - [ ] WP-05 list of entries relying on the `SupportsRpmReadback` default in the commit message
@@ -595,7 +595,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
   `diagnose` under "Other fan writers" and log one warning at daemon start. Do not stop or kill anything.
 - Tests: `src/OmenCore.Linux.Tests/Hardware/`: a scanner that takes an injected list of process names.
 
-**WP-04 Diagnostics export additions** (`todo`)
+**WP-04 Diagnostics export additions** (`done`, apart from fan-mode readback and the watchdog flag)
 - Goal: the next stuck-fan, hibernate or throttling report carries its own cause.
 - Evidence: #211 (no Max flag or mode readback in the export), K.8 (no sleep or hibernate reasons), #222 (no stuck-state data).
 - Where: `src/OmenCoreApp/Services/Diagnostics/DiagnosticExportService.cs` (follow the existing `AppendMemoryBreakdown` pattern and

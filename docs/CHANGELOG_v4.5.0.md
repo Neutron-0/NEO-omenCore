@@ -40,6 +40,11 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
   that are running (they also write `pwm1_enable`), and the daemon logs one warning at start. Nothing is stopped or killed.
   Test: `FanWriterScannerTests`.
 
+- **Diagnostics export: three new sections for stuck-fan and wake reports.** `[Fan Firmware State]` (Max flag, fan level readback,
+  thermal policy, fan count), `[Power Transitions]` (the last 20 sleep, resume and standby events with their reasons from the
+  Windows event log) and a reserved `[CPU Throttle]` line. Each is read-only and a failing read writes one line. Reports like
+  #211 had none of this, so their cause stayed open. Test: `FanFirmwareStateTests`.
+
 ## Release and CI (no change to the shipped program)
 
 - **Release notes keep the changelog.** Release Build now writes the notes from the template, the version's changelog,
