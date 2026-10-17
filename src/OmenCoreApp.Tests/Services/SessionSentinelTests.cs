@@ -139,5 +139,14 @@ namespace OmenCoreApp.Tests.Services
             var report = new SessionSentinel.PreviousSessionReport { Session = Record(false) };
             report.Summarise().Should().Contain("terminated from outside");
         }
+
+        [Fact]
+        public void ShutdownThatBeganButNeverFinished_IsNotBlamedOnOutsideKill()
+        {
+            var session = Record(false);
+            session.ExitStarted = true;
+            var text = new SessionSentinel.PreviousSessionReport { Session = session }.Summarise();
+            text.Should().Contain("begun its normal shutdown").And.NotContain("terminated from outside");
+        }
     }
 }

@@ -72,6 +72,8 @@ namespace OmenCore.Services
             public DateTime LastHeartbeatUtc { get; set; }
             public string Version { get; set; } = string.Empty;
             public bool CleanExit { get; set; }
+            /// <summary>OnExit had begun but never finished: the exit was ordinary, the process was ended mid-shutdown.</summary>
+            public bool ExitStarted { get; set; }
         }
 
         public sealed class PreviousSessionReport
@@ -85,6 +87,9 @@ namespace OmenCore.Services
                 $"{Session.StartedUtc:u}, last alive {Session.LastHeartbeatUtc:u} (ran about {RanFor.TotalMinutes:F0} min). " +
                 (WindowsEvidence.Count > 0
                     ? "Windows recorded: " + string.Join(" | ", WindowsEvidence)
+                    : Session.ExitStarted
+                    ? "It had begun its normal shutdown (fan restore) and was ended before finishing; " +
+                      "Windows recorded no crash, so the session was ending or something stopped the process then."
                     : "Windows recorded no crash for it - it was most likely terminated from outside " +
                       "(Task Manager, security software, or a restart/update), not a crash inside OmenCore.");
         }
@@ -130,6 +135,17 @@ namespace OmenCore.Services
 
             _heartbeat = new Timer(_ => Beat(), null, HeartbeatInterval, HeartbeatInterval);
             return report;
+        }
+
+        /// <summary>Call first thing in <c>OnExit</c>, so a shutdown that never finishes can be told from a kill.</summary>
+        public void MarkExitStarted()
+        {
+            lock (_gate)
+            {
+                _current.ExitStarted = true;
+                _current.LastHeartbeatUtc = DateTime.UtcNow;
+                Write(_current);
+            }
         }
 
         /// <summary>Mark this session as exited cleanly. Call from <c>OnExit</c>, before the log is disposed.</summary>

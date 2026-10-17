@@ -1154,8 +1154,15 @@ namespace OmenCore
             }
         }
 
+        protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+        {
+            Logging.Info($"Windows is ending the session ({e.ReasonSessionEnding}); OmenCore will exit.");
+            base.OnSessionEnding(e);
+        }
+
         protected override void OnExit(ExitEventArgs e)
         {
+            _sessionSentinel?.MarkExitStarted();
             // Restore fans to default/Windows auto control before shutdown
             // This ensures fans return to BIOS/Windows default behavior instead of staying at last manual setting
             try
