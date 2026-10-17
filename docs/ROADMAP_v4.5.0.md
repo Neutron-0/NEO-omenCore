@@ -616,6 +616,13 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] Section 4 "What counts as done" reviewed line by line
 - [ ] Replies drafted for every issue a shipped item touches; "Needs field confirmation" list rewritten — list written for what exists so far (`docs/CHANGELOG_v4.5.0.md`); to be re-checked at release; drafts still unposted: #226, #217, #143 and the Discord fan report
 - [ ] Full suite green, 0 warnings, count not lower than the baseline
+- [ ] Upstream and fork review 2026-10-18 (findings, no code yet):
+  - Bundled `installer/PawnIO_setup.exe` is 2.0.1 (Jun 2025); upstream PawnIO.Setup is 2.2.0 (Mar 2026): upgrades in place from 2.1.0, silent mode returns a reboot-required code, fixes BSODs on Windows 10 RS5/19H1/19H2, restores the legacy device path some third-party libs expect. Candidate: bundle 2.2.0 after a clean install and upgrade test; check the `-install -silent` flags still hold and that `IsPawnIOInstalled` still finds the uninstall key.
+  - PawnIO.Modules 0.2.9 to 0.2.11 (Aug 2026): IntelMSR now allows hardware-prefetcher/cache MSRs (not used here), AMDFamily17 allows read-only MCA/SMCA diagnostics, RyzenSMU gains pre-Ryzen sensor support and a Bergamo fix, a new read-only Intel PCH thermal module. Check which module .bin files `LibreHardwareMonitorImpl` embeds and whether they are 0.2.x-era; AMDFamily17 is the upstream route to AMD MSR/throttle reads (the Ryzen cases in #230 and K.x report 0 W because only IntelMSR is loaded).
+  - LibreHardwareMonitorLib: we are on 0.9.6, which is the latest stable (14 Feb 2026); only 0.9.7 prereleases exist. NvAPIWrapper.Net 0.8.1.101 and HidSharp 2.6.4 are the latest published. Nothing to take.
+  - PR #147 (Neutron-0): still the only open PR; reviewed three times; their fork has no new commits ahead of main. Awaiting maintainer decision.
+  - Fork `saikiranworks/omencore`: 28 commits ahead and 455 behind, Linux/Avalonia only (hp-wmi udev rules, four-zone init, fan-curve ramp and reload fixes, keyboard animation write reduction, a Linux install guide). Worth a licensed read of the udev and fan-curve commits for the Linux build; too far diverged to merge. Bundled `.avalonia-build-tasks` files show it was built in-tree, so take ideas, not files.
+  - Fork `bobshmo/OmenCore-Prophecy`: 6 ahead, 77 behind; already integrated (WP-22). Other active forks (hamzajazib, Neutron-0, iamabhishekt, WoofahRayetCode, ujjawalkaushik1110) have no commits ahead of main.
 - [ ] Maintainer: PR #147 and code signing decisions
 - [ ] Maintainer: tag `v4.5.0`, check the release notes step, record SHA256, update README and website
 - [ ] Maintainer: close issues earmarked "close on ship"
