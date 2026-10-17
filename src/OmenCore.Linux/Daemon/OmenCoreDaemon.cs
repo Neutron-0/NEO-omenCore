@@ -96,6 +96,10 @@ public class OmenCoreDaemon : IDisposable
             return;
         }
 
+        var otherWriters = FanWriterScanner.Scan();
+        if (otherWriters.Count > 0)
+            Log($"Warning: other fan services are running ({string.Join(", ", otherWriters)}). They also write pwm1_enable, so fan settings may not stick. OmenCore does not stop them.");
+
         // Create PID file
         WritePidFile();
         

@@ -107,6 +107,7 @@ public static class DiagnoseCommand
         info.IsRoot = LinuxEcController.CheckRootAccess();
         using (var probe = WriterLock.TryAcquire(WriterLock.DefaultPath(), "diagnose", out var heldBy))
             info.FanWriter = probe != null ? "free" : $"held by {heldBy}";
+        info.OtherFanWriters = string.Join(", ", FanWriterScanner.Scan());
 
         info.OsPrettyName = await ReadOsPrettyNameAsync() ?? "Unknown";
         info.KernelRelease = await ReadTextAsync("/proc/sys/kernel/osrelease") ?? "Unknown";
@@ -803,6 +804,7 @@ public static class DiagnoseCommand
         Console.WriteLine(midBorder);
         Console.WriteLine($"║  Root:      {(info.IsRoot ? "✓" : "✗"),-76}║");
         Console.WriteLine($"║  Fan writer:{info.FanWriter,-76}║");
+        Console.WriteLine($"║  Other fan writers:{(info.OtherFanWriters.Length == 0 ? "none found" : info.OtherFanWriters),-69}║");
         Console.WriteLine($"║  debugfs:   {(info.DebugFsMounted ? "✓ mounted" : "✗ not mounted"),-76}║");
         Console.WriteLine($"║  ec_io:     {(info.EcIoPathExists ? "✓ present" : "✗ missing"),-76}║");
         Console.WriteLine($"║  ec_sys:    {(info.EcSysModuleLoaded ? "✓ loaded" : "✗ not loaded"),-76}║");
@@ -910,6 +912,7 @@ public static class DiagnoseCommand
         Console.WriteLine(border);
         WriteLine("Root:", info.IsRoot ? "OK" : "NO");
         WriteLine("Fan writer:", info.FanWriter);
+        WriteLine("Other fan writers:", info.OtherFanWriters.Length == 0 ? "none found" : info.OtherFanWriters);
         WriteLine("debugfs:", State(info.DebugFsMounted, "mounted", "not mounted"));
         WriteLine("ec_io:", State(info.EcIoPathExists));
         WriteLine("ec_sys:", State(info.EcSysModuleLoaded, "loaded", "not loaded"));
@@ -1162,6 +1165,8 @@ public class DiagnoseInfo
     public bool IsRoot { get; set; }
     /// <summary>"free", or who holds the single fan-writer lock (daemon or another CLI call).</summary>
     public string FanWriter { get; set; } = "";
+    /// <summary>Comma-separated names of other fan services found running (they also write pwm1_enable); empty when none.</summary>
+    public string OtherFanWriters { get; set; } = "";
 
     public string OsPrettyName { get; set; } = "";
     public string KernelRelease { get; set; } = "";
