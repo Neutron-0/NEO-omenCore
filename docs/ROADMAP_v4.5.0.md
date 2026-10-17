@@ -490,8 +490,8 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-05 card wording: "Estimated from fan level" / "not readable on this board" — the card already reads "Estimated only" when the flag is false; 8BBE and 8BD4 now get it (dfcf2ce); a live-probe override (probe wins over database) not done
 - [x] (dfcf2ce) WP-05 list of entries relying on the `SupportsRpmReadback` default in the commit message — 56 of 82 entries; 8BBE and 8BD4 set false; 8BC2 has no entry yet (WP-07)
 - [x] (63af90b) WP-05 `SupportsRpmReadback = false` set for 8BBE, 8BD4, 8BC2 with tests
-- [ ] WP-06.1 calibration says RPM cannot be measured when the source is Estimated; table labelled estimated
-- [ ] WP-06.2 repeated stable readback below request counts as a firmware ceiling at any step
+- [ ] WP-06.1 calibration says RPM cannot be measured when the source is Estimated; table labelled estimated — not done: the wizard reads `ReadFanSpeeds()` (physical sources only, returns nothing on V1), while the "passes at 2000" result in K.1 comes from the verification path; needs a trace of which screen showed it before changing anything
+- [ ] WP-06.2 repeated stable readback below request counts as a firmware ceiling at any step — deliberately not done: on 8BD4 the CPU fan reads level 20 at every step, so accepting a stable plateau at any step would pass a fan that ignores commands. Needs a rule that tells a clamp from a dead command (data from a board that clamps at a distinct level)
 - [x] (912b818) WP-06.3 `IsFirmwareCeilingPlateau` 90% rule (88F8 case); the 60%-step rule and its test kept — implemented as `ReconcileCeilingAcrossFans`, run after each 100% step, because the sibling fan is only known then
 - [x] (ace9941) WP-06.4 thermal interruption marked, not failed; cool-down wait below 85 C before a run — decisions in `GuidedRunRules` (tested); the run itself needs a hot machine to see, so the wiring is untested on hardware
 - [x] (d1c1fc4) WP-06.5 refused per-fan write says "firmware refused level L" (878A)
