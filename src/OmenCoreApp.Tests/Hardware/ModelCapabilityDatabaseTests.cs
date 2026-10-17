@@ -125,6 +125,7 @@ namespace OmenCoreApp.Tests.Hardware
         [Theory]
         [InlineData("8BBE")] // #211: RPM is the V1 fan level x100
         [InlineData("8BD4")] // #212 and #226: same
+        [InlineData("8BC2")] // #227: same
         public void V1BoardsWhoseExportsShowNoTachometer_DoNotClaimRpmReadback(string productId)
         {
             // The database default is true, so a board that never said otherwise showed "Supported" on the capability card
@@ -411,6 +412,23 @@ namespace OmenCoreApp.Tests.Hardware
             caps.FanZoneCount.Should().Be(2);
             caps.MaxFanLevel.Should().Be(55);
             caps.SupportsUndervolt.Should().BeFalse();
+        }
+
+        [Fact]
+        public void GetCapabilities_8BC2_Victus16R0xxxIntel_HasItsOwnConservativeEntry()
+        {
+            // #227: measured V1, 2 fans, level readback only, one-zone keyboard. Resolved by model name to 8BBE before.
+            var caps = ModelCapabilityDatabase.GetCapabilities("8BC2");
+
+            caps.ProductId.Should().Be("8BC2");
+            caps.Family.Should().Be(OmenModelFamily.Victus);
+            caps.FanZoneCount.Should().Be(2);
+            caps.SupportsFanControlWmi.Should().BeTrue();
+            caps.SupportsRpmReadback.Should().BeFalse();
+            caps.SupportsFanCurves.Should().BeFalse();
+            caps.SupportsGpuPowerBoost.Should().BeFalse();
+            caps.SupportsUndervolt.Should().BeFalse();
+            caps.UserVerified.Should().BeFalse();
         }
 
         [Fact]

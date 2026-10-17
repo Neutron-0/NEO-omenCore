@@ -717,6 +717,22 @@ namespace OmenCore.Services.KeyboardLighting
                 Notes = "Added from user report — ensures keyboard zones are applied instead of falling back to Victus defaults"
             });
 
+            // GitHub #227 (ZycoJiun, 2026-10-12): Victus 16-r0xxx Intel, BIOS F.31. The firmware topology probe reports
+            // OneZoneWithNumpad (0x04), the same as 8BD4. KeyboardType has no one-zone value; the backend takes the real
+            // zone count from the live probe, so FourZone here only selects the WMI colour-table path.
+            AddModel(new KeyboardModelConfig
+            {
+                ProductId = "8BC2",
+                ModelName = "HP Victus 16-r0xxx Intel",
+                ModelNamePattern = "16-r0",
+                KeyboardType = KeyboardType.FourZone,
+                PreferredMethod = KeyboardMethod.ColorTable2020,
+                FallbackMethods = new[] { KeyboardMethod.NewWmi2023 },
+                ModelYear = 2023,
+                UserVerified = false,
+                Notes = "GitHub #227: firmware topology OneZoneWithNumpad. Uses the one-zone colour layout from the 8BD4 probe (#212), implemented in 4.5.0 and pending a retest on real hardware. The reporter's saved config holds an earlier 'Keyboard zones changed' observation (WMI BIOS), so colour may already work here; no Lighting result has been reported yet."
+            });
+
             AddModel(new KeyboardModelConfig
             {
                 ProductId = "8BD4",

@@ -7,6 +7,18 @@ namespace OmenCoreApp.Tests.Services
     public class KeyboardModelDatabaseTests
     {
         [Fact]
+        public void GetConfig_8BC2_ResolvesExactly_AndIsUnverified()
+        {
+            // #227: Victus 16-r0xxx Intel, firmware topology OneZoneWithNumpad. It used to match only by model name.
+            var cfg = KeyboardModelDatabase.GetConfig("8BC2");
+
+            cfg.Should().NotBeNull();
+            cfg!.ProductId.Should().Be("8BC2");
+            cfg.PreferredMethod.Should().Be(KeyboardMethod.ColorTable2020);
+            cfg.UserVerified.Should().BeFalse();
+        }
+
+        [Fact]
         public void GetConfig_8BA9_ResolvesExactly_AsFourZoneColorTable()
         {
             var cfg = KeyboardModelDatabase.GetConfig("8BA9");

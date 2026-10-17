@@ -2136,7 +2136,7 @@ namespace OmenCore.Hardware
                 HasFourZoneRgb = true,
                 HasKeyboardBacklight = true,
                 UserVerified = false,
-                Notes = "RC1 field log - Victus 16-s0xxx (8BD4), Ryzen 7 7840HS + RTX 4060. Conservative WMI V1 fan profile; GPU boost disabled pending verification. GitHub #212 (2026-09-24, BIOS F.29): this board's own live topology probe reports OneZoneWithNumpad, not four-zone, and every RGB write backend tested (Auto/WmiBios, explicit Wmi, forced EC) failed colour verification the same way (\"readback is all black\" / \"readback mismatch\"), including a follow-up test sending the identical colour into all four zone slots - which rules out \"only slot 0 is read\" and points at WmiBiosBackend.ZoneCount/EcDirectBackend.ZoneCount being hardcoded to 4 regardless of firmware topology, so HpWmiBios.SetColorTable's own payload declared \"4 zones\" (its byte 0) to a keyboard whose firmware reports exactly 1. IMPLEMENTED, PENDING CONFIRMATION (2026-09-25): WmiBiosBackend.ZoneCount now reads the live topology probe and SetColorTable's byte 0 is set from it instead of a hardcoded 4 - the 12-byte, 4-slot colour payload itself is UNCHANGED, since the real single-zone byte layout still isn't known; this only tests the one piece there is hard evidence for, that the firmware may be validating byte 0 against its own topology and discarding the whole write on a mismatch. Not yet confirmed on real hardware - if colour still fails after this, the byte-0 hypothesis is wrong and the real single-zone layout is still unknown. This is an architecture gap, not a fixable flag: HasFourZoneRgb has never gated zone COUNT, only whether zone lighting is offered at all, and the only alternative on this board's LightingCapability enum removes colour entirely - left at true. Discord 2026-06-03 reported fans stuck at max after long gaming session; v3.7.1 Discord 2026-06-07 logs showed non-reactive/0 RPM fan behavior after SetFanLevel(0,0), so V1 manual-zero floor clear is disabled pending a safer handoff sequence."
+                Notes = "RC1 field log - Victus 16-s0xxx (8BD4), Ryzen 7 7840HS + RTX 4060. Conservative WMI V1 fan profile; GPU boost disabled pending verification. GitHub #212 (2026-09-24, BIOS F.29): this board's own live topology probe reports OneZoneWithNumpad, not four-zone, and every RGB write backend tested (Auto/WmiBios, explicit Wmi, forced EC) failed colour verification the same way (\"readback is all black\" / \"readback mismatch\"), including a follow-up test sending the identical colour into all four zone slots - which rules out \"only slot 0 is read\" and points at WmiBiosBackend.ZoneCount/EcDirectBackend.ZoneCount being hardcoded to 4 regardless of firmware topology, so HpWmiBios.SetColorTable's own payload declared \"4 zones\" (its byte 0) to a keyboard whose firmware reports exactly 1. IMPLEMENTED, PENDING CONFIRMATION (2026-09-25): WmiBiosBackend.ZoneCount now reads the live topology probe and SetColorTable's byte 0 is set from it instead of a hardcoded 4 - the 12-byte, 4-slot colour payload itself is UNCHANGED, since the real single-zone byte layout still isn't known; this only tests the one piece there is hard evidence for, that the firmware may be validating byte 0 against its own topology and discarding the whole write on a mismatch. Not yet confirmed on real hardware - if colour still fails after this, the byte-0 hypothesis is wrong and the real single-zone layout is still unknown. This is an architecture gap, not a fixable flag: HasFourZoneRgb has never gated zone COUNT, only whether zone lighting is offered at all, and the only alternative on this board's LightingCapability enum removes colour entirely - left at true. Discord 2026-06-03 reported fans stuck at max after long gaming session; v3.7.1 Discord 2026-06-07 logs showed non-reactive/0 RPM fan behavior after SetFanLevel(0,0), so V1 manual-zero floor clear is disabled pending a safer handoff sequence. 2026-10-12 probe result (#212, 4.4.5): count 1 with the colour directly after the count byte (offsets 1 to 3) lit the keyboard; the four-zone offset (25) did not. The one-zone layout is implemented in 4.5.0, IMPLEMENTED, PENDING RETEST by the 8BD4 owner. A second owner (#226, BIOS F.32, Ryzen 7 7840HS) confirms the board; both exports show level-only RPM, so SupportsRpmReadback is false."
             });
 
             // Victus 16 S/R (2023/2024), AMD Ryzen 7 8845HS + Radeon 780M + RTX 4070.
@@ -2226,6 +2226,32 @@ namespace OmenCore.Hardware
                 HasKeyboardBacklight = true,
                 UserVerified = false,
                 Notes = "GitHub #211 (2026-09-24) — Victus 16-r0xxx Intel, ProductId 8BBE (RTX 4060, BIOS F.31). Previously resolved only via Family fallback (see #172, #198). WMI fan control and V1 thermal policy confirmed live in this export; fan curves, GPU boost, RGB and undervolt are unconfirmed and left conservative. RequiredCpuVendor=Intel mirrors the guard 8C2F already carries for this board, from the other direction."
+            });
+
+            // GitHub #227 (ZycoJiun, 2026-10-12): Victus 16-r0xxx Intel with its own board ID. Until now it resolved by model name to
+            // 8BBE at Low confidence. Measured in the export: i7-13700HX, RTX 4060, BIOS F.31, thermal policy V1, 2 fans, max fan level 55,
+            // level readback works (20/20), RPM readback null, keyboard topology OneZoneWithNumpad (0x04). Curves, GPU boost and undervolt
+            // stay off: not measured. Thermal protection fired at 92 and 96 C and released at 70 to 76 C in the same log.
+            AddModel(new ModelCapabilities
+            {
+                ProductId = "8BC2",
+                ModelName = "HP Victus 16-r0xxx Intel",
+                ModelNamePattern = "16-r0",
+                RequiredCpuVendor = CpuUndervoltProviderFactory.CpuVendor.Intel,
+                ModelYear = 2023,
+                Family = OmenModelFamily.Victus,
+                SupportsFanControlWmi = true,
+                SupportsFanControlEc = false,
+                SupportsFanCurves = false,
+                FanZoneCount = 2,
+                SupportsRpmReadback = false,
+                HasMuxSwitch = false,
+                SupportsGpuPowerBoost = false,
+                SupportsUndervolt = false,
+                HasFourZoneRgb = true,
+                HasKeyboardBacklight = true,
+                UserVerified = false,
+                Notes = "GitHub #227 (2026-10-12) - Victus 16-r0xxx Intel, ProductId 8BC2 (i7-13700HX, RTX 4060, BIOS F.31). Measured: thermal policy V1, 2 fans, max level 55, level readback 20/20, RPM readback null (estimates only), keyboard topology OneZoneWithNumpad. Curves, GPU boost, undervolt and RGB colour are unconfirmed and left conservative. Ohman's notes list the board as working for basic controls (documentation only, not our evidence)."
             });
 
             // GitHub #223 (2026-10-06): HyperX OMEN 15-gb0xxx, Ryzen 7 260 / RTX 5060, BIOS F.05. Measured in the
