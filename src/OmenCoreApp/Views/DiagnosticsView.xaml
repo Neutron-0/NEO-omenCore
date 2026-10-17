@@ -419,10 +419,7 @@
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Power limit (PL1/PL2) adjustment" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                    <TextBlock Text="✓ Supported" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" Visibility="{Binding DetectedCapabilities.ModelConfig.SupportsPowerLimits, Converter={StaticResource BoolToVisibility}}"/>
-                                    <TextBlock Text="✗ Not supported" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" Visibility="{Binding DetectedCapabilities.ModelConfig.SupportsPowerLimits, Converter={StaticResource InverseBoolToVisibility}}"/>
-                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{Binding PowerLimitReadbackLabel}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                             </Grid>
                         </Border>
                         <Border Background="#0D0D0F" CornerRadius="6" Padding="10,8" Margin="0,0,0,0">

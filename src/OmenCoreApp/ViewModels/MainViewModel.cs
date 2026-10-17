@@ -163,6 +163,7 @@ namespace OmenCore.ViewModels
         public SystemControlViewModel? LoadedSystemControl => _systemControl;
         public bool IsGpuPowerTrayLikelyAvailable => DetectedCapabilities?.ShowGpuPowerBoost ?? true;
         public string RpmReadbackLabel => Hardware.RpmReadbackLabel.Describe(DetectedCapabilities?.ModelConfig?.SupportsRpmReadback ?? true, FanTelemetry?.Select(t => t.RpmSource));
+        public string PowerLimitReadbackLabel => Hardware.PowerLimitReadbackLabel.Describe(DetectedCapabilities?.ModelConfig?.SupportsPowerLimits ?? false, _systemControl?.CpuPowerLimitsStatus?.StartsWith("MSR package limits unavailable", StringComparison.Ordinal) == true);
 
         public SystemControlViewModel? SystemControl
         {
@@ -190,6 +191,10 @@ namespace OmenCore.ViewModels
                     );
                     _systemControl.PropertyChanged += (s, e) =>
                     {
+                        if (e.PropertyName == nameof(SystemControlViewModel.CpuPowerLimitsStatus))
+                        {
+                            OnPropertyChanged(nameof(PowerLimitReadbackLabel));
+                        }
                         if (e.PropertyName == nameof(SystemControlViewModel.CurrentPerformanceModeName))
                         {
                             var confirmedPerformanceMode = _performanceModeService.GetCurrentMode()
