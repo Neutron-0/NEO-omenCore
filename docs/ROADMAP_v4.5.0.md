@@ -504,11 +504,11 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [x] (63af90b) WP-07 8BD4 Notes: second owner (#226)
 - [x] (cd8bf89) WP-07 8E9A Notes: keyboard colour confirmed through 30BF (#142)
 - [x] (08465e2) WP-07 callers of `SetColorTable` that omit `zoneCount` — done as part of WP-14.1: the default now follows the board topology (`KeyboardLightingService.cs:546`, `WmiBiosBackend.cs:213, 372`) pass the topology count
-- [ ] WP-08 write clamp for MAX/CURRENT with refusal text
-- [ ] WP-08 "stock max read X W, expected Y W" explanation
-- [ ] WP-08 panel text (do not disable PPAB, driver update may undo, RTX 5050 untested, re-toggle hint)
-- [ ] WP-08 TPP read-only, or left out with a note
-- [ ] WP-08 tests: range clamp, mismatch text
+- [x] (2613f4d) WP-08 write clamp for MAX/CURRENT with refusal text — already enforced in the backend (`SetMaxOverride` and `SetCurrent` refuse values outside the profile range, with text) and the dropdown only offers `Targets`; no change needed
+- [x] (2613f4d) WP-08 "stock max read X W, expected Y W" explanation
+- [x] (2613f4d) WP-08 panel text (do not disable PPAB, driver update may undo, RTX 5050 untested, re-toggle hint)
+- [x] (2613f4d) WP-08 TPP read-only, or left out with a note — left out: the backend has no TPP read, and adding one would be a new probe; revisit with the PCF/TPP work
+- [x] (2613f4d) WP-08 tests: range clamp, mismatch text — mismatch text tested (`NvidiaPowerStockNoteTests`); the range clamp needs a GPU and driver, so it stays untested here
 - [ ] WP-09 `docs/LINUX_KERNEL_BOARD_SUPPORT.md` written, linked from the install guide, `46be1453` verified on kernel.org
 - [ ] WP-09 #219 reply drafted into a scratch file
 
@@ -656,7 +656,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - Where for all: `src/OmenCore.Core/Hardware/ModelCapabilityDatabase.cs` (8BBE entry at line 2208 is the nearest model),
   `src/OmenCore.Core/Services/KeyboardLighting/KeyboardModelDatabase.cs`.
 
-**WP-08 NVIDIA power panel hardening** (`todo`)
+**WP-08 NVIDIA power panel hardening** (`done`, TPP left out)
 - Goal: the panel cannot send out-of-range values, and it explains what it read. Evidence: K.7.
 - Where: `src/OmenCoreApp/ViewModels/NvidiaPowerViewModel.cs`, `src/OmenCoreApp/Services/NvidiaPowerService.cs` (`Assess()` returns
   `Status` with `LiveCurrentW`, `LiveMaxW`, `Targets`), `src/OmenCore.NvidiaPower/**` (internal; `InternalsVisibleTo` already set).

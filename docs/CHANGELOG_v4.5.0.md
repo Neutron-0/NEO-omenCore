@@ -43,6 +43,11 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
   false. 8BBE, 8BD4 and 8BC2 now say "Estimated only" for RPM on the capability card instead of "Supported". Tests:
   `ModelCapabilityDatabaseTests`, `KeyboardModelDatabaseTests`.
 
+- **NVIDIA power panel explains what it read.** When the stock MAX read from the driver differs from the expected stock MAX for the
+  GPU (a 115 W against 140 W case), the status line says both numbers and that a difference is normal with an override or a lower
+  maker limit. New notes under the panel: keep PPAB (Dynamic Boost) on, a driver update can undo the unlock, the RTX 5050 is untested,
+  and how to re-toggle if CURRENT will not stick. No new write path. Test: `NvidiaPowerStockNoteTests`.
+
 ## Added
 
 - **OMEN key can show or hide the OSD.** New "ToggleOsd" choice for the OMEN key action in Settings. If the OSD is turned
