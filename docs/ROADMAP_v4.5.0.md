@@ -592,6 +592,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 
 **Phase 4: foundations (separate commits from behaviour changes)**
 - [ ] WP-19 fan write lease coordinator: design doc, then implementation
+- [x] (this commit) WP-19 design note `docs/DESIGN_FAN_WRITE_LEASE.md` (lease coordinator and trace-replay plan); implementation waits for the maintainer's go-ahead on step 1 and on keeping scrubbed traces as test data
 - [ ] WP-19 trace and replay harness with the 8BD4, 8BC2, 88F8 exports
 - [ ] WP-19 sensor identity record (frozen CPU reading on 8E9A, 8BC2, 8DD0, 88D1, 88ED)
 - [ ] WP-19 asymmetric temperature filter behind an off flag
