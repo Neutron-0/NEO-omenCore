@@ -55,6 +55,17 @@ namespace OmenCore.Services
                 Description = "Both apps may try to control fans simultaneously",
                 Mitigation = "Use OmenCore OR OMEN Gaming Hub, not both for fan control"
             },
+            // Ohman (Ohman.exe, a third-party OMEN control tool) writes the same HP fan, performance and lighting
+            // commands, so two writers fight. The process name is taken from the download's file name and has not been
+            // checked on a running copy yet (WP-02).
+            ["Ohman"] = new ConflictInfo
+            {
+                Name = "Ohman",
+                ProcessNames = new[] { "Ohman" },
+                Impact = ConflictSeverity.Medium,
+                Description = "Both apps send HP fan, performance and lighting commands, so they can undo each other's settings",
+                Mitigation = "Use OmenCore OR Ohman for fan and performance control, not both at once"
+            },
             ["XTU"] = new ConflictInfo
             {
                 Name = "Intel XTU",
