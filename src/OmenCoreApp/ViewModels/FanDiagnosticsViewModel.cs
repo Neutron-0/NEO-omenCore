@@ -315,8 +315,20 @@ namespace OmenCore.ViewModels
             GuidedTestProgress = 0;
             GuidedTestResult = "";
             
+            // A run that starts hot measures thermal protection, not the fans (8BC2, K.6): wait for it to cool first.
+            if (!await WaitForCoolDownAsync())
+            {
+                GuidedTestResult = $"Run not started: the CPU or GPU is at {HottestTemperatureC():0} C. Let the laptop cool below " +
+                                   $"{GuidedRunRules.StartBelowC:0} C and run the diagnostic again.";
+                GuidedTestStatus = "Too hot to start - cool down and run again";
+                IsGuidedTestRunning = false;
+                IsDiagnosticActive = false;
+                return;
+            }
+
             var testLevels = new[] { 30, 60, 100 };
             var fanNames = new[] { "CPU", "GPU" };
+            var interrupted = new System.Collections.Generic.List<string>();
             var results = new System.Collections.Generic.List<(string fan, int target, bool passed, string rpm, double deviation, int score, string rating, string evidence)>();
             var sourcesSeen = new System.Collections.Generic.List<RpmSource>();
             
@@ -343,6 +355,15 @@ namespace OmenCore.ViewModels
                         try
                         {
                             var result = await _verifier.ApplyAndVerifyFanSpeedAsync(fanIndex, targetPercent);
+
+                            // Thermal protection took over the fans mid-step: that says nothing about the fan, so it is not a failure.
+                            if (GuidedRunRules.IsInterruptedByThermalProtection(result.VerificationPassed, _fanService.IsThermalProtectionActive))
+                            {
+                                interrupted.Add($"{fanName} @ {targetPercent}%");
+                                _logging.Warn($"[GuidedDiagnostic] {fanName} at {targetPercent}% interrupted by thermal protection - not counted as a failure");
+                                await Task.Delay(1000);
+                                continue;
+                            }
                             
                             // Use the verifier's adaptive decision so slow/stair-stepped fan telemetry
                             // is judged consistently with the single-fan diagnostic.
@@ -393,7 +414,7 @@ namespace OmenCore.ViewModels
                 // Generate summary with scores (v2.7.0)
                 var passCount = results.Count(r => r.passed);
                 var totalTests = results.Count;
-                var overallPassed = passCount == totalTests;
+                var overallPassed = totalTests > 0 && passCount == totalTests;
                 var avgScore = results.Any() ? (int)results.Average(r => r.score) : 0;
                 var overallRating = avgScore switch
                 {
@@ -424,10 +445,19 @@ namespace OmenCore.ViewModels
                     summary.AppendLine($"{statusIcon} {r.fan} @ {r.target}%: {r.rpm} - Score: {r.score} [evidence: {r.evidence}]");
                 }
                 
+                if (interrupted.Count > 0)
+                {
+                    summary.AppendLine();
+                    summary.AppendLine($"⚠ {interrupted.Count} step(s) interrupted by thermal protection and not counted as failures: {string.Join(", ", interrupted)}.");
+                    summary.AppendLine($"Let the laptop cool below {GuidedRunRules.StartBelowC:0} C and run the diagnostic again to complete them.");
+                }
+
                 GuidedTestResult = summary.ToString();
-                GuidedTestStatus = overallPassed 
-                    ? $"All tests passed! Score: {avgScore}/100 ({overallRating})" 
-                    : $"Some tests failed - Score: {avgScore}/100 ({overallRating})";
+                GuidedTestStatus = interrupted.Count > 0
+                    ? $"Interrupted by thermal protection ({interrupted.Count} step(s)) - cool down and re-run"
+                    : overallPassed
+                        ? $"All tests passed! Score: {avgScore}/100 ({overallRating})"
+                        : $"Some tests failed - Score: {avgScore}/100 ({overallRating})";
                 
                 _logging.Info(summary.ToString());
             }
@@ -460,6 +490,28 @@ namespace OmenCore.ViewModels
                 IsDiagnosticActive = false;
                 GuidedTestProgress = 100;
             }
+        }
+
+        private double HottestTemperatureC()
+        {
+            var hottest = 0.0;
+            foreach (var reading in _fanService.ThermalProvider.ReadTemperatures())
+                hottest = Math.Max(hottest, reading.Celsius);
+            return hottest;
+        }
+
+        /// <summary>Waits up to three minutes for the machine to drop below the start limit. False if it never does.</summary>
+        private async Task<bool> WaitForCoolDownAsync()
+        {
+            var waited = 0;
+            while (GuidedRunRules.NeedsCoolDown(HottestTemperatureC()))
+            {
+                if (waited >= 180) return false;
+                GuidedTestStatus = $"Waiting for the laptop to cool below {GuidedRunRules.StartBelowC:0} C ({HottestTemperatureC():0} C now)...";
+                await Task.Delay(5000);
+                waited += 5;
+            }
+            return true;
         }
 
         private async Task<string> RunGuidedRgbCheckAsync()
