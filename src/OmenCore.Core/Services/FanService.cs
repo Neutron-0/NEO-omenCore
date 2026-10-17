@@ -203,6 +203,9 @@ namespace OmenCore.Services
         // Diagnostic mode - suspends curve engine to allow manual fan testing
         private volatile bool _diagnosticModeActive = false;
         private static int _globalDiagnosticModeCount = 0;
+        private readonly object _leaseGate = new();
+        private readonly List<FanWriteLease> _leases = new();
+        private FanWriteLease? _legacyLease;
         
         // Fan level range note: HP WMI uses 0-55 (krpm) on classic models or 0-100 (percentage) on newer.
         // Actual conversion is handled by WmiFanController which auto-detects the max level.
@@ -555,32 +558,72 @@ namespace OmenCore.Services
         /// </summary>
         public void EnterDiagnosticMode()
         {
-            if (_diagnosticModeActive)
+            // One anonymous lease per FanService keeps the old flag behaviour for callers not yet migrated.
+            lock (_leaseGate)
             {
-                return;
+                _legacyLease ??= AcquireFanWriteLease("legacy caller");
             }
-
-            _diagnosticModeActive = true;
-            System.Threading.Interlocked.Increment(ref _globalDiagnosticModeCount);
-            _logging.Info("🔧 Entered fan diagnostic mode - curve engine suspended");
         }
-        
+
         /// <summary>
         /// Exit diagnostic mode - resumes normal curve engine operation.
         /// </summary>
         public void ExitDiagnosticMode()
         {
-            if (!_diagnosticModeActive)
+            FanWriteLease? lease;
+            lock (_leaseGate)
             {
-                return;
+                lease = _legacyLease;
+                _legacyLease = null;
             }
+            lease?.Dispose();
+        }
 
-            _diagnosticModeActive = false;
-            if (System.Threading.Interlocked.Decrement(ref _globalDiagnosticModeCount) < 0)
+        /// <summary>
+        /// Take a named, reference-counted claim on fan writes. While any lease is held the curve engine and
+        /// keepalive stand down (thermal protection still wins). Dispose is idempotent.
+        /// </summary>
+        public FanWriteLease AcquireFanWriteLease(string owner)
+        {
+            var lease = new FanWriteLease(owner, Release);
+            lock (_leaseGate)
             {
-                System.Threading.Volatile.Write(ref _globalDiagnosticModeCount, 0);
+                _leases.Add(lease);
+                if (_leases.Count == 1)
+                {
+                    _diagnosticModeActive = true;
+                    System.Threading.Interlocked.Increment(ref _globalDiagnosticModeCount);
+                }
             }
-            _logging.Info("✓ Exited fan diagnostic mode - curve engine resumed");
+            _logging.Info($"🔧 Fan write lease taken by {owner} - curve engine suspended");
+            return lease;
+
+            void Release(FanWriteLease l)
+            {
+                bool last;
+                lock (_leaseGate)
+                {
+                    if (!_leases.Remove(l)) return;
+                    last = _leases.Count == 0;
+                    if (last)
+                    {
+                        _diagnosticModeActive = false;
+                        if (System.Threading.Interlocked.Decrement(ref _globalDiagnosticModeCount) < 0)
+                        {
+                            System.Threading.Volatile.Write(ref _globalDiagnosticModeCount, 0);
+                        }
+                    }
+                }
+                _logging.Info(last
+                    ? $"✓ Fan write lease released by {l.Owner} - curve engine resumed"
+                    : $"Fan write lease released by {l.Owner}; other owners still hold fan writes");
+            }
+        }
+
+        /// <summary>Owners of the fan write leases currently held, for diagnostics.</summary>
+        public IReadOnlyList<string> FanWriteLeaseOwners
+        {
+            get { lock (_leaseGate) { return _leases.Select(l => l.Owner).ToList(); } }
         }
 
         /// <summary>
@@ -3475,5 +3518,14 @@ namespace OmenCore.Services
         public int RpmReading { get; set; }
         public TimeSpan DurationAtZero { get; set; }
         public string Message { get; set; } = string.Empty;
+    }
+
+    /// <summary>A named claim on fan writes taken from <see cref="FanService.AcquireFanWriteLease"/>.</summary>
+    public sealed class FanWriteLease : IDisposable
+    {
+        private Action<FanWriteLease>? _release;
+        public string Owner { get; }
+        internal FanWriteLease(string owner, Action<FanWriteLease> release) { Owner = owner; _release = release; }
+        public void Dispose() => System.Threading.Interlocked.Exchange(ref _release, null)?.Invoke(this);
     }
 }

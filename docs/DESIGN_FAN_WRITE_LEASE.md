@@ -1,6 +1,6 @@
 # Design note: one owner for fan writes (WP-19, first step)
 
-Status: proposal for the maintainer. Nothing here is implemented. WP-19 says to design first, then build behind tests, and not to mix
+Status: migration step 1 implemented 2026-10-18 (`AcquireFanWriteLease`, wrappers on one anonymous lease; tests in `FanServiceSuspendTests`). Steps 2 to 4 and the trace work are not started. WP-19 says to design first, then build behind tests, and not to mix
 this with behaviour changes.
 
 ## What exists today

@@ -143,6 +143,49 @@ namespace OmenCoreApp.Tests.Services
         }
 
         [Fact]
+        public void FanWriteLease_StaysHeldUntilTheLastOwnerReleases()
+        {
+            using var service = CreateFanService(new TrackingFanController());
+            var first = service.AcquireFanWriteLease("guided run");
+            var second = service.AcquireFanWriteLease("single-fan test");
+
+            first.Dispose();
+            service.IsDiagnosticModeActive.Should().BeTrue();
+            service.FanWriteLeaseOwners.Should().Equal("single-fan test");
+            FanService.IsAnyDiagnosticModeActive.Should().BeTrue();
+
+            second.Dispose();
+            service.IsDiagnosticModeActive.Should().BeFalse();
+        }
+
+        [Fact]
+        public void FanWriteLease_DisposeTwiceDoesNotReleaseAnotherOwner()
+        {
+            using var service = CreateFanService(new TrackingFanController());
+            var first = service.AcquireFanWriteLease("a");
+            using var second = service.AcquireFanWriteLease("b");
+
+            first.Dispose();
+            first.Dispose();
+
+            service.IsDiagnosticModeActive.Should().BeTrue();
+        }
+
+        [Fact]
+        public void LegacyEnterExit_StillWorks_AndExitWithoutEnterIsANoOp()
+        {
+            using var service = CreateFanService(new TrackingFanController());
+            service.ExitDiagnosticMode();
+            service.IsDiagnosticModeActive.Should().BeFalse();
+
+            service.EnterDiagnosticMode();
+            service.EnterDiagnosticMode();
+            service.IsDiagnosticModeActive.Should().BeTrue();
+            service.ExitDiagnosticMode();
+            service.IsDiagnosticModeActive.Should().BeFalse();
+        }
+
+        [Fact]
         public void AutomaticCurve_IsInert_WhenTheUserHasNotSwitchedItOn()
         {
             using var service = CreateFanService(new TrackingFanController());
