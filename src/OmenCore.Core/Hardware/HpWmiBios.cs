@@ -2031,6 +2031,41 @@ namespace OmenCore.Hardware
             return false;
         }
 
+        private const int ColorTablePad = 24;
+        private byte? _resolvedZoneCount;
+
+        /// <summary>
+        /// The zone count to declare when the caller does not say: the board's own topology, asked once. Callers that
+        /// built a four-slot payload without a count (legacy service, brightness scaling, restore) used to send 4 on every
+        /// board, which a single-zone keyboard rejects (GitHub #212).
+        /// </summary>
+        private byte ResolveZoneCount()
+        {
+            if (_resolvedZoneCount.HasValue) return _resolvedZoneCount.Value;
+            var topology = GetKeyboardLightingType();
+            var zones = MapLightingTypeToZoneCount(topology);
+            if (topology.HasValue) _resolvedZoneCount = zones; // an unanswered probe is not remembered as "four"
+            return zones;
+        }
+
+        /// <summary>
+        /// Builds the 128-byte colour table. Four-zone layout (verified on 8A13 and 8787): byte 0 = 4, colours from offset 25.
+        /// One-zone layout (GitHub #212, board 8BD4; probe result in the roadmap's K.11): byte 0 = 1 and the single colour
+        /// directly after the count, at offsets 1 to 3, because the same write at offset 25 left the keyboard dark. The firmware
+        /// reports a single-zone write back at offset 25, so verification keeps reading there. *Implemented, pending retest by
+        /// the 8BD4 owner.* Input is the usual 12-byte, four-slot array; a one-zone payload uses its first three bytes.
+        /// </summary>
+        internal static byte[] BuildColorTable(byte[] zoneColors, byte zoneCount)
+        {
+            var data = new byte[128];
+            data[0] = zoneCount;
+            if (zoneCount == 1)
+                Array.Copy(zoneColors, 0, data, 1, Math.Min(zoneColors.Length, 3));
+            else
+                Array.Copy(zoneColors, 0, data, 1 + ColorTablePad, Math.Min(zoneColors.Length, 12));
+            return data;
+        }
+
         /// <summary>
         /// Set keyboard color table for 4-zone keyboards.
         /// OmenMon: Cmd.Keyboard, 0x03
@@ -2050,8 +2085,8 @@ namespace OmenCore.Hardware
         /// <param name="zoneColors">12-byte array: [R0,G0,B0,R1,G1,B1,R2,G2,B2,R3,G3,B3]</param>
         /// <param name="ensureBacklightOn">If true, ensures backlight is enabled first</param>
         /// <param name="zoneCount">
-        /// Byte 0 of the payload - what this command tells the firmware the keyboard is. Defaults
-        /// to 4 (every caller before this parameter existed sent exactly that, unconditionally,
+        /// Byte 0 of the payload - what this command tells the firmware the keyboard is. When null it follows the board's own topology (4 if unknown).
+        /// Before this parameter existed every caller sent 4, unconditionally,
         /// regardless of the actual keyboard). GitHub #212 (board 8BD4): a firmware-reported
         /// single-zone keyboard rejected every colour write this way, INCLUDING one where all four
         /// RGB slots carried the identical colour - ruling out "only slot 0 is read" and leaving
@@ -2059,7 +2094,7 @@ namespace OmenCore.Hardware
         /// payload on a mismatch" as the standing hypothesis. Unconfirmed until a board owner tests
         /// it with the real count.
         /// </param>
-        public bool SetColorTable(byte[] zoneColors, bool ensureBacklightOn = true, byte zoneCount = 4)
+        public bool SetColorTable(byte[] zoneColors, bool ensureBacklightOn = true, byte? zoneCount = null)
         {
             if (!_isAvailable)
             {
@@ -2077,26 +2112,16 @@ namespace OmenCore.Hardware
                     System.Threading.Thread.Sleep(50); // Brief delay for hardware
                 }
                 
-                // Build proper 128-byte ColorTable structure per OmenMon format
-                var data = new byte[128];
-                
-                // Byte 0: zone count, per the caller - see SetColorTable's own remarks on #212.
-                data[0] = zoneCount;
-                
-                // Bytes 1-24: Padding (leave as zeros)
-                const int COLOR_TABLE_PAD = 24;
-                
-                // Bytes 25+: Zone colors (RGB per zone)
-                // Input zoneColors should be 12 bytes: [R1,G1,B1,R2,G2,B2,R3,G3,B3,R4,G4,B4]
-                int colorOffset = 1 + COLOR_TABLE_PAD; // Byte 25
-                int colorsToCopy = Math.Min(zoneColors.Length, 12); // Max 4 zones x 3 bytes
-                Array.Copy(zoneColors, 0, data, colorOffset, colorsToCopy);
-                
+                var zones = zoneCount ?? ResolveZoneCount();
+                var data = BuildColorTable(zoneColors, zones);
+                int colorOffset = zones == 1 ? 1 : 1 + ColorTablePad;
+
                 _logging?.Info($"SetColorTable: ZoneCount={data[0]}, Colors at offset {colorOffset}: " +
-                    $"Z0=#{data[colorOffset]:X2}{data[colorOffset+1]:X2}{data[colorOffset+2]:X2}, " +
-                    $"Z1=#{data[colorOffset+3]:X2}{data[colorOffset+4]:X2}{data[colorOffset+5]:X2}, " +
+                    $"Z0=#{data[colorOffset]:X2}{data[colorOffset+1]:X2}{data[colorOffset+2]:X2}" +
+                    (zones == 1 ? "" :
+                    $", Z1=#{data[colorOffset+3]:X2}{data[colorOffset+4]:X2}{data[colorOffset+5]:X2}, " +
                     $"Z2=#{data[colorOffset+6]:X2}{data[colorOffset+7]:X2}{data[colorOffset+8]:X2}, " +
-                    $"Z3=#{data[colorOffset+9]:X2}{data[colorOffset+10]:X2}{data[colorOffset+11]:X2}");
+                    $"Z3=#{data[colorOffset+9]:X2}{data[colorOffset+10]:X2}{data[colorOffset+11]:X2}"));
 
                 var result = SendBiosCommand(BiosCmd.Keyboard, CMD_COLOR_SET, data, 0);
                 if (result != null)

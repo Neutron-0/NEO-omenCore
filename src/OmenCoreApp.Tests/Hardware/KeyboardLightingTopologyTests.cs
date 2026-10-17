@@ -88,6 +88,42 @@ namespace OmenCoreApp.Tests.Hardware
             HpWmiBios.MapLightingTypeToZoneCount(null).Should().Be(4);
         }
 
+        private static readonly byte[] FourSlotRed =
+            { 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x11, 0x22, 0x33 };
+
+        [Fact]
+        public void BuildColorTable_FourZone_PutsColoursAtOffset25AndDeclaresFour()
+        {
+            // 8A13 and 8787 verify this layout; it must not move.
+            var t = HpWmiBios.BuildColorTable(FourSlotRed, 4);
+
+            t.Should().HaveCount(128);
+            t[0].Should().Be(4);
+            t.AsSpan(1, 24).ToArray().Should().OnlyContain(b => b == 0);
+            t.AsSpan(25, 12).ToArray().Should().Equal(FourSlotRed);
+        }
+
+        [Fact]
+        public void BuildColorTable_OneZone_PutsTheColourRightAfterTheCount()
+        {
+            // GitHub #212, 8BD4 probe step 2: count 1 with the colour at offsets 1 to 3 lit the keyboard; the same
+            // colour at offset 25 did not. Slots 1 to 3 of the four-slot input are not part of a one-zone write.
+            var t = HpWmiBios.BuildColorTable(FourSlotRed, 1);
+
+            t.Should().HaveCount(128);
+            t[0].Should().Be(1);
+            t.AsSpan(1, 3).ToArray().Should().Equal(0xFF, 0x00, 0x00);
+            t.AsSpan(4).ToArray().Should().OnlyContain(b => b == 0);
+        }
+
+        [Fact]
+        public void BuildColorTable_OneZone_AcceptsAThreeByteColour()
+        {
+            var t = HpWmiBios.BuildColorTable(new byte[] { 1, 2, 3 }, 1);
+
+            t.AsSpan(0, 4).ToArray().Should().Equal(1, 1, 2, 3);
+        }
+
         [Fact]
         public void DecodeKeyboardType_RejectsTheAccumulatorValues()
         {
