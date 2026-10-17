@@ -48,6 +48,10 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
   maker limit. New notes under the panel: keep PPAB (Dynamic Boost) on, a driver update can undo the unlock, the RTX 5050 is untested,
   and how to re-toggle if CURRENT will not stick. No new write path. Test: `NvidiaPowerStockNoteTests`.
 
+- **Guided Fan Verification no longer blames the fan when thermal protection took over.** On 8BC2 (#227) protection fired during the run.
+  A step that fails while protection is driving the fans is now listed as interrupted (and not counted as a failure) with a prompt to
+  re-run after cooling, and a run waits up to three minutes for the machine to drop below 85 C before starting. Test: `GuidedRunRulesTests`.
+
 ## Added
 
 - **OMEN key can show or hide the OSD.** New "ToggleOsd" choice for the OMEN key action in Settings. If the OSD is turned

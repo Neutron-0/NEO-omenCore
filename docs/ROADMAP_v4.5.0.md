@@ -493,7 +493,7 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-06.1 calibration says RPM cannot be measured when the source is Estimated; table labelled estimated
 - [ ] WP-06.2 repeated stable readback below request counts as a firmware ceiling at any step
 - [x] (912b818) WP-06.3 `IsFirmwareCeilingPlateau` 90% rule (88F8 case); the 60%-step rule and its test kept — implemented as `ReconcileCeilingAcrossFans`, run after each 100% step, because the sibling fan is only known then
-- [ ] WP-06.4 thermal interruption marked, not failed; cool-down wait below 85 C before a run
+- [x] (ace9941) WP-06.4 thermal interruption marked, not failed; cool-down wait below 85 C before a run — decisions in `GuidedRunRules` (tested); the run itself needs a hot machine to see, so the wiring is untested on hardware
 - [x] (d1c1fc4) WP-06.5 refused per-fan write says "firmware refused level L" (878A)
 - [ ] WP-06 scenario tests for #226 and #207 give "level-only" and "pass (ceiling)"
 - [x] (63af90b) WP-07 8BC2 capability entry (V1, 2 fans, max 55, no RPM readback, curves/GPU boost/undervolt off, Intel) and test
