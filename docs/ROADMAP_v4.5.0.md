@@ -411,7 +411,7 @@ All of this is single-laptop evidence from bobshmo's own machine unless stated. 
   `FourZoneWithNumpad (0x01)`; the V2 engine's WMI ColorTable write was read back as verified. PawnIO's MSR module is Intel only, so CPU
   power reads 0 W and throttling telemetry falls back to LibreHardwareMonitor (known, logged).
 - Done (`34951e2`): capability entry and keyboard row, both `UserVerified = false`, curves, GPU boost, MUX and undervolt left off.
-- Reply (draft `r230.md`, not posted): thank them, say the entry exists in the 4.5.0 work, ask for Guided Fan Verification and what
+- Reply posted 2026-10-17: thank them, say the entry exists in the 4.5.0 work, ask for Guided Fan Verification and what
   changes on the keyboard when a colour is set, and be plain that nothing about visible colour is confirmed yet.
 
 **K.16 Transcend 14 (8E41) export with a guided run (#157, jmsguevara, 4.4.5, 2026-10-16)**
@@ -427,7 +427,7 @@ All of this is single-laptop evidence from bobshmo's own machine unless stated. 
 - Sensor freeze: the log shows CPU and GPU "frozen" at the **same** value (56 C and 56 C, 60 C and 60 C, 59 C and 59 C) across many
   windows, with load swings of 15 to 60 percent. Two sensors holding an identical value is new; it points at one source feeding both
   readings. Fourth board with the freeze pattern; goes to WP-19 (sensor identity), not a per-board fix.
-- Reply (draft `r157b.md`, not posted).
+- Reply posted 2026-10-17.
 
 **K.17 Fans pinned near level 20 after a hand-back: the cause, from the #227 log (2026-10-14 comment, 8BC2)**
 - Report: with the Extreme profile selected the fans stay near 2000 RPM at 80 C and above; restoring the OEM profile fixes it. Same
@@ -843,26 +843,26 @@ Every open item is listed once. "Owner reply last" means the maintainer answered
 **Active, in packages above**
 | Issue | Board or topic | Where it is covered | State |
 |---|---|---|---|
-| #230 | 8F21 HyperX OMEN 16-ap1xxx | WP-07, K.15 | new, export read, entry added (`34951e2`), reply drafted, not posted |
+| #230 | 8F21 HyperX OMEN 16-ap1xxx | WP-07, K.15 | new, export read, entry added (`34951e2`), replied 2026-10-17 |
 | #228 | 88D1 OMEN 15-en1xxx | WP-07, K.12 | replied 2026-10-12; entry added (`cd8bf89`); waiting on the reporter |
-| #227 | 8BC2 Victus 16-r0xxx | WP-07, WP-14, K.2, K.17 | replied 2026-10-14; reporter answered (fans at 2000 RPM, will test one-zone RGB); reply drafted `r227b.md`, not posted |
+| #227 | 8BC2 Victus 16-r0xxx | WP-07, WP-14, K.2, K.17 | replied 2026-10-14; reporter answered (fans at 2000 RPM, will test one-zone RGB); level-20 finding and the opt-in setting posted 2026-10-17 |
 | #226 | 8BD4 calibration, "stuck at 2000" | WP-06, K.1, K.17 | replied 2026-10-13; level-20 hint finding (K.17) not yet told to the reporter |
 | #225 | 8A13 | WP-07 | reporter replied 2026-10-11 (6/6 pass) |
 | #224 | 8E9F | WP-14, K.5 | reporter replied: keyboard no, light bar yes |
 | #223 | 8EEC (Ryzen 7 260) | WP-17 | owner reply last; needs a 4.4.5 export with PawnIO |
 | #222 | 8E35 | WP-11, WP-17, K.4 | reporter replied; files were config copies |
 | #221 | 8DD0 temperature | section 3E | owner asked a question; no answer |
-| #219 | Linux 8D2F | WP-09, K.10 | reporter replied 2026-10-05, unanswered |
+| #219 | Linux 8D2F | WP-09, K.10 | reporter replied 2026-10-05; kernel-guide answer posted 2026-10-17 |
 | #218 | 878A | WP-06, WP-15, K.9 | reporter replied (1/6 on 4.4.1) |
 | #217 | 88EE | WP-16, K.9 | reporter replied (6/6, idle fan question) |
 | #215 | 88F7 | K.10 | undervolt test build promised |
-| #212 | 8BD4 RGB | WP-14, K.11 | probe result posted 2026-10-12; owner has not replied |
+| #212 | 8BD4 RGB | WP-14, K.11 | probe result posted 2026-10-12; owner has not replied; one-zone build note posted 2026-10-17 |
 | #211 | 8BBE stuck fans | WP-04, K.9 | reporter replied with exports |
 | #207 | 88F8 | WP-06, K.9 | reporter replied (5/6) |
 | #195 | 8E35 | K.10 | reporter replied; rerun expected 6/6 |
 | #189 | 8D87 factory curve | section 1 | waiting on mbilykov's run |
 | #179, #151, #87 | Linux per-key RGB, 8D87 and 8D41 | section 3B | tester volunteered (#179) |
-| #229 | 88ED Victus 16-e0xxx | WP-07, K.13 | replied 2026-10-14; reporter asks about replaced fans, reply drafted `r229b.md`, not posted; keyboard row added (`cd8bf89`) |
+| #229 | 88ED Victus 16-e0xxx | WP-07, K.13 | replied 2026-10-14; reporter asks about replaced fans, answered 2026-10-17; keyboard row added (`cd8bf89`) |
 | #142 | 8E9A | WP-14, K.14 | replied 2026-10-13; reporter answered with effects/startup questions, new reply drafted 2026-10-14 |
 
 **Waiting on a reporter's export or test (owner reply last)**
