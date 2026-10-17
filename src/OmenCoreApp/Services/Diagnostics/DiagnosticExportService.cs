@@ -320,6 +320,8 @@ namespace OmenCore.Services.Diagnostics
                     sb.AppendLine($"LastMaxModeExternalResetDetails: {ownershipController.LastMaxModeExternalResetDetails}");
                 }
 
+                AppendFanFirmwareState(sb, BuildFanFirmwareProbes(wmiController as HpWmiBios, ownershipController));
+
                 File.WriteAllText(Path.Combine(exportPath, "monitoring-cadence-hold.txt"), sb.ToString());
                 await Task.CompletedTask;
             }
@@ -2165,6 +2167,44 @@ namespace OmenCore.Services.Diagnostics
             }
 
             return string.Join("; ", findings);
+        }
+
+        /// <summary>
+        /// What the firmware reports about the fans right now: the Max flag, level readback, thermal policy. A stuck-fan report
+        /// (#211) had none of this, so the cause stayed open. Read-only; a probe that throws writes one line, not an exception.
+        /// </summary>
+        internal static void AppendFanFirmwareState(StringBuilder sb, IEnumerable<(string Label, Func<string?> Read)> probes)
+        {
+            sb.AppendLine();
+            sb.AppendLine("[Fan Firmware State]");
+            foreach (var (label, read) in probes)
+            {
+                try
+                {
+                    sb.AppendLine($"{label}: {read() ?? "<unavailable>"}");
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception
+                    or System.Management.ManagementException or NotSupportedException or TimeoutException)
+                {
+                    sb.AppendLine($"{label}: <read failed: {ex.Message}>");
+                }
+            }
+        }
+
+        private static IEnumerable<(string Label, Func<string?> Read)> BuildFanFirmwareProbes(HpWmiBios? bios, IFanController? controller)
+        {
+            if (bios == null)
+            {
+                yield return ("HpWmiBios", () => null);
+                yield break;
+            }
+
+            yield return ("ThermalPolicy", () => bios.ThermalPolicy.ToString());
+            yield return ("FanCount", () => $"{bios.FanCount} ({(bios.FanCountFromFirmware ? "from firmware" : "assumed")})");
+            yield return ("MaxFanLevel", () => bios.MaxFanLevel.ToString());
+            yield return ("FirmwareMaxFlag", () => bios.GetFanMax()?.ToString());
+            yield return ("FanLevelReadback", () => bios.GetFanLevel() is { } l ? $"fan1={l.fan1} fan2={l.fan2}" : null);
+            yield return ("ControllerMode", () => controller?.GetType().Name);
         }
 
         /// <summary>
