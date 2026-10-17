@@ -31,7 +31,7 @@ namespace OmenCore.Services
 
         public sealed record Status(
             bool Supported, bool MaxReady, bool CurrentReady, string Gpu, string Reason,
-            double? LiveCurrentW, double? LiveMaxW, int[] Targets);
+            double? LiveCurrentW, double? LiveMaxW, int[] Targets, int? ExpectedStockW = null);
 
         public sealed record Outcome(bool Success, string Message, bool RebootRequired);
 
@@ -39,8 +39,9 @@ namespace OmenCore.Services
         {
             var c = _backend.CheckCompatibility();
             var p = _backend.GetPowerState();
+            int? expectedStock = c.VbiosResolver is { StockMaxW: > 0 } ? c.VbiosResolver.StockMaxW : c.Profile?.StockPowerW;
             return new Status(c.Supported, c.MaxWritesReady, c.CurrentWritesReady, c.GpuName, c.Reason,
-                p.CurrentW, p.MaxW, c.Profile?.Targets() ?? Array.Empty<int>());
+                p.CurrentW, p.MaxW, c.Profile?.Targets() ?? Array.Empty<int>(), expectedStock);
         }
 
         public Outcome ApplyMax(int watts) => Run("MAX " + watts + " W", () => _backend.SetMaxOverride(watts));

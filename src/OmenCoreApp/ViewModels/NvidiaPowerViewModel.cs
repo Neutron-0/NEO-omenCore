@@ -115,7 +115,8 @@ namespace OmenCore.ViewModels
                 var live = s.LiveCurrentW.HasValue && s.LiveMaxW.HasValue
                     ? $"Live CURRENT {s.LiveCurrentW:0.#} W, live MAX {s.LiveMaxW:0.#} W. " : "";
                 StatusText = $"{(string.IsNullOrEmpty(s.Gpu) ? "NVIDIA GPU" : s.Gpu)}: {live}" +
-                             $"MAX writes {(s.MaxReady ? "ready" : "not ready")}, CURRENT writes {(s.CurrentReady ? "ready" : "not ready")}. {s.Reason}";
+                             $"MAX writes {(s.MaxReady ? "ready" : "not ready")}, CURRENT writes {(s.CurrentReady ? "ready" : "not ready")}. {s.Reason}" +
+                             StockMismatchNote(s.LiveMaxW, s.ExpectedStockW);
                 RaiseCommands();
             });
         });
@@ -143,6 +144,19 @@ namespace OmenCore.ViewModels
                 _busy = false;
                 await RefreshAsync();
             }
+        }
+
+        /// <summary>
+        /// When the live MAX read from the driver differs from the stock MAX we expect for this GPU (the 115 W against 140 W case),
+        /// say so and say what it can mean. Read only; it never changes what is written. Empty when they agree or either is unknown.
+        /// </summary>
+        internal static string StockMismatchNote(double? liveMaxW, int? expectedStockW)
+        {
+            if (!liveMaxW.HasValue || !expectedStockW.HasValue || Math.Abs(liveMaxW.Value - expectedStockW.Value) <= 1.0)
+                return string.Empty;
+
+            return $" Stock max read: {liveMaxW.Value:0.#} W, expected: {expectedStockW.Value} W. A difference is normal when a MAX override " +
+                   "is installed or the laptop maker set a lower limit; it is not an error by itself.";
         }
 
         private void RaiseCommands()

@@ -925,6 +925,8 @@
                             <Button Content="Refresh" Command="{Binding SystemControl.NvidiaPower.RefreshCommand}" Style="{StaticResource ModernButton}" Padding="16,8" Margin="0,0,8,4"/>
                         </WrapPanel>
                         <TextBlock Text="{Binding SystemControl.NvidiaPower.ResultText}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0"/>
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"
+                                   Text="Notes: do not disable PPAB (Dynamic Boost); the adapter limit applies to CPU and GPU together. A graphics driver update can undo the unlock, so check the live values afterwards. The RTX 5050 is untested. If CURRENT will not stick, switch the HP performance mode away and back, then apply again."/>
                     </StackPanel>
                 </StackPanel>
             </Border>
