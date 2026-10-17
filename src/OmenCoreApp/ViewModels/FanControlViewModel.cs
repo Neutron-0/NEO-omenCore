@@ -1726,7 +1726,7 @@ namespace OmenCore.ViewModels
             var fanCount = Math.Min(CurveVerificationKickFanLimit, FanTelemetry.Count);
             var results = new System.Collections.Generic.List<FanApplyResult>();
 
-            _fanService.EnterDiagnosticMode();
+            var fanLease = _fanService.AcquireFanWriteLease("Curve verification");
             using var verificationCts = new CancellationTokenSource(CurveVerificationKickTimeout);
             try
             {
@@ -1743,7 +1743,7 @@ namespace OmenCore.ViewModels
             }
             finally
             {
-                _fanService.ExitDiagnosticMode();
+                fanLease.Dispose();
                 reapplyCurveAction();
             }
 

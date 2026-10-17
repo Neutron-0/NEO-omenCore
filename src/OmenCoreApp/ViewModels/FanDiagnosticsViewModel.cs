@@ -175,7 +175,7 @@ namespace OmenCore.ViewModels
                 _preTestPreset = _fanService.ActivePreset;
                 
                 // Enter diagnostic mode to suspend curve engine during test
-                _fanService.EnterDiagnosticMode();
+                var testLease = _fanService.AcquireFanWriteLease("Single-fan test");
                 
                 try
                 {
@@ -190,7 +190,7 @@ namespace OmenCore.ViewModels
                 finally
                 {
                     // Always exit diagnostic mode when done
-                    _fanService.ExitDiagnosticMode();
+                    testLease.Dispose();
                     
                     // v2.7.1: Restore previous fan preset after diagnostic
                     if (_preTestPreset != null)
@@ -336,7 +336,7 @@ namespace OmenCore.ViewModels
             _preTestPreset = _fanService.ActivePreset;
             
             _logging.Info("=== GUIDED FAN DIAGNOSTIC STARTED ===");
-            _fanService.EnterDiagnosticMode();
+            var guidedLease = _fanService.AcquireFanWriteLease("Guided Fan Verification");
             
             try
             {
@@ -463,7 +463,7 @@ namespace OmenCore.ViewModels
             }
             finally
             {
-                _fanService.ExitDiagnosticMode();
+                guidedLease.Dispose();
                 
                 // v2.7.1: Restore previous fan preset after diagnostic
                 if (_preTestPreset != null)

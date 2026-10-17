@@ -3746,7 +3746,7 @@ namespace OmenCore.ViewModels
             // keepalive / curve engine could overwrite it mid-cycle, and nothing put the user's preset
             // back afterwards. Same bracket the guided diagnostic uses.
             var presetBeforeCleaning = _fanService?.ActivePreset;
-            _fanService?.EnterDiagnosticMode();
+            var cleaningLease = _fanService?.AcquireFanWriteLease("Fan cleaning");
 
             try
             {
@@ -3781,7 +3781,7 @@ namespace OmenCore.ViewModels
             }
             finally
             {
-                _fanService?.ExitDiagnosticMode();
+                cleaningLease?.Dispose();
                 RestoreFanStateAfterCleaning(presetBeforeCleaning);
 
                 IsFanCleaningActive = false;

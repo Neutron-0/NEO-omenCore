@@ -87,7 +87,7 @@ namespace OmenCore.Services
             if (!_isVictus.Value) return NoLease.Instance;
 
             Monitor.Enter(Sync);
-            var diagnosticEntered = false;
+            FanWriteLease? fanLease = null;
             try
             {
                 if (FanService.IsAnyDiagnosticModeActive)
@@ -111,14 +111,13 @@ namespace OmenCore.Services
 
                 if (_fans != null)
                 {
-                    _fans.EnterDiagnosticMode();
-                    diagnosticEntered = true;
+                    fanLease = _fans.AcquireFanWriteLease("NVIDIA power write");
                 }
-                return new HeldLease(_fans, diagnosticEntered);
+                return new HeldLease(fanLease);
             }
             catch
             {
-                if (diagnosticEntered) _fans?.ExitDiagnosticMode();
+                fanLease?.Dispose();
                 Monitor.Exit(Sync);
                 throw;
             }
@@ -149,13 +148,12 @@ namespace OmenCore.Services
 
         private sealed class HeldLease : IDisposable
         {
-            private readonly FanService? _fans;
-            private readonly bool _diagnostic;
-            public HeldLease(FanService? fans, bool diagnostic) { _fans = fans; _diagnostic = diagnostic; }
+            private readonly FanWriteLease? _fanLease;
+            public HeldLease(FanWriteLease? fanLease) { _fanLease = fanLease; }
 
             public void Dispose()
             {
-                try { if (_diagnostic) _fans?.ExitDiagnosticMode(); }
+                try { _fanLease?.Dispose(); }
                 finally { Monitor.Exit(Sync); }
             }
         }
