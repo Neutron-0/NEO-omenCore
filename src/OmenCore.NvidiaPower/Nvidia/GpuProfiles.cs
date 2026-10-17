@@ -106,11 +106,39 @@ namespace NvpwrControlBlackwell
             {
                 if (mapped.IndexOf("Laptop", StringComparison.OrdinalIgnoreCase) < 0) return null;
                 foreach (GpuProfile p in Profiles)
-                    if (p.DeviceIdMatches(dev)) return named != null && named.Id != p.Id ? null : p;
+                    if (p.DeviceIdMatches(dev)) return named != null && named.Id != p.Id ? null : DeviceVariant(p, pnpId);
                 return null;
             }
             // Name-only detection is a display fallback. Supplied PCI IDs must be known laptop IDs.
             return String.IsNullOrEmpty(pnpId) ? named : null;
+        }
+
+        /// <summary>
+        /// The HP OMEN board with PCI subsystem 8E71103C and an RTX 5070 Ti Laptop (DEV_2F58) has a stock limit of 115 W, not the 140 W
+        /// the generic profile assumes. Found and reviewed by the Prophecy author (standalone 1.2.5, on a supplied ROM: one board-power
+        /// record of 5 / 80 / 115 W with a base of 100 W); written here from that finding, not copied. Scoped to this exact subsystem so
+        /// no other 5070 Ti board inherits it. Pending confirmation on an OmenCore owner's hardware.
+        /// </summary>
+        private static GpuProfile DeviceVariant(GpuProfile p, string pnpId)
+        {
+            if (p.Id != "5070ti" || ParseHexToken(pnpId, "DEV_", 4) != 0x2F58 ||
+                ParseHexTokenUInt(pnpId, "SUBSYS_", 8) != 0x8E71103C)
+                return p;
+
+            return new GpuProfile
+            {
+                Id = p.Id,
+                Match = p.Match,
+                Aliases = p.Aliases,
+                DisplayName = p.DisplayName + " (HP OMEN 115 W)",
+                MinPowerW = 115,
+                StockPowerW = 115,
+                MaxPowerW = p.MaxPowerW,
+                ReferenceValidatedW = 115,
+                AllowMsvdd = p.AllowMsvdd,
+                KnownDeviceIds = new int[] { 0x2F58 },
+                AlternativeStockWatts = new int[] { 140 }
+            };
         }
 
         public static GpuIdentity BuildIdentity(string gpuName, string pnpId, GpuProfile profile)
