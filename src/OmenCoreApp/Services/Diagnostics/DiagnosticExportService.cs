@@ -321,6 +321,8 @@ namespace OmenCore.Services.Diagnostics
                 }
 
                 AppendFanFirmwareState(sb, BuildFanFirmwareProbes(wmiController as HpWmiBios, ownershipController));
+                AppendPowerTransitions(sb, ReadKernelPowerEvents);
+                AppendCpuThrottle(sb);
 
                 File.WriteAllText(Path.Combine(exportPath, "monitoring-cadence-hold.txt"), sb.ToString());
                 await Task.CompletedTask;
@@ -2189,6 +2191,77 @@ namespace OmenCore.Services.Diagnostics
                     sb.AppendLine($"{label}: <read failed: {ex.Message}>");
                 }
             }
+        }
+
+        internal readonly record struct PowerTransition(DateTime TimeUtc, int EventId, string Summary);
+
+        private static readonly Dictionary<int, string> KernelPowerEventNames = new()
+        {
+            [41] = "unexpected restart (power loss or crash)",
+            [42] = "entering sleep",
+            [107] = "resumed from sleep",
+            [506] = "entering connected standby",
+            [507] = "leaving connected standby",
+        };
+
+        /// <summary>
+        /// The last 20 sleep, resume and standby events with their reasons, so a hibernate or wake report carries its own cause (K.8).
+        /// Read through the event log API (no powercfg process); a failing source writes one line.
+        /// </summary>
+        internal static void AppendPowerTransitions(StringBuilder sb, Func<IReadOnlyList<PowerTransition>> read)
+        {
+            sb.AppendLine();
+            sb.AppendLine("[Power Transitions]");
+            try
+            {
+                var events = read();
+                if (events.Count == 0)
+                {
+                    sb.AppendLine("  none recorded");
+                    return;
+                }
+
+                foreach (var e in events)
+                {
+                    var name = KernelPowerEventNames.TryGetValue(e.EventId, out var n) ? n : "event";
+                    sb.AppendLine($"  {e.TimeUtc:O} | {e.EventId} {name} | {e.Summary}");
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception
+                or UnauthorizedAccessException or System.Diagnostics.Eventing.Reader.EventLogException or NotSupportedException)
+            {
+                sb.AppendLine($"  <read failed: {ex.Message}>");
+            }
+        }
+
+        private static IReadOnlyList<PowerTransition> ReadKernelPowerEvents()
+        {
+            const string query = "*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=41 or EventID=42 or EventID=107 or EventID=506 or EventID=507)]]";
+            var result = new List<PowerTransition>();
+            using var reader = new System.Diagnostics.Eventing.Reader.EventLogReader(
+                new System.Diagnostics.Eventing.Reader.EventLogQuery("System", System.Diagnostics.Eventing.Reader.PathType.LogName, query)
+                { ReverseDirection = true });
+            for (var record = reader.ReadEvent(); record != null && result.Count < 20; record = reader.ReadEvent())
+            {
+                using (record)
+                {
+                    string text;
+                    try { text = record.FormatDescription() ?? ""; }
+                    catch (System.Diagnostics.Eventing.Reader.EventLogException) { text = ""; }
+                    var oneLine = string.Join(" ", text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)).Trim();
+                    if (oneLine.Length > 200) oneLine = oneLine[..200];
+                    result.Add(new PowerTransition((record.TimeCreated ?? DateTime.MinValue).ToUniversalTime(), record.Id, oneLine));
+                }
+            }
+            return result;
+        }
+
+        /// <summary>Reserved for WP-13 (CPU throttle reasons); says so until that lands, so an export never implies it was checked.</summary>
+        internal static void AppendCpuThrottle(StringBuilder sb)
+        {
+            sb.AppendLine();
+            sb.AppendLine("[CPU Throttle]");
+            sb.AppendLine("  not available in this build");
         }
 
         private static IEnumerable<(string Label, Func<string?> Read)> BuildFanFirmwareProbes(HpWmiBios? bios, IFanController? controller)
