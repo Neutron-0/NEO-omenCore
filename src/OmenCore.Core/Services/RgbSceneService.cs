@@ -409,6 +409,45 @@ namespace OmenCore.Services
             return result;
         }
 
+        /// <summary>
+        /// The keyboard's own effect for a scene effect, or false for scenes that are just a colour. Spectrum becomes the device's
+        /// colour cycle, the same mapping the Lighting page's effect picker already uses for the per-key backend.
+        /// </summary>
+        internal static bool TryBuildDeviceEffect(RgbScene scene, out Hardware.DojoKeyboardMcu.EffectRecord record)
+        {
+            record = default;
+            Hardware.DojoKeyboardMcu.Effect wire;
+            switch (scene.Effect)
+            {
+                case RgbSceneEffect.Wave: wire = Hardware.DojoKeyboardMcu.Effect.Wave; break;
+                case RgbSceneEffect.Spectrum: wire = Hardware.DojoKeyboardMcu.Effect.ColorCycle; break;
+                case RgbSceneEffect.Breathing: wire = Hardware.DojoKeyboardMcu.Effect.Breathing; break;
+                default: return false;
+            }
+
+            var color = ColorTranslator.FromHtml(scene.PrimaryColor);
+            var speed = scene.Speed switch
+            {
+                < 34 => Hardware.DojoKeyboardMcu.EffectSpeed.Slow,
+                < 67 => Hardware.DojoKeyboardMcu.EffectSpeed.Medium,
+                _ => Hardware.DojoKeyboardMcu.EffectSpeed.Fast
+            };
+
+            record = new Hardware.DojoKeyboardMcu.EffectRecord
+            {
+                Effect = wire,
+                ShowMode = Hardware.DojoKeyboardMcu.ShowMode.SingleCustomColor,
+                ColorNumber = 0,
+                Speed = speed,
+                Brightness = 0, // left at what the device's own frames send; brightness is set separately
+                Direction = Hardware.DojoKeyboardMcu.EffectDirection.LeftToRight,
+                RippleSize = 1,
+                RaindropFrequency = (byte)speed,
+                Colors = new[] { (color.R, color.G, color.B) }
+            };
+            return true;
+        }
+
         private async Task<bool> ApplyToOmenKeyboardAsync(RgbScene scene)
         {
             if (_keyboardLightingService == null) return false;
@@ -427,6 +466,19 @@ namespace OmenCore.Services
                     // Do NOT map to a 0-3 scale here: passing 3 to SetBrightness() means 3% which makes
                     // the keyboard appear off even though colors are correctly applied.
                     await _keyboardLightingService.SetBrightness(scene.Brightness);
+
+                    // Wave, Spectrum and Breathing are animations. A uniform fill cannot express them, so on a keyboard with its
+                    // own effect engine (8E9A, Keith1341 #142: Heat Wave arrived as a plain colour) use that engine. Anything
+                    // the engine refuses falls through to the static fill below, as before.
+                    if (_keyboardLightingService.SupportsDeviceEffects && TryBuildDeviceEffect(scene, out var record))
+                    {
+                        if (await _keyboardLightingService.SetDeviceEffectAsync(record))
+                        {
+                            return true;
+                        }
+
+                        _logging.Warn($"Scene '{scene.Name}': keyboard refused the {record.Effect} effect, falling back to a static colour");
+                    }
                     
                     // Apply colors
                     if (scene.ZoneColors.Count > 0)
