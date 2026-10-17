@@ -52,6 +52,11 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
   A step that fails while protection is driving the fans is now listed as interrupted (and not counted as a failure) with a prompt to
   re-run after cooling, and a run waits up to three minutes for the machine to drop below 85 C before starting. Test: `GuidedRunRulesTests`.
 
+- **Scenes: Wave, Spectrum and Breathing run on the keyboard itself.** On 8E9A (#142) a Heat Wave scene arrived as a plain colour because
+  scene effects only reached third-party RGB providers. Keyboards with their own effect engine now get the matching effect (Wave, colour
+  cycle, Breathing) in the scene's colour and speed; if the keyboard refuses it, the scene falls back to the static fill as before.
+  *Implemented, pending confirmation by an 8E9A owner.* Test: `RgbSceneDeviceEffectTests`.
+
 ## Added
 
 - **OMEN key can show or hide the OSD.** New "ToggleOsd" choice for the OMEN key action in Settings. If the OSD is turned

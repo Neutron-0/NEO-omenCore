@@ -523,9 +523,9 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 **Phase 3: needs reporter data**
 - [x] (08465e2) WP-14.1 `SetColorTable` one-zone layout (`t[0]=1`, RGB at offsets 1 to 3, verify reads offset 25)
 - [x] (08465e2) WP-14.2 tests: payload bytes for zone count 1 and 4; 8BD4 and 8BC2 topology mapping
-- [ ] WP-14.3 changelog says "implemented, pending 8BD4 retest"; build offered to the 8BD4 owner (draft only)
+- [x] (5acc8ab) WP-14.3 changelog says "implemented, pending 8BD4 retest"; build offered to the 8BD4 owner (draft only) — changelog wording is in; reply drafted in `r212c.md`, not posted, no test build exists yet
 - [ ] WP-14.4 30BF probe comparing interfaces (needs the maintainer's go-ahead on design)
-- [ ] WP-14.5 scene Wave/Rainbow reach the V2 keyboard engine (3K.14)
+- [x] (be14d99) WP-14.5 scene Wave/Rainbow reach the V2 keyboard engine (3K.14) — Wave, Spectrum (as the device colour cycle) and Breathing scenes go to the keyboard's own effect engine; static scenes unchanged; the engine's Rainbow palette is not used, so a Spectrum scene shows the scene's colour cycling rather than a fixed rainbow
 - [x] (2b86584) WP-14.7 tray GPU Power submenu: Extended item — item always shown, like the Tuning page list; not per-board gated (when supported) and correct tick (#142)
 - [ ] WP-14.8 per-key paint/Apply and box-select reproduced from a log after one Apply (#142, needs data)
 - [ ] WP-14.6 startup-restore label says "saved, not applied" and the setting is findable (#142) — main status label already says "Default" for a saved mode that was not applied; the tray Quick Profile popup still highlights Balanced, needs the saved-not-applied flag threaded through the tray snapshot
