@@ -1010,20 +1010,29 @@ namespace OmenCore.Utils
             });
         }
 
+        // The main window calls the unapplied or firmware-default state "Default" (#199, #142). Normalizing it to Balanced for the
+        // checkmarks is right, but the header must not claim Balanced is what the firmware is running.
+        private bool _performanceIsFirmwareDefault;
+
         public void UpdatePerformanceMode(string mode)
         {
             var normalizedMode = PerformanceModeNameResolver.Normalize(mode);
-            if (string.Equals(_currentPerformanceMode, normalizedMode, StringComparison.Ordinal))
+            var firmwareDefault = IsFirmwareDefaultLabel(mode);
+            if (string.Equals(_currentPerformanceMode, normalizedMode, StringComparison.Ordinal) &&
+                firmwareDefault == _performanceIsFirmwareDefault)
             {
                 return;
             }
 
+            _performanceIsFirmwareDefault = firmwareDefault;
             _currentPerformanceMode = normalizedMode;
             Application.Current?.Dispatcher?.BeginInvoke(() =>
             {
                 if (_performanceModeMenuItem != null)
                 {
-                    _performanceModeMenuItem.Header = BuildPerformanceModeHeaderText(_currentPerformanceMode);
+                    _performanceModeMenuItem.Header = _performanceIsFirmwareDefault
+                        ? BuildPerformanceModeHeaderText("Firmware default")
+                        : BuildPerformanceModeHeaderText(_currentPerformanceMode);
                 }
 
                 UpdatePerformanceModeCheckmarks(_currentPerformanceMode);
@@ -1133,6 +1142,9 @@ namespace OmenCore.Utils
         /// <summary>
         /// Pure helper for tray performance mode header formatting.
         /// </summary>
+        internal static bool IsFirmwareDefaultLabel(string? mode) =>
+            string.Equals(mode?.Trim(), "Default", StringComparison.OrdinalIgnoreCase);
+
         public static string BuildPerformanceModeHeaderText(string currentMode)
         {
             var normalizedCurrentMode = string.IsNullOrWhiteSpace(currentMode) ? "Unknown" : currentMode.Trim();

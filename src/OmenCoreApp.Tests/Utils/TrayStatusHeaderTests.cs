@@ -10,6 +10,18 @@ namespace OmenCoreApp.Tests.Utils
     /// </summary>
     public class TrayStatusHeaderTests
     {
+        [Theory]
+        [InlineData("Default", true)]
+        [InlineData(" default ", true)]
+        [InlineData("Balanced", false)]
+        [InlineData("Performance", false)]
+        [InlineData(null, false)]
+        public void FirmwareDefaultLabel_IsRecognisedSoTheHeaderDoesNotClaimBalanced(string? mode, bool expected)
+        {
+            // #142: after a restart the saved mode is not applied; the window says "Default" and the tray header must agree.
+            TrayIconService.IsFirmwareDefaultLabel(mode).Should().Be(expected);
+        }
+
         [Fact]
         public void PerformanceHeader_UsesProvidedMode()
         {
