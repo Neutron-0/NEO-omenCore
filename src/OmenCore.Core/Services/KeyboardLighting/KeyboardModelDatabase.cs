@@ -149,6 +149,36 @@ namespace OmenCore.Services.KeyboardLighting
                 Notes = "GitHub #120 - 4-zone WMI BIOS ColorTable works; RPM/fan diagnostics pending verification"
             });
 
+            // GitHub #228: OMEN 15-en1xxx, firmware topology FourZoneWithoutNumpad. Same colour-table path as 8787; the WMI write ran
+            // without error but no one has reported seeing the keys change.
+            AddModel(new KeyboardModelConfig
+            {
+                ProductId = "88D1",
+                ModelName = "OMEN 15-en1xxx (2021) AMD",
+                ModelNamePattern = "15-en1",
+                KeyboardType = KeyboardType.FourZoneTkl,
+                PreferredMethod = KeyboardMethod.ColorTable2020,
+                FallbackMethods = Array.Empty<KeyboardMethod>(),
+                ModelYear = 2021,
+                UserVerified = false,
+                Notes = "GitHub #228: firmware topology FourZoneWithoutNumpad (0x02); WMI ColorTable initialised and wrote without error, visible colour change not yet reported."
+            });
+
+            // GitHub #229 (88ED, Victus 16-e0xxx): firmware topology Normal (0x00) = backlight only. Exact row so it stops
+            // matching 88EC by model name at Low confidence.
+            AddModel(new KeyboardModelConfig
+            {
+                ProductId = "88ED",
+                ModelName = "HP Victus 16-e0xxx",
+                ModelNamePattern = "16-e0",
+                KeyboardType = KeyboardType.BacklightOnly,
+                PreferredMethod = KeyboardMethod.BacklightOnly,
+                FallbackMethods = Array.Empty<KeyboardMethod>(),
+                ModelYear = 2022,
+                UserVerified = false,
+                Notes = "GitHub #229: firmware keyboard topology Normal (0x00), backlight only; colour control is correctly not offered."
+            });
+
             AddModel(new KeyboardModelConfig
             {
                 ProductId = "878C",

@@ -462,6 +462,34 @@ namespace OmenCore.Hardware
                 Notes = "GitHub #120 - HP OMEN Laptop 15-en0038ur, ProductId 8787. Initial support from diagnostics; fan RPM readback remains pending verification."
             });
 
+            // GitHub #228 (korokhidup, 2026-10-12): OMEN 15-en1xxx, ProductId 88D1, Ryzen 5 5600H + RTX 3060 Laptop, BIOS F.30.
+            // Until now it resolved by model name to the 8787 entry at Low confidence. Measured in the export: thermal policy V1,
+            // software fan control supported, 2 fans, max level 55, level readback works, RPM is Estimated, keyboard topology
+            // FourZoneWithoutNumpad (0x02). Not measured: MUX, GPU power boost, undervolt, any visible keyboard colour change.
+            AddModel(new ModelCapabilities
+            {
+                ProductId = "88D1",
+                ModelName = "OMEN 15-en1xxx (2021) AMD",
+                ModelNamePattern = "15-en1",
+                RequiredCpuVendor = CpuUndervoltProviderFactory.CpuVendor.AMD,
+                ModelYear = 2021,
+                Family = OmenModelFamily.Legacy,
+                SupportsFanControlWmi = true,
+                SupportsFanControlEc = false,
+                SupportsFanCurves = true,
+                SupportsIndependentFanCurves = false,
+                SupportsRpmReadback = false,
+                FanZoneCount = 2,
+                MaxFanLevel = 55,
+                HasMuxSwitch = false,
+                SupportsGpuPowerBoost = false,
+                SupportsUndervolt = false,
+                HasFourZoneRgb = true,
+                HasKeyboardBacklight = true,
+                UserVerified = false,
+                Notes = "GitHub #228 (2026-10-12) - OMEN 15-en1xxx, ProductId 88D1 (Ryzen 5 5600H, RTX 3060 Laptop, BIOS F.30). Measured: thermal policy V1, software fan control supported, 2 fans, max level 55, level readback works, RPM Estimated, keyboard topology FourZoneWithoutNumpad. Nobody has yet seen the keys change colour. MUX, GPU boost and undervolt are not measured and left off. Previously borrowed the 8787 profile by model name."
+            });
+
             // Discord field report (2026-06-12): OMEN Laptop 15-ek0xxx / ProductId 878C
             // (i7-10750H + GTX 1650 Ti). v3.7.1 resolved this board through FAMILY_LEGACY;
             // Quick Profile Performance/Balanced/Quiet left fans near 1900 RPM even at 99C,
@@ -2330,7 +2358,7 @@ namespace OmenCore.Hardware
                 HasFourZoneRgb = false,
                 HasKeyboardBacklight = true,
                 UserVerified = false,
-                Notes = "GitHub #142 - HyperX OMEN MAX 16t-ah100 (290HX Plus / RTX 5090, BIOS F.05). Thermal policy V1, firmware fan count 3, WMI GPU power verified (Extended3) and a per-key keyboard topology read live; Guided Fan Verification 6/6 passed but RPM is estimated from level only. Only the CPU and GPU fan levels are evidenced - the third fan's control and speed are not. Undervolt writes failed (PawnIO MSR 0x80070002) and the WMI colour table was not verified, so curves, undervolt, MUX and RGB colour stay off until proven. Sensor note from the same export: the BIOS CPU reading (0x23 index 1) sat at a constant ~28 C (frozen 150-336 readings at idle) while the worker's LibreHardwareMonitor sensor read 38-39 C, so on this board index 1 is not the CPU die (it fits the Ambient index in GitHub #189); the existing OMEN MAX model override already makes the worker sensor the CPU authority, and fan decisions used it."
+                Notes = "GitHub #142 - HyperX OMEN MAX 16t-ah100 (290HX Plus / RTX 5090, BIOS F.05). Thermal policy V1, firmware fan count 3, WMI GPU power verified (Extended3) and a per-key keyboard topology read live; Guided Fan Verification 6/6 passed but RPM is estimated from level only. Only the CPU and GPU fan levels are evidenced - the third fan's control and speed are not. Undervolt writes failed (PawnIO MSR 0x80070002) and the WMI colour table was not verified, so curves, undervolt, MUX and RGB colour stay off until proven. Sensor note from the same export: the BIOS CPU reading (0x23 index 1) sat at a constant ~28 C (frozen 150-336 readings at idle) while the worker's LibreHardwareMonitor sensor read 38-39 C, so on this board index 1 is not the CPU die (it fits the Ambient index in GitHub #189); the existing OMEN MAX model override already makes the worker sensor the CPU authority, and fan decisions used it. 2026-10-13 (#142): the reporter confirms keyboard colour, brightness and the keyboard effects Confetti and Raindrop through the Darfon 0D62:30BF route (effects confirmed by readback). Per-key painting from the editor did not work in their test and the layout is still unverified."
             });
 
             // GitHub #225 (2026-10-10): OMEN by HP Laptop 16-b1xxx, i7-12700H / RTX 3060, BIOS F.25.
@@ -2357,7 +2385,7 @@ namespace OmenCore.Hardware
                 HasFourZoneRgb = true,
                 HasKeyboardBacklight = true,
                 UserVerified = false,
-                Notes = "GitHub #225 (2026-10-10) - OMEN 16-b1xxx, i7-12700H / RTX 3060 Laptop, BIOS F.25. Thermal policy V1, 2 fans, max fan level 55, WMI GPU power set and verified (Medium) and a four-zone keyboard topology (0x02) read live. Guided Fan Verification 6/6 passed on 4.4.1 (second report, same day), and the reporter saw the RGB test pattern visibly change the keyboard colours, so four-zone colour via WMI is confirmed by eye. Fan RPM is estimated only, MUX was reported available but never exercised and undervolt state is unclear, so curves, MUX and undervolt stay off."
+                Notes = "GitHub #225 (2026-10-10) - OMEN 16-b1xxx, i7-12700H / RTX 3060 Laptop, BIOS F.25. Thermal policy V1, 2 fans, max fan level 55, WMI GPU power set and verified (Medium) and a four-zone keyboard topology (0x02) read live. Guided Fan Verification 6/6 passed on 4.4.1 (second report, same day), and the reporter saw the RGB test pattern visibly change the keyboard colours, so four-zone colour via WMI is confirmed by eye. Fan RPM is estimated only, MUX was reported available but never exercised and undervolt state is unclear, so curves, MUX and undervolt stay off. 2026-10-12 (#225): the reporter confirms Guided Fan Verification 6/6 (82/100) and that the four keyboard zones visibly change colour. MUX stays off and the entry stays UserVerified=false because the rest is not confirmed."
             });
 
             AddModel(new ModelCapabilities

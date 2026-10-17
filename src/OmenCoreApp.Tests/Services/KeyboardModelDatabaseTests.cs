@@ -19,6 +19,22 @@ namespace OmenCoreApp.Tests.Services
         }
 
         [Fact]
+        public void GetConfig_88D1_And_88ED_ResolveExactly_NotByModelName()
+        {
+            var d1 = KeyboardModelDatabase.GetConfig("88D1");
+            d1.Should().NotBeNull();
+            d1!.ProductId.Should().Be("88D1");
+            d1.PreferredMethod.Should().Be(KeyboardMethod.ColorTable2020);
+            d1.UserVerified.Should().BeFalse();
+
+            var ed = KeyboardModelDatabase.GetConfig("88ED");
+            ed.Should().NotBeNull();
+            ed!.ProductId.Should().Be("88ED");
+            ed.KeyboardType.Should().Be(KeyboardType.BacklightOnly);
+            ed.UserVerified.Should().BeFalse();
+        }
+
+        [Fact]
         public void GetConfig_8BA9_ResolvesExactly_AsFourZoneColorTable()
         {
             var cfg = KeyboardModelDatabase.GetConfig("8BA9");

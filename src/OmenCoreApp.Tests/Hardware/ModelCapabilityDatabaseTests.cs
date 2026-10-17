@@ -415,6 +415,22 @@ namespace OmenCoreApp.Tests.Hardware
         }
 
         [Fact]
+        public void GetCapabilities_88D1_Omen15En1xxx_HasItsOwnConservativeEntry()
+        {
+            // #228: resolved by model name to the 8787 profile before. Measured V1, 2 fans, level readback only.
+            var caps = ModelCapabilityDatabase.GetCapabilities("88D1");
+
+            caps.ProductId.Should().Be("88D1");
+            caps.FanZoneCount.Should().Be(2);
+            caps.SupportsFanControlWmi.Should().BeTrue();
+            caps.SupportsRpmReadback.Should().BeFalse();
+            caps.HasMuxSwitch.Should().BeFalse();
+            caps.SupportsGpuPowerBoost.Should().BeFalse();
+            caps.SupportsUndervolt.Should().BeFalse();
+            caps.UserVerified.Should().BeFalse();
+        }
+
+        [Fact]
         public void GetCapabilities_8BC2_Victus16R0xxxIntel_HasItsOwnConservativeEntry()
         {
             // #227: measured V1, 2 fans, level readback only, one-zone keyboard. Resolved by model name to 8BBE before.
