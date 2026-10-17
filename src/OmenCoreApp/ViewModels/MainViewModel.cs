@@ -332,7 +332,8 @@ namespace OmenCore.ViewModels
                         _hotkeyService,
                         _omenKeyService,
                         _wmiBios,
-                        ecAccess: _ecAccess);
+                        ecAccess: _ecAccess,
+                        cpuThrottleReader: () => SystemControl?.ReadCpuThermStatus());
                     
                     _settings = new SettingsViewModel(_logging, _configService, _systemInfoService, 
                         _fanCleaningService, _biosUpdateService, profileExportService, diagnosticsExportService,
@@ -3005,7 +3006,8 @@ namespace OmenCore.ViewModels
                         hotkeyService: _hotkeyService,
                         omenKeyService: _omenKeyService,
                         wmiController: _wmiBios,
-                        ecAccess: _ecAccess),
+                        ecAccess: _ecAccess,
+                        cpuThrottleReader: () => SystemControl?.ReadCpuThermStatus()),
                     Update.AutoUpdateService?.GetCurrentVersion()?.ToString() ?? "unknown");
 
                 if (!string.IsNullOrEmpty(exportedPath) && File.Exists(exportedPath))

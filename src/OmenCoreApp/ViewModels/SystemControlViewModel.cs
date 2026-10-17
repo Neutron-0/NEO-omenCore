@@ -2857,6 +2857,9 @@ namespace OmenCore.ViewModels
             NeutraliseTuningHardwareAfterRecovery();
         }
 
+        /// <summary>Raw IA32_THERM_STATUS through this page's own MSR handle, or null when there is none. Read only.</summary>
+        public ulong? ReadCpuThermStatus() => _msrAccess is { IsAvailable: true } msr ? msr.ReadThermStatusRaw() : null;
+
         private void InitializeTccOffset()
         {
             try
@@ -2868,9 +2871,6 @@ namespace OmenCore.ViewModels
                     _msrAccess = null;
                     return;
                 }
-
-                var msrForThrottle = _msrAccess;
-                OmenCore.Services.Diagnostics.DiagnosticExportService.CpuThrottleReader = () => msrForThrottle.ReadThermStatusRaw();
 
                 var tj = _msrAccess.ReadTjMax();
                 var currentOffset = _msrAccess.ReadTccOffset();

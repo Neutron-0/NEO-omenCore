@@ -35,6 +35,7 @@ namespace OmenCore.Services.Diagnostics
         private readonly HotkeyService? _hotkeyService;
         private readonly OmenKeyService? _omenKeyService;
         private readonly IEcAccess? _ecAccess;
+        private readonly Func<ulong?>? _cpuThrottleReader;
 
         public DiagnosticExportService(
             LoggingService logging,
@@ -49,8 +50,10 @@ namespace OmenCore.Services.Diagnostics
             HotkeyService? hotkeyService = null,
             OmenKeyService? omenKeyService = null,
             object? wmiController = null,
-            IEcAccess? ecAccess = null)
+            IEcAccess? ecAccess = null,
+            Func<ulong?>? cpuThrottleReader = null)
         {
+            _cpuThrottleReader = cpuThrottleReader;
             _logging = logging;
             _logsDirectory = logsDirectory;
             _resumeDiagnostics = resumeDiagnostics;
@@ -322,7 +325,7 @@ namespace OmenCore.Services.Diagnostics
 
                 AppendFanFirmwareState(sb, BuildFanFirmwareProbes(wmiController as HpWmiBios, ownershipController));
                 AppendPowerTransitions(sb, ReadKernelPowerEvents);
-                AppendCpuThrottle(sb);
+                AppendCpuThrottle(sb, _cpuThrottleReader);
 
                 File.WriteAllText(Path.Combine(exportPath, "monitoring-cadence-hold.txt"), sb.ToString());
                 await Task.CompletedTask;
@@ -2262,7 +2265,7 @@ namespace OmenCore.Services.Diagnostics
             sb.AppendLine();
             sb.AppendLine("[CPU Throttle]");
             ulong? raw;
-            try { raw = (readThermStatus ?? CpuThrottleReader)?.Invoke(); }
+            try { raw = readThermStatus?.Invoke(); }
             catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or ObjectDisposedException)
             {
                 sb.AppendLine($"  <read failed: {ex.Message}>");
@@ -2278,11 +2281,6 @@ namespace OmenCore.Services.Diagnostics
             sb.AppendLine($"  IA32_THERM_STATUS=0x{raw.Value:X}: {CpuThrottleStatus.Decode(raw.Value)}");
         }
 
-        /// <summary>
-        /// Set by the Tuning view model once it holds an MSR handle, so the export reads through that handle instead of opening a
-        /// second one. Null until then (and on AMD), which the section reports as not available.
-        /// </summary>
-        public static Func<ulong?>? CpuThrottleReader { get; set; }
 
         private static IEnumerable<(string Label, Func<string?> Read)> BuildFanFirmwareProbes(HpWmiBios? bios, IFanController? controller)
         {
