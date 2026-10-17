@@ -487,8 +487,8 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [x] (242e829) WP-04 `[CPU Throttle]` placeholder line
 - [x] (242e829) WP-04 tests: fake source and throwing source for each section
 - [ ] WP-05 live RPM source and PL1/PL2 result passed into the capability card
-- [ ] WP-05 card wording: "Estimated from fan level" / "not readable on this board"
-- [ ] WP-05 list of entries relying on the `SupportsRpmReadback` default in the commit message
+- [ ] WP-05 card wording: "Estimated from fan level" / "not readable on this board" — the card already reads "Estimated only" when the flag is false; 8BBE and 8BD4 now get it (dfcf2ce); a live-probe override (probe wins over database) not done
+- [x] (dfcf2ce) WP-05 list of entries relying on the `SupportsRpmReadback` default in the commit message — 56 of 82 entries; 8BBE and 8BD4 set false; 8BC2 has no entry yet (WP-07)
 - [ ] WP-05 `SupportsRpmReadback = false` set for 8BBE, 8BD4, 8BC2 with tests
 - [ ] WP-06.1 calibration says RPM cannot be measured when the source is Estimated; table labelled estimated
 - [ ] WP-06.2 repeated stable readback below request counts as a firmware ceiling at any step
