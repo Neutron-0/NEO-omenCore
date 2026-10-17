@@ -103,6 +103,7 @@ Everything below runs only in software tests so far. Each line says who can conf
 | Scenes use the keyboard's own effects | 8E9A (#142) | Apply a Wave or Spectrum scene; say if the keyboard animates. |
 | Fan within 90% of its sibling counts as a firmware ceiling | 88F8 (#207) | Run Guided Fan Verification; the CPU fan at 100% should pass. |
 | Resolve VBIOS finds `nvflashb.exe` | RTX 50 laptops using the NVIDIA power unlock | Put `nvflashb.exe` next to OmenCore.exe and press Resolve VBIOS. |
+| HP OMEN RTX 5070 Ti uses a 115 W stock | HP OMEN laptop with an RTX 5070 Ti (PCI subsystem 8E71103C) | Open the NVIDIA power panel: the target list should start at 115 W, and Resolve VBIOS (with a ROM) should report a 115 W stock. |
 | OMEN key can show or hide the OSD | Any board with a working OMEN key | Set the OMEN key action to ToggleOsd and press the key. |
 | Hotkeys held by another app are retried and listed | Anyone with a hotkey another app holds | Hold a hotkey in another app, start OmenCore, and check Settings names it. |
 | Tray GPU Power Extended item | Boards that use Extended (#142) | Pick Extended in the Custom profile and check the tray ticks it. |
