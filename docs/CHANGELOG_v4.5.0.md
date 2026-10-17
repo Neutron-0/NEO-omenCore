@@ -57,6 +57,13 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
   cycle, Breathing) in the scene's colour and speed; if the keyboard refuses it, the scene falls back to the static fill as before.
   *Implemented, pending confirmation by an 8E9A owner.* Test: `RgbSceneDeviceEffectTests`.
 
+- **Experimental setting: do not pin a fan level when returning to Auto (off by default).** On several V1 boards (8BC2 #227, 8BD4 #226,
+  88EE #217, 8DCD #143) the fans sit near 2000 RPM, even at 96 C, until the OEM profile is restored. The log points at a fan-level hint
+  (level 20) that OmenCore sends when it hands fans back to the BIOS and that the disabled floor-clear never undoes. The setting skips the
+  hint (restart needed). The cause is *not confirmed*; this is here so an owner can test it. Test: `WmiFanControllerLevelHintTests`.
+- **Board entries: 8F21 (HyperX OMEN 16-ap1xxx, #230), and 8E41 (Transcend 14) now has two fans and level-only RPM (#157).** The fan
+  diagnostics button now reads "Run Guided Fan Verification", matching what we tell people to look for.
+
 ## Added
 
 - **OMEN key can show or hide the OSD.** New "ToggleOsd" choice for the OMEN key action in Settings. If the OSD is turned

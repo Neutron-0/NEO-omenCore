@@ -429,6 +429,24 @@ All of this is single-laptop evidence from bobshmo's own machine unless stated. 
   readings. Fourth board with the freeze pattern; goes to WP-19 (sensor identity), not a per-board fix.
 - Reply (draft `r157b.md`, not posted).
 
+**K.17 Fans pinned near level 20 after a hand-back: the cause, from the #227 log (2026-10-14 comment, 8BC2)**
+- Report: with the Extreme profile selected the fans stay near 2000 RPM at 80 C and above; restoring the OEM profile fixes it. Same
+  symptom as #217 (88EE), #226 (8BD4), #143 (8DCD) and the 2026-10-15 Discord report (2300 RPM at all times, "OGH stops the fans").
+- Log (e227, `OmenCore_20261012_015243.log`): the hand-back runs `SetFanMax(false)`, `SetFanMode(Default)`, then "Step 3:
+  SetFanLevel(20, 20) succeeded (V1 krpm hint)". On this board `AllowV1AutoModeFloorClear` is false, so the paired `SetFanLevel(0, 0)`
+  is skipped (`ClearV1AutoModeFloor`: "conservative WMI profile avoids manual-zero fan stops"). The (20, 20) manual level is never
+  undone. The same log shows the CPU at 96 to 98 C with the fan at 1600 to 1700 RPM ("unusually low for this temperature"), and only
+  the 96 C emergency path raising the fans.
+- Code: the hint is sent at `WmiFanController.cs` lines ~536 (Performance to Default kick), ~1166 (`ResetFromMaxMode`) and ~1224
+  (the handoff helper). Each was written as the first half of a pair whose second half (0, 0) is now disabled on conservative boards.
+- Status: **hypothesis from code and one log, not confirmed on hardware.** Implemented as an opt-in (`SkipV1FanLevelHint`, Settings,
+  off by default, restart) so the owner can A/B it. Not made the default because the hint was added for a real case (#102, fans staying
+  at 100% after Performance to Balanced) and skipping it for every conservative board could bring that back.
+- Next: the #227 owner's A/B result decides the default. If skipping fixes it and nothing regresses, make it the default for boards with
+  `AllowV1AutoModeFloorClear` unset. Then answer #217, #226, #143 and the Discord reporter with the same finding.
+- Also from the same comment: the owner asks why fan curves, MUX and undervolt are not offered; the answer is the evidence gate (draft
+  `r227b.md`, not posted).
+
 ### L. Research log
 - 2026-10-11. **Ohman** (`P4R1H/ohman`, [repo](https://github.com/P4R1H/ohman), [releases](https://github.com/P4R1H/ohman/releases)):
   releases 1.0.6 (15 Sep) to 1.3.1 (10 Oct). Taken from the README and releases page through a summarising fetch, not checked
@@ -567,8 +585,8 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 - [ ] WP-22.2 confirm with bobshmo in writing that 1.2.x code may be used before copying anything
 - [x] (bab4f61) WP-22.3 `FindNvflash` also finds `nvflashb.exe`; clear message when none is found; tests
 - [ ] WP-22.4 CURRENT fault from WP-22.1 reproduced from the log and fixed, or recorded as unconfirmed
-- [ ] WP-16.1 ask the reporters (#217, #226, #143, new 2026-10-15) for the stop-with-OmenCore-closed A/B; record the result per board
-- [ ] WP-16.2 if OmenCore holds the floor: skip the level 20 hint and keepalive on those boards, opt-in "allow fans to stop at idle", tests
+- [ ] WP-16.1 ask the reporters (#217, #226, #143, new 2026-10-15) for the stop-with-OmenCore-closed A/B; record the result per board — the #227 log already shows the hint left in place (K.17); the closed-app A/B is still wanted from #217, #226, #143
+- [ ] WP-16.2 if OmenCore holds the floor: skip the level 20 hint and keepalive on those boards, opt-in "allow fans to stop at idle", tests — PARTLY: the level-20 hint skip is in as an opt-in (`bad5d47`, K.17, tested); the keepalive part and the "allow fans to stop at idle" option are not done and need the A/B result first
 - [ ] WP-17 8E35 and AMD SMU (needs data)
 - [ ] WP-18 Transcend 14 entries (needs data)
 
