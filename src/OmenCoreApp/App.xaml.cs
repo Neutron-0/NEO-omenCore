@@ -195,7 +195,7 @@ namespace OmenCore
             bool rtssActive = IsRtssRunning();
             if (rtssActive)
             {
-                Logging.Warn("RTSS detected at startup — enabling software rendering to prevent render-thread crash (UCEERR_RENDERTHREADFAILURE)");
+                Logging.Warn("RTSS detected at startup — enabling software rendering to prevent render-thread crash (UCEERR_RENDERTHREADFAILURE). The interface is drawn on the CPU while this is on, so heavy pages (Fan Control) can feel slow; setting OmenCore's application detection level to None in RTSS avoids the hooks this guards against (not yet verified).");
                 EnableSoftwareRendering();
             }
             else if (Configuration.Config.UseSoftwareRendering)
