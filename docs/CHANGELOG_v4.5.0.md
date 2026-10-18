@@ -75,6 +75,21 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
   The profile now has a variant scoped to that subsystem only. Found by the Prophecy author (standalone 1.2.5); written here from that
   finding. *Pending hardware confirmation* on an OmenCore owner's laptop. Tests: `NvidiaProfileVariantTests`, `NvidiaOmen115RomTests`.
 
+- **Capability card tells the truth about power limits.** The Diagnostics "Power limit (PL1/PL2) adjustment" row said
+  "Supported" from the model database even when the live MSR readback was 0 W / 0 W. It now says "Firmware-managed (readback
+  0 W)" in that case, next to the earlier RPM row fix. Test: `PowerLimitReadbackLabelTests`. *Pending a look in the running app.*
+
+- **"Previous session did not exit cleanly" no longer blames an outside kill when the shutdown had begun.** The #211 export
+  showed four such warnings whose logs all stopped inside OmenCore's own shutdown fan restore. The session record now notes that
+  `OnExit` started, the warning says so, and a Windows session-ending message is logged with its reason. This does not fix the
+  cause (still unknown); it makes the next report say which kind of end it was. Test: `SessionSentinelTests`.
+
+- **Fan writes are claimed with named leases instead of one flag.** Guided Fan Verification, the single-fan test, the curve
+  verification kick, fan cleaning, fan calibration and the NVIDIA power write each take a named lease; the curve engine and
+  keepalive stay stood down until the last lease is released, so one finishing no longer lets them resume under another.
+  Diagnostics lists the current owners (`FanWriteLeaseOwners`). No change for a single caller. Tests: `FanServiceSuspendTests`.
+  *Implemented in software; the migrated callers have not been run on a laptop.*
+
 ## Added
 
 - **OMEN key can show or hide the OSD.** New "ToggleOsd" choice for the OMEN key action in Settings. If the OSD is turned
@@ -85,6 +100,12 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
 - **Linux: other fan services are reported.** `omencore-cli diagnose` lists any of victus-fan, victus-backend, omen-fan-control or omenctld
   that are running (they also write `pwm1_enable`), and the daemon logs one warning at start. Nothing is stopped or killed.
   Test: `FanWriterScannerTests`.
+
+- **Diagnostics lists HID lighting candidates.** `rgb-control-path.txt` has a `[HID Lighting Candidates]` section naming HP, Darfon
+  and ITE HID interfaces (IDs, name, report lengths). Read-only; nothing is sent to them. For boards such as 8F21 (#230) where the WMI
+  colour table is accepted and read back but the keyboard does not change.
+- **RGB Payload Probe has two four-zone steps** (count 4 with the colours at offset 1, and at both offset 1 and 25), and logs the
+  readback at offset 1 as well as 25. Test: `ColorTableProbeTests`.
 
 - **Diagnostics export: three new sections for stuck-fan and wake reports.** `[Fan Firmware State]` (Max flag, fan level readback,
   thermal policy, fan count), `[Power Transitions]` (the last 20 sleep, resume and standby events with their reasons from the
@@ -113,6 +134,9 @@ Everything below runs only in software tests so far. Each line says who can conf
 | OMEN key can show or hide the OSD | Any board with a working OMEN key | Set the OMEN key action to ToggleOsd and press the key. |
 | Hotkeys held by another app are retried and listed | Anyone with a hotkey another app holds | Hold a hotkey in another app, start OmenCore, and check Settings names it. |
 | Tray GPU Power Extended item | Boards that use Extended (#142) | Pick Extended in the Custom profile and check the tray ticks it. |
+| RGB Payload Probe four-zone steps and HID candidate list | 8F21 (#230) | Run Keyboard Diagnostics -> RGB Payload Probe, say which step lights the keyboard, and attach the export. |
+| Fan write leases (guided run, single-fan test, fan cleaning, calibration, NVIDIA write) | Any HP laptop | Start a Guided Fan Verification and, while it runs, start a single-fan test; the curve should stay suspended until both finish. |
+| Capability card power-limit row | Any Intel board reading 0 W / 0 W | Open Diagnostics and check the row says "Firmware-managed (readback 0 W)". |
 | New board entries (8BC2, 88D1, 8F21, 8E41 two fans, exact 88ED row) | #227, #228, #230, #157, #229 | Run Guided Fan Verification and say what changes on the keyboard when a colour is set. |
 
 ## Release and CI (no change to the shipped program)

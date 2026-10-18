@@ -142,6 +142,7 @@ tag path is unverified until the next release tag.
   the #219 reply.
 
 ### I. Stretch: not started (move to 4.6 if this cycle runs out)
+**Decision 2026-10-19: none of the items in this section ship in 4.5.0; all move to 4.6.** The "firmware holds the fans" label is not a wording change: no stuck-high detector exists in `FanService` (searched 2026-10-18), so it needs new logic and data.
 - **Battery refresh-rate limit** (Ohman). Optional and off by default: drop to a lower rate on battery, restore on AC.
   `DisplayService` has refresh-rate control but no battery branch.
 - **Benchmark and FPS overlay** (Ohman 1.3.0). FPS, 1 % and 0.1 % lows, frame time, and temperature, power, clocks and
@@ -613,8 +614,8 @@ commit. Before every push: tick the row, run the full suite, then update the "Su
 **Housekeeping and release (maintainer owns the last block)**
 - [x] (this commit) WP-20 Linux package suspend hook — copied into the zip by `build-linux-package.ps1` (snippet dry-run on Windows; the Linux build itself runs in CI on the next tag, unverified until then)
 - [x] (this commit) WP-20 `CLAUDE.md` updated (version and open threads)
-- [ ] Section 4 "What counts as done" reviewed line by line
-- [ ] Replies drafted for every issue a shipped item touches; "Needs field confirmation" list rewritten — list written for what exists so far (`docs/CHANGELOG_v4.5.0.md`); to be re-checked at release; drafts still unposted: #226, #217, #143 and the Discord fan report
+- [x] Section 4 "What counts as done" reviewed line by line 2026-10-19: section 1 items each have a fix, a reply or an honest unconfirmed in the changelog; stretch items moved to 4.6 (3I note); 3K items are fixes with tests, replies, or unconfirmed (K.4 still needs a real export); CI green on `main` for `ci` and `linux-qa` (the release, pages and alpha workflows have not run since the changes)
+- [x] (drafts in the agent scratchpad `release_replies_4.5.0.md`, not posted) Replies drafted for every issue a shipped item touches; "Needs field confirmation" list rewritten — list written for what exists so far (`docs/CHANGELOG_v4.5.0.md`); to be re-checked at release; drafts still unposted: #226, #217, #143 and the Discord fan report
 - [ ] Full suite green, 0 warnings, count not lower than the baseline
 - [ ] Upstream and fork review 2026-10-18 (findings, no code yet):
   - Bundled `installer/PawnIO_setup.exe` is 2.0.1 (Jun 2025); upstream PawnIO.Setup is 2.2.0 (Mar 2026): upgrades in place from 2.1.0, silent mode returns a reboot-required code, fixes BSODs on Windows 10 RS5/19H1/19H2, restores the legacy device path some third-party libs expect. Done 2026-10-18: bundled 2.2.0 (signature valid, same signer); clean-VM install and upgrade test still pending; check the `-install -silent` flags still hold and that `IsPawnIOInstalled` still finds the uninstall key.
