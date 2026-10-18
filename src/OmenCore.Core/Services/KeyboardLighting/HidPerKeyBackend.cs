@@ -482,6 +482,40 @@ namespace OmenCore.Services.KeyboardLighting
         /// throw here rather than answering, and an unreadable length must not read as 0 -
         /// 0 is a meaningful value meaning "no output reports at all".
         /// </summary>
+        /// <summary>
+        /// One diagnostics line per HID interface that could be a laptop keyboard lighting controller (HP, Darfon, ITE).
+        /// Read-only: nothing is opened for writing. Added for #230 (8F21), where the WMI colour table is accepted and
+        /// read back but the keyboard does not change, so the lighting may live on a USB HID endpoint instead.
+        /// </summary>
+        public static IReadOnlyList<string> DescribeLightingCandidates()
+        {
+            var lines = new List<string>();
+            try
+            {
+                foreach (var d in DeviceList.Local.GetHidDevices()
+                             .Where(d => ScannedVendorIds.ContainsKey(d.VendorID) || d.VendorID == 0x048D)
+                             .OrderBy(d => d.VendorID).ThenBy(d => d.ProductID))
+                {
+                    lines.Add(FormatCandidate(d.VendorID, d.ProductID, Safe(() => d.GetProductName()),
+                        Safe(() => d.GetMaxInputReportLength()), Safe(() => d.GetMaxOutputReportLength()),
+                        Safe(() => d.GetMaxFeatureReportLength())));
+                }
+            }
+            catch (Exception ex)
+            {
+                lines.Add($"HID enumeration failed: {ex.Message}");
+            }
+            return lines;
+
+            static T? Safe<T>(Func<T> read)
+            {
+                try { return read(); } catch (Exception) { return default; }
+            }
+        }
+
+        internal static string FormatCandidate(int vid, int pid, string? name, int inLen, int outLen, int featLen) =>
+            $"{vid:X4}:{pid:X4} '{name ?? "unknown"}' in={inLen} out={outLen} feature={featLen}";
+
         private int SafeGetMaxOutputReportLength(HidDevice d)
         {
             try

@@ -1541,6 +1541,10 @@ namespace OmenCore.Services.Diagnostics
                 : $"WindowsDynamicLighting: global={dynamicLighting.GlobalEnabled}, deviceFound={dynamicLighting.DeviceFound}, " +
                   $"deviceEnabled={dynamicLighting.DeviceEnabled}, willRepaint={dynamicLighting.WillRepaintWhenReleased}");
             AppendRgbObservedSurface(sb, observedRgb);
+            sb.AppendLine("[HID Lighting Candidates]");
+            var hidCandidates = OmenCore.Services.KeyboardLighting.HidPerKeyBackend.DescribeLightingCandidates();
+            if (hidCandidates.Count == 0) sb.AppendLine("none (no HP, Darfon or ITE HID interfaces present)");
+            foreach (var line in hidCandidates) sb.AppendLine(line);
             sb.AppendLine();
         }
 
