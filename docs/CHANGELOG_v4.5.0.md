@@ -104,6 +104,8 @@ Nothing below is called confirmed unless a reporter has verified it on real hard
 - **Diagnostics lists HID lighting candidates.** `rgb-control-path.txt` has a `[HID Lighting Candidates]` section naming HP, Darfon
   and ITE HID interfaces (IDs, name, report lengths). Read-only; nothing is sent to them. For boards such as 8F21 (#230) where the WMI
   colour table is accepted and read back but the keyboard does not change.
+  When none of those exist, it lists every HID interface that takes output reports (names and IDs only), since #230's keyboard is lit by OMEN Gaming Hub.
+- **Fan calibration results no longer clip the "Applied Level" and "Measured RPM" headers.**
 - **RGB Payload Probe has two four-zone steps** (count 4 with the colours at offset 1, and at both offset 1 and 25), and logs the
   readback at offset 1 as well as 25. Test: `ColorTableProbeTests`.
 
