@@ -492,9 +492,13 @@ namespace OmenCore.Services.KeyboardLighting
             var lines = new List<string>();
             try
             {
-                foreach (var d in DeviceList.Local.GetHidDevices()
-                             .Where(d => ScannedVendorIds.ContainsKey(d.VendorID) || d.VendorID == 0x048D)
-                             .OrderBy(d => d.VendorID).ThenBy(d => d.ProductID))
+                var all = DeviceList.Local.GetHidDevices().OrderBy(d => d.VendorID).ThenBy(d => d.ProductID).ToList();
+                var known = all.Where(d => ScannedVendorIds.ContainsKey(d.VendorID) || d.VendorID == 0x048D).ToList();
+                // #230: OGH lights a keyboard we found no HP/Darfon/ITE interface for, so list every HID interface
+                // that accepts output/feature reports (names and sizes only, nothing is opened for writing).
+                var shown = known.Count > 0 ? known : all.Where(d => Safe(() => d.GetMaxOutputReportLength()) >= 8
+                    || Safe(() => d.GetMaxFeatureReportLength()) >= 8).Take(60).ToList();
+                foreach (var d in shown)
                 {
                     lines.Add(FormatCandidate(d.VendorID, d.ProductID, Safe(() => d.GetProductName()),
                         Safe(() => d.GetMaxInputReportLength()), Safe(() => d.GetMaxOutputReportLength()),

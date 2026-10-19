@@ -1543,7 +1543,7 @@ namespace OmenCore.Services.Diagnostics
             AppendRgbObservedSurface(sb, observedRgb);
             sb.AppendLine("[HID Lighting Candidates]");
             var hidCandidates = OmenCore.Services.KeyboardLighting.HidPerKeyBackend.DescribeLightingCandidates();
-            if (hidCandidates.Count == 0) sb.AppendLine("none (no HP, Darfon or ITE HID interfaces present)");
+            if (hidCandidates.Count == 0) sb.AppendLine("none (no HP, Darfon or ITE interface, and no other HID interface takes output reports)");
             foreach (var line in hidCandidates) sb.AppendLine(line);
             sb.AppendLine();
         }

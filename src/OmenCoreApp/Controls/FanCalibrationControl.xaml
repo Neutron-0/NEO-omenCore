@@ -79,8 +79,8 @@
                             <DataGrid x:Name="CalibrationResultsGrid" AutoGenerateColumns="False" Height="200" Margin="0,10,0,0" IsReadOnly="True">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Target %" Binding="{Binding RequestedPercent}" Width="80"/>
-                                    <DataGridTextColumn Header="Applied Level" Binding="{Binding AppliedLevel}" Width="100"/>
-                                    <DataGridTextColumn Header="Measured RPM" Binding="{Binding MeasuredRpm}" Width="100"/>
+                                    <DataGridTextColumn Header="Applied Level" Binding="{Binding AppliedLevel}" Width="130"/>
+                                    <DataGridTextColumn Header="Measured RPM" Binding="{Binding MeasuredRpm}" Width="140"/>
                                     <DataGridTextColumn Header="RPM Range" Binding="{Binding RpmRange}" Width="100"/>
                                     <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
                                     <DataGridTextColumn Header="Duration" Binding="{Binding DurationFormatted}" Width="100"/>
