@@ -5504,10 +5504,12 @@ namespace OmenCore.ViewModels
 
                 var tempResult = amdProvider.SetTctlTemp(AmdTempLimitC);
 
-                if (report.AnyAccepted && tempResult == RyzenSmu.SmuStatus.Ok)
+                // The Tctl write is refused on some Ryzen parts (7840HS, #226) while the power limits land;
+                // saving only when both succeeded meant nothing was ever persisted or restored there.
+                if (report.AnyAccepted)
                 {
                     _logging.Info($"AMD power limits applied: {AmdStapmLimitWatts}W to all four " +
-                                  $"({report}), Temp={AmdTempLimitC}°C");
+                                  $"({report}), Temp={AmdTempLimitC}°C ({tempResult})");
                     SaveAmdPowerLimitsToConfig();
                 }
                 else

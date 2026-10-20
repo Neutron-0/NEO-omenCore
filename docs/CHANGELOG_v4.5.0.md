@@ -157,6 +157,8 @@ Everything below runs only in software tests so far. Each line says who can conf
 
 - **Settings now says why startup Tuning restore can be skipped on OMEN 16/Victus.** The Tuning restore switch is ignored on those models unless "Allow startup restore on OMEN 16/Victus" is on (#226).
 
+- **AMD power limits are now saved when the limits are accepted even if the Tctl write is refused.** On the Ryzen 7 7840HS the SMU accepts the four power limits but refuses the Tctl temperature, so nothing was ever saved and the sliders went back to 25 W / 95 C after every restart (#226). IMPLEMENTED, PENDING CONFIRMATION: whether the limits are effective on that CPU is still unverified (its power table is not identified).
+
 ## Contributors
 
 - **bobshmo**: the V0/V1+ performance-mode finding (standalone Prophecy Power Unlocker 1.2.0).
