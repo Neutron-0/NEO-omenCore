@@ -1364,7 +1364,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
                                         <TextBlock Text="Tuning" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                        <TextBlock Text="Reapply confirmed undervolt, TCC, CPU power, and GPU OC restore paths." FontSize="11"
+                                        <TextBlock Text="Reapply confirmed undervolt, TCC, CPU power, and GPU OC restore paths. On OMEN 16/Victus models this is skipped unless 'Allow startup restore on OMEN 16/Victus' is on." FontSize="11"
                                                    Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <ToggleButton Grid.Column="1" Style="{StaticResource ModernToggleButton}"

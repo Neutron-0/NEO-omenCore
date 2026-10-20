@@ -155,6 +155,8 @@ Everything below runs only in software tests so far. Each line says who can conf
 - **Workflows use the `ubuntu-24.04` runner instead of `ubuntu-latest`**, which moves to a newer image on 2026-10-19. A tag build should not be
   the first run on a new image; move to the new image on purpose after a normal CI run.
 
+- **Settings now says why startup Tuning restore can be skipped on OMEN 16/Victus.** The Tuning restore switch is ignored on those models unless "Allow startup restore on OMEN 16/Victus" is on (#226).
+
 ## Contributors
 
 - **bobshmo**: the V0/V1+ performance-mode finding (standalone Prophecy Power Unlocker 1.2.0).
